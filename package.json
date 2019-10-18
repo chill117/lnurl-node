@@ -1,0 +1,45 @@
+{
+  "name": "lnurl-node",
+  "version": "1.0.0",
+  "description": "Node.js implementation of lnurl",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test:unit",
+    "test:unit": "./node_modules/.bin/mocha ./test/unit/*.js ./test/unit/**/*.js"
+  },
+  "bin": {
+    "lnurl": "cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chill117/lnurl-node.git"
+  },
+  "author": {
+    "name": "Charles Hill",
+    "email": "chill@degreesofzero.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/chill117/lnurl-node/issues"
+  },
+  "homepage": "https://github.com/chill117/lnurl-node",
+  "dependencies": {
+    "async": "3.1.0",
+    "bech32": "1.1.3",
+    "bignumber.js": "9.0.0",
+    "bolt11": "1.2.6",
+    "commander": "3.0.2",
+    "debug": "4.1.1",
+    "express": "4.17.1",
+    "pem": "1.14.1",
+    "request": "2.88.0",
+    "underscore": "1.9.1"
+  },
+  "devDependencies": {
+    "chai": "4.2.0",
+    "fs-extra": "8.1.0",
+    "mkdirp": "0.5.1",
+    "mocha": "6.2.1"
+  },
+  "readmeFilename": "README.md"
+}
