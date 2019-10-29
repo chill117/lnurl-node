@@ -4,6 +4,8 @@
 
 Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
 
+__This project is a work-in-progress so expect some changes in the coming days__
+
 * [Installation](#installation)
 * [Subprotocols](#subprotocols)
   * [channel](#channel)
