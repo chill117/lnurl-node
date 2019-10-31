@@ -589,17 +589,18 @@ module.exports = function(lnurl) {
 				throw new Error(`Missing required option: "lightning.config.${key}"`);
 			}
 		});
-		ln.connect().then(() => {
-			debug.info('Successfully connected to ln backend');
-		}).catch(debug.error);
+		ln.checkConfiguration();
 	};
 
 	Server.prototype.lightningBackends = function() {
 		return {
 			lnd: {
 				requiredConfig: ['hostname', 'cert', 'macaroon'],
-				connect: () => {
-					return this.ln.getNodeInfo();
+				checkConfiguration: () => {
+					debug.info('Checking LN backend configuration...');
+					const { cert, macaroon } = this.options.lightning.config;
+					fs.statSync(cert);
+					fs.statSync(macaroon);
 				},
 				getNodeUri: () => {
 					return this.ln.getNodeInfo().then(info => {
@@ -681,6 +682,7 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.close = function() {
+		debug.info('Closing lnurl server...');
 		return new Promise((resolve, reject) => {
 			if (this.app && this.app.httpsServer) {
 				this.app.httpsServer.close(() => {
