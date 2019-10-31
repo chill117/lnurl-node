@@ -156,18 +156,19 @@ lnurl server --help
 ```
 Expected output:
 ```bash
-  -h, --host [value]           The host for the HTTPS server (default: "localhost")
-  -p, --port [value]           The port for the HTTPS server (default: 3000)
-  -u, --url [value]            The URL where the server is externally reachable (default: "https://localhost:3000")
-  -a, --apiKeyHash [value]     The hash (sha256) of the API key that is used to secure the write endpoint (default: null)
-  -x, --exposeWriteEndpoint    Expose the write endpoint (default: true)
+  --host [value]               The host for the HTTPS server (default: "localhost")
+  --port [value]               The port for the HTTPS server (default: 3000)
+  --url [value]                The URL where the server is externally reachable (default: "https://localhost:3000")
+  --apiKeyHash [value]         The hash (sha256) of the API key that is used to secure the write endpoint (default: null)
+  --no-exposeWriteEndpoint     Do NOT expose the write endpoint
   --lightning.backend [value]  Which LN backend to use (only lnd supported currently) (default: "lnd")
   --lightning.config [value]   The configuration object to connect to the LN backend (default: {"hostname":"127.0.0.1:8080","cert":null,"macaroon":null})
-  --tls.certPath [value]       The full file path to the TLS certificate (default: "/home/chill/Projects/current/lnurl-node/tls.cert")
-  --tls.keyPath [value]        The full file path to the TLS certificate key (default: "/home/chill/Projects/current/lnurl-node/tls.key")
-  --tls.no-generate            Do NOT create TLS cert/key pair when does not already exist (default: false)
-  --tls.no-selfSigned          Do NOT self-sign the certificate (default: false)
+  --tls.certPath [value]       The full file path to the TLS certificate (default: "./tls.cert")
+  --tls.keyPath [value]        The full file path to the TLS certificate key (default: "./tls.key")
+  --no-tls.generate            Do NOT create TLS cert/key pair when does not already exist
+  --no-tls.selfSigned          Do NOT self-sign the certificate
   --tls.days [value]           The length of validity of the self-signed certificate (default: 3650)
+  -h, --help                   output usage information
 ```
 
 

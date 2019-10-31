@@ -38,34 +38,34 @@ program
 	.command('server')
 	.description('Start an lnurl application server.')
 	.option(
-		'-h, --host [value]',
+		'--host [value]',
 		'The host for the HTTPS server',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.host,
 	)
 	.option(
-		'-p, --port [value]',
+		'--port [value]',
 		'The port for the HTTPS server',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.port
 	)
 	.option(
-		'-u, --url [value]',
+		'--url [value]',
 		'The URL where the server is externally reachable',
 		_.identity,
 		lnurl.Server.prototype.getDefaultUrl()
 	)
 	.option(
-		'-a, --apiKeyHash [value]',
+		'--apiKeyHash [value]',
 		'The hash (sha256) of the API key that is used to secure the write endpoint',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.apiKeyHash
 	)
 	.option(
-		'-x, --exposeWriteEndpoint',
-		'Expose the write endpoint',
+		'--no-exposeWriteEndpoint',
+		'Do NOT expose the write endpoint',
 		_.identity,
-		true,
+		false,
 	)
 	.option(
 		'--lightning.backend [value]',
@@ -92,13 +92,13 @@ program
 		lnurl.Server.prototype.defaultOptions.tls.keyPath
 	)
 	.option(
-		'--tls.no-generate',
+		'--no-tls.generate',
 		'Do NOT create TLS cert/key pair when does not already exist',
 		_.identity,
 		!lnurl.Server.prototype.defaultOptions.tls.generate
 	)
 	.option(
-		'--tls.no-selfSigned',
+		'--no-tls.selfSigned',
 		'Do NOT self-sign the certificate',
 		_.identity,
 		!lnurl.Server.prototype.defaultOptions.tls.selfSigned
@@ -123,9 +123,6 @@ program
 				.object()
 				.value();
 		});
-		// Negative options.
-		options.tls.generate = this['tls.noGenerate'] === false;
-		options.tls.selfSigned = this['tls.noSelfSigned'] === false;
 		if (_.isString(options.lightning.config)) {
 			options.lightning.config = JSON.parse(options.lightning.config);
 		}
