@@ -1,6 +1,7 @@
 const _ = require('underscore');
 const async = require('async');
 const bolt11 = require('bolt11');
+const crypto = require('crypto');
 const { expect } = require('chai');
 const express = require('express');
 const fs = require('fs');
@@ -8,6 +9,7 @@ const https = require('https');
 const path = require('path');
 const pem = require('pem');
 const request = require('request');
+const secp256k1 = require('secp256k1');
 const url = require('url');
 const lnurl = require('../../../');
 
@@ -25,6 +27,18 @@ const generatePaymentRequest = function(amount) {
 	const nodePrivateKey = lnurl.Server.prototype.generateApiKey().key;
 	const signed = bolt11.sign(encoded, nodePrivateKey);
 	return signed.paymentRequest;
+};
+
+const generateLinkingKey = function() {
+	let privKey;
+	do {
+		privKey = crypto.randomBytes(32);
+	} while (!secp256k1.privateKeyVerify(privKey))
+	const pubKey = secp256k1.publicKeyCreate(privKey);
+	return {
+		pubKey: pubKey,
+		privKey: privKey,
+	};
 };
 
 describe('Server: HTTP API', function() {
@@ -351,6 +365,22 @@ describe('Server: HTTP API', function() {
 					});
 				});
 			});
+			testsByTag['login'] = [
+				{
+					params: {},
+					expected: function(body) {
+						expect(body).to.be.an('object');
+						expect(body.status).to.not.equal('ERROR');
+						expect(body.encoded).to.be.a('string');
+						expect(body.secret).to.be.a('string');
+						expect(body.url).to.be.a('string');
+						const decoded = lnurl.decode(body.encoded);
+						expect(decoded).to.equal(body.url);
+						url.parse(decoded);
+						url.parse(body.url);
+					},
+				},
+			];
 			_.each(testsByTag, function(tests, tag) {
 				describe(`tag: "${tag}"`, function() {
 					_.each(tests, function(test) {
@@ -411,6 +441,12 @@ describe('Server: HTTP API', function() {
 			});
 		});
 
+		before(function() {
+			return this.server.generateNewUrl('login').then(result => {
+				this.secrets['login'] = result.secret;
+			});
+		});
+
 		it('missing secret', function(done) {
 			request.get({
 				url: 'https://localhost:3000/lnurl',
@@ -458,7 +494,7 @@ describe('Server: HTTP API', function() {
 			let testsByTag = {};
 			testsByTag['channelRequest'] = [
 				{
-					name: 'valid secret',
+					description: 'valid secret',
 					expected: function(body) {
 						expect(body).to.deep.equal({
 							k1: this.secrets['channelRequest'],
@@ -471,7 +507,7 @@ describe('Server: HTTP API', function() {
 			];
 			testsByTag['withdrawRequest'] = [
 				{
-					name: 'valid secret',
+					description: 'valid secret',
 					expected: function(body) {
 						expect(body).to.deep.equal({
 							k1: this.secrets['withdrawRequest'],
@@ -484,10 +520,19 @@ describe('Server: HTTP API', function() {
 					},
 				},
 			];
+			testsByTag['login'] = [
+				{
+					description: 'valid secret',
+					expected: {
+						status: 'ERROR',
+						reason: 'Invalid request. Expected querystring as follows: k1=SECRET&sig=SIGNATURE&key=LINKING_PUBKEY',
+					},
+				},
+			];
 			_.each(testsByTag, function(tests, tag) {
 				describe(`tag: "${tag}"`, function() {
 					_.each(tests, function(test) {
-						it(test.name, function(done) {
+						it(test.description, function(done) {
 							request.get({
 								url: 'https://localhost:3000/lnurl',
 								ca: this.ca,
@@ -585,8 +630,62 @@ describe('Server: HTTP API', function() {
 					},
 				},
 			];
+			testsByTag['login'] = [
+				{
+					description: 'signed with different private key',
+					params: function() {
+						const linkingKey1 = generateLinkingKey();
+						const linkingKey2 = generateLinkingKey();
+						const k1 = Buffer.from(this.secrets['login'], 'hex');
+						const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
+						const params = {
+							sig: signature.toString('hex'),
+							key: linkingKey2.pubKey.toString('hex'),
+						};
+						return params;
+					},
+					expected: {
+						status: 'ERROR',
+						reason: 'Invalid signature',
+					},
+				},
+				{
+					description: 'signed different secret',
+					params: function() {
+						const { pubKey, privKey } = generateLinkingKey();
+						const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
+						const { signature } = secp256k1.sign(k1, privKey);
+						const params = {
+							sig: signature.toString('hex'),
+							key: pubKey.toString('hex'),
+						};
+						return params;
+					},
+					expected: {
+						status: 'ERROR',
+						reason: 'Invalid signature',
+					},
+				},
+				{
+					description: 'valid signature',
+					params: function() {
+						const { pubKey, privKey } = generateLinkingKey();
+						const k1 = Buffer.from(this.secrets['login'], 'hex');
+						const { signature } = secp256k1.sign(k1, privKey);
+						const params = {
+							sig: signature.toString('hex'),
+							key: pubKey.toString('hex'),
+						};
+						return params;
+					},
+					expected: {
+						status: 'OK',
+					},
+				},
+			];
 			_.each(validParams, function(params, tag) {
 				_.chain(params).keys().each(function(key) {
+					testsByTag[tag] = testsByTag[tag] || [];
 					testsByTag[tag].push({
 						params: _.omit(params, key),
 						expected: {
@@ -599,8 +698,15 @@ describe('Server: HTTP API', function() {
 			_.each(testsByTag, function(tests, tag) {
 				describe(`tag: "${tag}"`, function() {
 					_.each(tests, function(test) {
-						it('params: ' + JSON.stringify(test.params), function(done) {
-							const params = _.extend({}, test.params, {
+						let description = test.description || ('params: ' + JSON.stringify(test.params));
+						it(description, function(done) {
+							let params;
+							if (_.isFunction(test.params)) {
+								params = test.params.call(this);
+							} else {
+								params = test.params;
+							}
+							params = _.extend({}, params, {
 								k1: this.secrets[tag],
 							});
 							request.get({

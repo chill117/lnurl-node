@@ -18,6 +18,7 @@ module.exports = function(lnurl) {
 	const pem = require('pem');
 	const querystring = require('querystring');
 	const request = require('request');
+	const secp256k1 = require('secp256k1');
 
 	let Server = function(options) {
 		this.options = this.prepareOptions(options);
@@ -458,6 +459,34 @@ module.exports = function(lnurl) {
 						throw new HttpError('Amount in invoice must be less than or equal to "maxWithdrawable"', 400);
 					}
 					return this.ln.payInvoice(pr);
+				},
+			},
+			login: {
+				params: {
+					required: [],
+				},
+				validate: (params) => {
+				},
+				info: () => {
+					throw new HttpError('Invalid request. Expected querystring as follows: k1=SECRET&sig=SIGNATURE&key=LINKING_PUBKEY', 400)
+				},
+				action: (secret, params) => {
+					if (!params.sig) {
+						throw new HttpError('Missing required parameter: "sig"', 400);
+					}
+					if (!params.key) {
+						throw new HttpError('Missing required parameter: "key"', 400);
+					}
+					return new Promise((resolve, reject) => {
+						const k1 = Buffer.from(secret, 'hex');
+						const signature = Buffer.from(params.sig, 'hex');
+						const key = Buffer.from(params.key, 'hex')
+						const signatureOk = secp256k1.verify(k1, signature, key);
+						if (!signatureOk) {
+							throw new HttpError('Invalid signature', 400);
+						}
+						resolve();
+					});
 				},
 			},
 		};

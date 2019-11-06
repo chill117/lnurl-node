@@ -83,7 +83,17 @@ Client parameters:
 
 ### auth
 
-!!! TODO !!!
+Server parameters:
+
+_None_
+
+Client parameters:
+
+| name  | type  | notes                            |
+| ------| ----- | -------------------------------- |
+| `sig` | `hex` | `sign(k1, <public linking key>)` |
+| `key` | `hex` | public linking key               |
+
 
 
 ## Command-line interface

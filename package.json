@@ -33,6 +33,7 @@
     "express": "4.17.1",
     "pem": "1.14.1",
     "request": "2.88.0",
+    "secp256k1": "3.7.1",
     "underscore": "1.9.1"
   },
   "devDependencies": {
