@@ -51,21 +51,21 @@ describe('Server: HTTP API', function() {
 		const keyPath = path.join(this.tmpDir, 'lnd-tls.key');
 		const macaroonPath = path.join(this.tmpDir, 'lnd-admin.macaroon');
 		const macaroon = lnurl.generateApiKey().key;
-		app.use('*', function(req, res, next) {
+		app.use('*', (req, res, next) => {
+			this.lnd.requests.push(req);
 			if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {
 				return res.status(400).end();
 			}
 			next();
 		});
-		const nodePubKey = '02c990e21bee14bf4b73a34bd69d7eff4fda2a6877bb09074046528f41e586ebe3';
-		const nodeUri = `${nodePubKey}@127.0.0.1:9735`;
-		app.get('/v1/getinfo', function(req, res, next) {
-			res.json({
-				identity_pubkey: nodePubKey,
-				alias: 'lnd-testnet',
-				testnet: true,
-				uris: [ nodeUri ],
-			});
+		app.get('/v1/getinfo', (req, res, next) => {
+			res.json(this.lnd.responses['get /v1/getinfo']);
+		});
+		app.post('/v1/channels', (req, res, next) => {
+			res.json(this.lnd.responses['post /v1/channels']);
+		});
+		app.post('/v1/channels/transactions', (req, res, next) => {
+			res.json(this.lnd.responses['post /v1/channels/transactions']);
 		});
 		fs.writeFile(macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {
 			if (error) return done(error);
@@ -87,12 +87,46 @@ describe('Server: HTTP API', function() {
 				});
 			});
 		});
+		const nodePubKey = '02c990e21bee14bf4b73a34bd69d7eff4fda2a6877bb09074046528f41e586ebe3';
+		const nodeUri = `${nodePubKey}@127.0.0.1:9735`;
 		this.lnd = app;
 		this.lnd.hostname = `${host}:${port}`;
 		this.lnd.cert = certPath;
 		this.lnd.macaroon = macaroonPath;
 		this.lnd.nodePubKey = nodePubKey;
 		this.lnd.nodeUri = nodeUri;
+		this.lnd.responses = {
+			'get /v1/getinfo': {
+				identity_pubkey: nodePubKey,
+				alias: 'lnd-testnet',
+				testnet: true,
+				uris: [ nodeUri ],
+			},
+			'post /v1/channels': {
+				output_index: 0,
+				funding_txid_bytes: null,
+				funding_txid_str: '968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e',
+			},
+			'post /v1/channels/transactions': (function() {
+				const preimage = lnurl.Server.prototype.generateRandomKey();
+				return {
+					payment_preimage: preimage,
+					payment_hash: lnurl.Server.prototype.hash(preimage),
+					payment_error: '',
+					payment_route: {},
+				};
+			})(),
+		};
+		this.expectRequests = function(method, uri, total) {
+			const numRequests = _.filter(this.lnd.requests, function(req) {
+				return req.url === uri && req.method.toLowerCase() === method;
+			}).length;
+			expect(numRequests).to.equal(total);
+		};
+	});
+
+	beforeEach(function() {
+		this.lnd.requests = [];
 	});
 
 	before(function(done) {
@@ -396,11 +430,11 @@ describe('Server: HTTP API', function() {
 								headers: {
 									'API-Key': this.apiKey,
 								},
-							}, function(error, response, body) {
+							}, (error, response, body) => {
 								if (error) return done(error);
 								try {
 									if (_.isFunction(test.expected)) {
-										test.expected(body);
+										test.expected.call(this, body);
 									} else {
 										expect(body).to.deep.equal(test.expected);
 									}
@@ -607,8 +641,25 @@ describe('Server: HTTP API', function() {
 			testsByTag['withdrawRequest'] = [
 				{
 					params: validParams.withdrawRequest,
-					expected: {
-						status: 'OK',
+					expected: function(body) {
+							expect(body).to.deep.equal({
+							status: 'OK',
+						});
+						this.expectRequests('post', '/v1/channels/transactions', 1);
+					},
+				},
+				{
+					description: 'multiple payment requests (total OK)',
+					params: {
+						pr: [
+							generatePaymentRequest(700),
+							generatePaymentRequest(800),
+							generatePaymentRequest(400),
+						].join(','),
+					},
+					expected: function(body) {
+						expect(body).to.deep.equal({ status: 'OK' });
+						this.expectRequests('post', '/v1/channels/transactions', 3);
 					},
 				},
 				{
@@ -617,16 +668,49 @@ describe('Server: HTTP API', function() {
 					},
 					expected: {
 						status: 'ERROR',
-						reason: 'Amount in invoice must be greater than or equal to "minWithdrawable"',
+						reason: 'Amount in invoice(s) must be greater than or equal to "minWithdrawable"',
+					},
+				},
+				{
+					description: 'multiple payment requests (total < minWithdrawable)',
+					params: {
+						pr: [
+							generatePaymentRequest(300),
+							generatePaymentRequest(500),
+						].join(','),
+					},
+					expected: {
+						status: 'ERROR',
+						reason: 'Amount in invoice(s) must be greater than or equal to "minWithdrawable"',
 					},
 				},
 				{
 					params: {
 						pr: generatePaymentRequest(5000),
 					},
-					expected: {
-						status: 'ERROR',
-						reason: 'Amount in invoice must be less than or equal to "maxWithdrawable"',
+					expected: function(body) {
+							expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
+						});
+						this.expectRequests('post', '/v1/channels/transactions', 0);
+					},
+				},
+				{
+					description: 'multiple payment requests (total > maxWithdrawable)',
+					params: {
+						pr: [
+							generatePaymentRequest(700),
+							generatePaymentRequest(800),
+							generatePaymentRequest(800),
+						].join(','),
+					},
+					expected: function(body) {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
+						});
+						this.expectRequests('post', '/v1/channels/transactions', 0);
 					},
 				},
 			];
@@ -717,11 +801,11 @@ describe('Server: HTTP API', function() {
 								headers: {
 									'API-Key': this.apiKey,
 								},
-							}, function(error, response, body) {
+							}, (error, response, body) => {
 								if (error) return done(error);
 								try {
 									if (_.isFunction(test.expected)) {
-										test.expected(body);
+										test.expected.call(this, body);
 									} else {
 										expect(body).to.deep.equal(test.expected);
 									}

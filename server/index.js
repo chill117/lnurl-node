@@ -132,7 +132,6 @@ module.exports = function(lnurl) {
 			},
 			bodyParser: {
 				json: bodyParser.json(),
-				urlencoded: bodyParser.urlencoded({ extended: true }),
 			},
 		};
 	};
@@ -440,25 +439,37 @@ module.exports = function(lnurl) {
 						throw new HttpError('Missing required parameter: "pr"', 400);
 					}
 					let { minWithdrawable, maxWithdrawable, pr } = params;
-					// !!! pr=invoice1,invoice2,invoice3
-					let decoded;
-					try {
-						decoded = bolt11.decode(pr);
-					} catch (error) {
-						if (error.message === 'Not a proper lightning payment request') {
-							throw new HttpError('Invalid parameter ("pr"): Lightning payment request expected', 400);
-						} else {
-							throw error;
+					let paymentRequests = pr.split(',');
+					const total = _.reduce(paymentRequests, (memo, paymentRequest) => {
+						let decoded;
+						try {
+							decoded = bolt11.decode(paymentRequest);
+						} catch (error) {
+							if (error.message === 'Not a proper lightning payment request') {
+								throw new HttpError('Invalid parameter ("pr"): Lightning payment request(s) expected', 400);
+							} else {
+								throw error;
+							}
 						}
+						return memo.plus(decoded.satoshis);
+					}, new BigNumber(0));
+					if (!total.isGreaterThanOrEqualTo(minWithdrawable)) {
+						throw new HttpError('Amount in invoice(s) must be greater than or equal to "minWithdrawable"', 400);
 					}
-					const satoshis = new BigNumber(decoded.satoshis);
-					if (!satoshis.isGreaterThanOrEqualTo(minWithdrawable)) {
-						throw new HttpError('Amount in invoice must be greater than or equal to "minWithdrawable"', 400);
+					if (!total.isLessThanOrEqualTo(maxWithdrawable)) {
+						throw new HttpError('Amount in invoice(s) must be less than or equal to "maxWithdrawable"', 400);
 					}
-					if (!satoshis.isLessThanOrEqualTo(maxWithdrawable)) {
-						throw new HttpError('Amount in invoice must be less than or equal to "maxWithdrawable"', 400);
-					}
-					return this.ln.payInvoice(pr);
+					// Pay all invoices.
+					return new Promise((resolve, reject) => {
+						async.each(paymentRequests, (paymentRequest, next) => {
+							this.ln.payInvoice(paymentRequest).then(() => {
+								next();
+							}).catch(next);
+						}, error => {
+							if (error) return reject(error);
+							resolve();
+						});
+					});
 				},
 			},
 			login: {
@@ -637,7 +648,18 @@ module.exports = function(lnurl) {
 					});
 				},
 				getNodeInfo: () => {
-					return this.ln.request('get', '/v1/getinfo');
+					return this.ln.request('get', '/v1/getinfo').then((result) => {
+						if (_.isUndefined(result.alias) || !_.isString(result.alias)) {
+							throw new Error('Unexpected response from LN Backend [GET /v1/getinfo]: "alias"');
+						}
+						if (_.isUndefined(result.identity_pubkey) || !_.isString(result.identity_pubkey)) {
+							throw new Error('Unexpected response from LN Backend [GET /v1/getinfo]: "identity_pubkey"');
+						}
+						if (_.isUndefined(result.uris) || !_.isArray(result.uris)) {
+							throw new Error('Unexpected response from LN Backend [GET /v1/getinfo]: "uris"');
+						}
+						return result;
+					});
 				},
 				openChannel: (remoteid, localAmt, pushAmt, private) => {
 					return this.ln.request('post', '/v1/channels', {
@@ -645,11 +667,37 @@ module.exports = function(lnurl) {
 						local_funding_amount: localAmt,
 						push_sat: pushAmt,
 						private: private,
+					}).then((result) => {
+						if (_.isUndefined(result.output_index) || !_.isNumber(result.output_index)) {
+							throw new Error('Unexpected response from LN Backend [POST /v1/channels]: "output_index"');
+						}
+						if (_.isUndefined(result.funding_txid_str) || !_.isString(result.funding_txid_str)) {
+							throw new Error('Unexpected response from LN Backend [POST /v1/channels]: "funding_txid_str"');
+						}
+						return result;
 					});
 				},
 				payInvoice: invoice => {
 					return this.ln.request('post', '/v1/channels/transactions', {
 						payment_request: invoice,
+					}).then((result) => {
+						if (_.isUndefined(result.payment_preimage) || !_.isString(result.payment_preimage)) {
+							throw new Error('Unexpected response from LN Backend [POST /v1/channels/transactions]: "payment_preimage"');
+						}
+						if (_.isUndefined(result.payment_hash) || !_.isString(result.payment_hash)) {
+							throw new Error('Unexpected response from LN Backend [POST /v1/channels/transactions]: "payment_hash"');
+						}
+						if (_.isUndefined(result.payment_route) || !_.isObject(result.payment_route)) {
+							throw new Error('Unexpected response from LN Backend [POST /v1/channels/transactions]: "payment_route"');
+						}
+						if (result.payment_error) {
+							const message = result.payment_error;
+							throw new Error(`Failed to pay invoice: "${message}"`);
+						}
+						if (!result.payment_preimage) {
+							throw new Error('Probable failed payment: Did not receive payment_preimage in response');
+						}
+						return result;
 					});
 				},
 				getCertAndMacaroon: () => {
@@ -693,6 +741,13 @@ module.exports = function(lnurl) {
 						return new Promise((resolve, reject) => {
 							request(options, (error, response, body) => {
 								if (error) return reject(error);
+								if (response.statusCode >= 300) {
+									const status = response.statusCode;
+									return reject(new Error(`Unexpected response from LN backend: HTTP_${status}_ERROR`));
+								}
+								if (!_.isObject(body)) {
+									return reject(new Error('Unexpected response format from LN backend: JSON data expected'));
+								}
 								resolve(body);
 							});
 						});
