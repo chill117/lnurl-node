@@ -1,9 +1,13 @@
 const fs = require('fs-extra');
 const mkdirp = require('mkdirp');
-const path = require('path');
+
+before(function() {
+	this.helpers = require('../helpers');
+	this.lnurl = this.helpers.lnurl;
+	this.tmpDir = this.helpers.tmpDir;
+});
 
 before(function(done) {
-	this.tmpDir = path.join(__dirname, '..', 'tmp');
 	mkdirp(this.tmpDir, done);
 });
 
