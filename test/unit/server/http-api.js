@@ -122,7 +122,7 @@ describe('Server: HTTP API', function() {
 				ca: this.ca,
 				json: true,
 				headers: {
-					'API-Key': 'invalid-api-key',
+					'API-Key': '469bf65fd2b3575a1604d62fc7a6a94f',
 				},
 			}, function(error, response, body) {
 				if (error) return done(error);
@@ -428,7 +428,7 @@ describe('Server: HTTP API', function() {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
 					qs: {
-						q: 'invalid-secret',
+						q: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
 					json: true,
 				}, function(error, response, body) {
@@ -523,7 +523,7 @@ describe('Server: HTTP API', function() {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
 					qs: {
-						k1: 'invalid-secret',
+						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
 					json: true,
 				}, function(error, response, body) {

@@ -610,6 +610,9 @@ module.exports = function(lnurl) {
 	Server.prototype.hash = function(hexOrBuffer) {
 		let buffer;
 		if (_.isString(hexOrBuffer)) {
+			if (!this.isHex(hexOrBuffer)) {
+				throw new Error('Invalid argument ("hexOrBuffer"): String or buffer expected.');
+			}
 			buffer = Buffer.from(hexOrBuffer, 'hex');
 		} else if (Buffer.isBuffer(hexOrBuffer)) {
 			buffer = hexOrBuffer;
@@ -762,6 +765,9 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.isHex = function(hex) {
+		if (!_.isString(hex)) {
+			throw new Error('Invalid argument ("hex"): String expected.');
+		}
 		return Buffer.from(hex, 'hex').toString('hex') === hex;
 	};
 
