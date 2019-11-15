@@ -27,6 +27,7 @@ module.exports = function(lnurl) {
 		this.createHttpsServer();
 		this.prepareLightningBackend();
 		this._store = {};
+		this._locks = {};
 	};
 
 	const HttpError = function(message, status) {
@@ -235,19 +236,31 @@ module.exports = function(lnurl) {
 			if (!secret) {
 				return next(new HttpError('Missing secret', 400));
 			}
-			this.fetchUrl(secret).then(url => {
+			if (this.isLocked(secret)) {
+				throw new HttpError('Invalid secret', 400);
+			}
+			this.lock(secret);
+			const hash = this.hash(secret);
+			this.fetchUrl(hash).then(url => {
 				if (!url) {
+					this.unlock(secret);
 					throw new HttpError('Invalid secret', 400);
 				}
 				const tag = url.tag;
 				const params = _.extend({}, req.query, url.params);
 				if (req.query.q) {
 					return this.runSubProtocol(tag, 'info', secret, params).then(info => {
-						res.status(200).json(info);
+						return this.clearUrl(hash).then(() => {
+							this.unlock(secret);
+							res.status(200).json(info);
+						});
 					});
 				} else {
 					return this.runSubProtocol(tag, 'action', secret, params).then(() => {
-						res.status(200).json({ status: 'OK' });
+						return this.clearUrl(hash).then(() => {
+							this.unlock(secret);
+							res.status(200).json({ status: 'OK' });
+						});
 					});
 				}
 			}).catch(next);
@@ -527,11 +540,10 @@ module.exports = function(lnurl) {
 		return fullUrl;
 	};
 
-	Server.prototype.fetchUrl = function(secret) {
+	Server.prototype.fetchUrl = function(hash) {
 		return new Promise((resolve, reject) => {
 			let result;
 			try {
-				const hash = this.hash(secret);
 				result = this._store[hash] || null;
 				if (result) {
 					result = this.deepClone(result);
@@ -541,6 +553,25 @@ module.exports = function(lnurl) {
 			}
 			resolve(result);
 		});
+	};
+
+	Server.prototype.clearUrl = function(hash) {
+		return new Promise((resolve, reject) => {
+			this._store[hash] = null;
+			resolve();
+		});
+	};
+
+	Server.prototype.isLocked = function(secret) {
+		return this._locks[secret] === true;
+	};
+
+	Server.prototype.lock = function(secret) {
+		this._locks[secret] = true;
+	};
+
+	Server.prototype.unlock = function(secret) {
+		this._locks[secret] = null;
 	};
 
 	Server.prototype.generateApiKey = function() {

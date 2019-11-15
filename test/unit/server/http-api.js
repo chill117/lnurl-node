@@ -372,11 +372,11 @@ describe('Server: HTTP API', function() {
 
 	describe('GET /lnurl', function() {
 
-		before(function() {
+		beforeEach(function() {
 			this.secrets = {};
 		});
 
-		before(function() {
+		beforeEach(function() {
 			return this.server.generateNewUrl('channelRequest', {
 				localAmt: 1000,
 				pushAmt: 0,
@@ -385,7 +385,7 @@ describe('Server: HTTP API', function() {
 			});
 		});
 
-		before(function() {
+		beforeEach(function() {
 			return this.server.generateNewUrl('withdrawRequest', {
 				minWithdrawable: 1000,
 				maxWithdrawable: 2000,
@@ -395,7 +395,7 @@ describe('Server: HTTP API', function() {
 			});
 		});
 
-		before(function() {
+		beforeEach(function() {
 			return this.server.generateNewUrl('login').then(result => {
 				this.secrets['login'] = result.secret;
 			});
@@ -718,9 +718,6 @@ describe('Server: HTTP API', function() {
 								ca: this.ca,
 								qs: params,
 								json: true,
-								headers: {
-									'API-Key': this.apiKey,
-								},
 							}, (error, response, body) => {
 								if (error) return done(error);
 								try {
@@ -736,6 +733,40 @@ describe('Server: HTTP API', function() {
 							});
 						});
 					});
+				});
+			});
+
+			it('one-time-use', function(done) {
+				const doRequest = (cb) => {
+					request.get({
+						url: 'https://localhost:3000/lnurl',
+						ca: this.ca,
+						qs: {
+							k1: this.secrets['withdrawRequest'],
+							pr: generatePaymentRequest(1200),
+						},
+						json: true,
+					}, cb);
+				};
+				doRequest((error, response, body) => {
+					if (error) return done(error);
+					try {
+						expect(body).to.deep.equal({ status: 'OK' });
+					} catch (error) {
+						return done(error);
+					}
+					doRequest((error, response, body) => {
+						if (error) return done(error);
+						try {
+							expect(body).to.deep.equal({
+								status: 'ERROR',
+								reason: 'Invalid secret',
+							});
+						} catch (error) {
+							return done(error);
+						}
+						done();
+					})
 				});
 			});
 		});
