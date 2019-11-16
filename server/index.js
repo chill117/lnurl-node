@@ -24,7 +24,7 @@ module.exports = function(lnurl) {
 		this.options = this.prepareOptions(options);
 		this.checkOptions();
 		this.prepareQueues();
-		this.prepareLightningBackend();
+		this.prepareLightning();
 		this.prepareStore();
 		this.createHttpsServer();
 		this._locks = {};
@@ -654,141 +654,11 @@ module.exports = function(lnurl) {
 		return crypto.createHash('sha256').update(buffer).digest('hex');
 	};
 
-	Server.prototype.prepareLightningBackend = function() {
-		const lightningBackends = _.result(this, 'lightningBackends');
-		const ln = this.ln = lightningBackends[this.options.lightning.backend];
-		const { config } = this.options.lightning;
-		_.each(ln.requiredConfig || [], key => {
-			if (!config[key]) {
-				throw new Error(`Missing required option: "lightning.config.${key}"`);
-			}
-		});
-		ln.checkConfiguration();
-	};
-
-	Server.prototype.lightningBackends = function() {
-		return {
-			lnd: {
-				requiredConfig: ['hostname', 'cert', 'macaroon'],
-				checkConfiguration: () => {
-					debug.info('Checking LN backend configuration...');
-					const { cert, macaroon } = this.options.lightning.config;
-					fs.statSync(cert);
-					fs.statSync(macaroon);
-				},
-				getNodeUri: () => {
-					return this.ln.getNodeInfo().then(info => {
-						return info.uris[0];
-					});
-				},
-				getNodeInfo: () => {
-					return this.ln.request('get', '/v1/getinfo').then((result) => {
-						if (_.isUndefined(result.alias) || !_.isString(result.alias)) {
-							throw new Error('Unexpected response from LN Backend [GET /v1/getinfo]: "alias"');
-						}
-						if (_.isUndefined(result.identity_pubkey) || !_.isString(result.identity_pubkey)) {
-							throw new Error('Unexpected response from LN Backend [GET /v1/getinfo]: "identity_pubkey"');
-						}
-						if (_.isUndefined(result.uris) || !_.isArray(result.uris)) {
-							throw new Error('Unexpected response from LN Backend [GET /v1/getinfo]: "uris"');
-						}
-						return result;
-					});
-				},
-				openChannel: (remoteid, localAmt, pushAmt, private) => {
-					return this.ln.request('post', '/v1/channels', {
-						node_pubkey_string: remoteid,
-						local_funding_amount: localAmt,
-						push_sat: pushAmt,
-						private: private,
-					}).then((result) => {
-						if (_.isUndefined(result.output_index) || !_.isNumber(result.output_index)) {
-							throw new Error('Unexpected response from LN Backend [POST /v1/channels]: "output_index"');
-						}
-						if (_.isUndefined(result.funding_txid_str) || !_.isString(result.funding_txid_str)) {
-							throw new Error('Unexpected response from LN Backend [POST /v1/channels]: "funding_txid_str"');
-						}
-						return result;
-					});
-				},
-				payInvoice: invoice => {
-					return this.ln.request('post', '/v1/channels/transactions', {
-						payment_request: invoice,
-					}).then((result) => {
-						if (_.isUndefined(result.payment_preimage) || !_.isString(result.payment_preimage)) {
-							throw new Error('Unexpected response from LN Backend [POST /v1/channels/transactions]: "payment_preimage"');
-						}
-						if (_.isUndefined(result.payment_hash) || !_.isString(result.payment_hash)) {
-							throw new Error('Unexpected response from LN Backend [POST /v1/channels/transactions]: "payment_hash"');
-						}
-						if (_.isUndefined(result.payment_route) || !_.isObject(result.payment_route)) {
-							throw new Error('Unexpected response from LN Backend [POST /v1/channels/transactions]: "payment_route"');
-						}
-						if (result.payment_error) {
-							const message = result.payment_error;
-							throw new Error(`Failed to pay invoice: "${message}"`);
-						}
-						if (!result.payment_preimage) {
-							throw new Error('Probable failed payment: Did not receive payment_preimage in response');
-						}
-						return result;
-					});
-				},
-				getCertAndMacaroon: () => {
-					return new Promise((resolve, reject) => {
-						const { cert, macaroon } = this.options.lightning.config;
-						async.parallel({
-							cert: fs.readFile.bind(fs, cert, 'utf8'),
-							macaroon: fs.readFile.bind(fs, macaroon, 'hex'),
-						}, (error, results) => {
-							if (error) return reject(error);
-							resolve(results);
-						});
-					});
-				},
-				request: (method, uri, data) => {
-					if (!_.isString(method)) {
-						throw new Error('Invalid argument ("method"): String expected');
-					}
-					if (!_.isString(uri)) {
-						throw new Error('Invalid argument ("uri"): String expected');
-					}
-					data = data || {};
-					if (!_.isObject(data)) {
-						throw new Error('Invalid argument ("data"): Object expected');
-					}
-					return this.ln.getCertAndMacaroon().then((results) => {
-						const { cert, macaroon } = results;
-						const { hostname } = this.options.lightning.config;
-						let options = {
-							method: method.toLowerCase(),
-							url: `https://${hostname}${uri}`,
-							headers: {
-								'Grpc-Metadata-macaroon': macaroon,
-							},
-							ca: cert,
-							json: true,
-						};
-						if (!_.isEmpty(data)) {
-							options.body = data;
-						}
-						return new Promise((resolve, reject) => {
-							request(options, (error, response, body) => {
-								if (error) return reject(error);
-								if (response.statusCode >= 300) {
-									const status = response.statusCode;
-									return reject(new Error(`Unexpected response from LN backend: HTTP_${status}_ERROR`));
-								}
-								if (!_.isObject(body)) {
-									return reject(new Error('Unexpected response format from LN backend: JSON data expected'));
-								}
-								resolve(body);
-							});
-						});
-					});
-				},
-			},
-		};
+	Server.prototype.prepareLightning = function() {
+		const { backend, config } = this.options.lightning;
+		const lightningPath = path.join(__dirname, 'lightning', backend);
+		const Lightning = require(lightningPath);
+		this.ln = new Lightning(config);
 	};
 
 	Server.prototype.deepClone = function(data) {

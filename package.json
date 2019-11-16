@@ -32,7 +32,6 @@
     "debug": "4.1.1",
     "express": "4.17.1",
     "pem": "1.14.1",
-    "request": "2.88.0",
     "secp256k1": "3.7.1",
     "underscore": "1.9.1"
   },
@@ -40,7 +39,8 @@
     "chai": "4.2.0",
     "fs-extra": "8.1.0",
     "mkdirp": "0.5.1",
-    "mocha": "6.2.1"
+    "mocha": "6.2.1",
+    "request": "2.88.0"
   },
   "readmeFilename": "README.md"
 }
