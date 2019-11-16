@@ -5,4 +5,20 @@ node_js:
   - "8"
 
 install: npm install
-script: skip
+script: npm test
+
+jobs:
+  include:
+    - env: LNURL_STORE_BACKEND=redis LNURL_STORE_CONFIG='{"prefix":"lnurl_"}'
+      services: redis-server
+      before_script: npm install redis
+    - env: LNURL_STORE_BACKEND=knex LNURL_STORE_CONFIG='{"client":"sqlite3","connection":{"filename":"db.sqlite3"}}'
+      before_script: npm install knex sqlite3
+    - env: LNURL_STORE_BACKEND=knex LNURL_STORE_CONFIG='{"client":"mysql","connection":{"host":"127.0.0.1","user":"root","password":"","database":"lnurl_test"}}'
+      services: mysql
+      before_install: "mysql -e 'drop database if exists lnurl_test; create database lnurl_test;'"
+      before_script: npm install knex mysql
+    - env: LNURL_STORE_BACKEND=knex LNURL_STORE_CONFIG='{"client":"postgres","connection":{"host":"127.0.0.1","user":"postgres","password":"","database":"lnurl_test"}}'
+      services: postgresql
+      before_install: "psql -c 'create database lnurl_test;' -U postgres"
+      before_script: npm install knex pg

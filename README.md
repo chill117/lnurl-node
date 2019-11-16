@@ -24,6 +24,11 @@ __This project is a work-in-progress so expect some changes in the coming days__
   * [createServer](#createServer)
     * [options](#options-for-createserver-method)
   * [generateApiKey](#generateapikey)
+* [Configuring Data Store](#configuring-data-store)
+  * [Redis](#redis)
+  * [SQLite](#sqlite)
+  * [MySQL](#mysql)
+  * [PostgreSQL](#postgresql)
 * [Debugging](#debugging)
 * [Tests](#tests)
 * [License](#license)
@@ -158,7 +163,8 @@ lnurl server \
 	--lightning.backend="lnd" \
 	--lightning.config='{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
 ```
-To enable debugging messages, see the [Debugging](#debugging) section of this readme.
+* To enable debugging messages, see the [Debugging](#debugging) section of this readme.
+* By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
 
 To print all available options for the server command:
 ```bash
@@ -266,6 +272,8 @@ const server = lnurl.createServer({
 	},
 });
 ```
+* To enable debugging messages, see the [Debugging](#debugging) section of this readme.
+* By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
 
 To generate a new lnurl that a client application can then consume:
 ```js
@@ -394,6 +402,138 @@ Expected output:
 	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
 	"hash": "1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3"
 }
+```
+
+
+## Configuring Data Store
+
+By default the lnurl server will store data in memory - which is not ideal for several reasons - so it is strongly recommended that you configure a proper data store for your server. This module supports [Redis](#redis), [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
+
+
+### Redis
+
+To use Redis as your data store you will need to install the [redis module](https://github.com/NodeRedis/node_redis) wherever you are running your lnurl server:
+```bash
+npm install redis
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'redis',
+		config: {
+			prefix: 'lnurl_',
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="redis" \
+	--store.config='{"prefix":"lnurl_"}'
+```
+
+
+### SQLite
+
+To use SQLite as your data store you will need to install the [sqlite3 module](https://github.com/mapbox/node-sqlite3) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex sqlite3
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'sqlite3',
+			connection: {
+				filename: './lnurl-server.sqlite3',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"sqlite3","connection":{"filename":"./lnurl-server.sqlite3"}}'
+```
+
+
+### MySQL
+
+To use MySQL as your data store you will need to install the [mysql module](https://github.com/mysqljs/mysql) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex mysql
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'mysql',
+			connection: {
+				host: '127.0.0.1',
+				user: 'lnurl_server',
+				password: '',
+				database: 'lnurl_server',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"mysql","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
+```
+
+
+### PostgreSQL
+
+To use PostgreSQL as your data store you will need to install the [postgres module](https://github.com/brianc/node-postgres) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex pg
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'postgres',
+			connection: {
+				host: '127.0.0.1',
+				user: 'lnurl_server',
+				password: '',
+				database: 'lnurl_server',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"postgres","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
 ```
 
 
