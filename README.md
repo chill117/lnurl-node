@@ -4,8 +4,6 @@
 
 Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
 
-__This project is a work-in-progress so expect some changes in the coming days__
-
 * [Installation](#installation)
 * [Subprotocols](#subprotocols)
   * [channel](#channel)
@@ -85,6 +83,8 @@ Client parameters:
 | ---------- | --------- | ------------------------- |
 | `pr`       | `string`  | lightning payment request |
 
+* Note that `pr` can contain multiple payment requests (separated by commas)
+
 
 ### auth
 
@@ -96,7 +96,7 @@ Client parameters:
 
 | name  | type  | notes                            |
 | ------| ----- | -------------------------------- |
-| `sig` | `hex` | `sign(k1, <public linking key>)` |
+| `sig` | `hex` | `sign(k1, <private linking key>)` |
 | `key` | `hex` | public linking key               |
 
 
