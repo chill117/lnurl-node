@@ -24,9 +24,9 @@ module.exports = function(lnurl) {
 		this.options = this.prepareOptions(options);
 		this.checkOptions();
 		this.prepareQueues();
-		this.createHttpsServer();
 		this.prepareLightningBackend();
-		this._store = {};
+		this.prepareStore();
+		this.createHttpsServer();
 		this._locks = {};
 	};
 
@@ -71,6 +71,10 @@ module.exports = function(lnurl) {
 			selfSigned: true,
 			// The length of validity of the self-signed certificate:
 			days: 3650,
+		},
+		store: {
+			backend: 'memory',
+			config: {},
 		},
 	};
 
@@ -250,14 +254,14 @@ module.exports = function(lnurl) {
 				const params = _.extend({}, req.query, url.params);
 				if (req.query.q) {
 					return this.runSubProtocol(tag, 'info', secret, params).then(info => {
-						return this.clearUrl(hash).then(() => {
+						return this.deleteUrl(hash).then(() => {
 							this.unlock(secret);
 							res.status(200).json(info);
 						});
 					});
 				} else {
 					return this.runSubProtocol(tag, 'action', secret, params).then(() => {
-						return this.clearUrl(hash).then(() => {
+						return this.deleteUrl(hash).then(() => {
 							this.unlock(secret);
 							res.status(200).json({ status: 'OK' });
 						});
@@ -540,26 +544,19 @@ module.exports = function(lnurl) {
 		return fullUrl;
 	};
 
-	Server.prototype.fetchUrl = function(hash) {
-		return new Promise((resolve, reject) => {
-			let result;
-			try {
-				result = this._store[hash] || null;
-				if (result) {
-					result = this.deepClone(result);
-				}
-			} catch (error) {
-				return reject(error);
-			}
-			resolve(result);
-		});
+	Server.prototype.prepareStore = function() {
+		const { backend, config } = this.options.store;
+		const storePath = path.join(__dirname, 'stores', backend);
+		const Store = require(storePath)(lnurl);
+		this.store = new Store(config);
 	};
 
-	Server.prototype.clearUrl = function(hash) {
-		return new Promise((resolve, reject) => {
-			this._store[hash] = null;
-			resolve();
-		});
+	Server.prototype.fetchUrl = function(hash) {
+		return this.store.fetch(hash);
+	};
+
+	Server.prototype.deleteUrl = function(hash) {
+		return this.store.delete(hash);
 	};
 
 	Server.prototype.isLocked = function(secret) {
@@ -609,18 +606,21 @@ module.exports = function(lnurl) {
 					numAttempts++;
 					key = this.generateRandomKey();
 					const hash = this.hash(key);
-					if (this._store[hash]) {
-						// Already exists.
-						// Generate another key.
-						key = null;
-					} else {
-						const data = { tag, params }
-						this._store[hash] = data;
-					}
+					return this.store.exists(hash).then(exists => {
+						if (exists) {
+							// Already exists.
+							// Generate another key.
+							key = null;
+						} else {
+							const data = { tag, params };
+							return this.store.save(hash, data).then(() => {
+								next();
+							}).catch(next);
+						}
+					}).catch(next);
 				} catch (error) {
 					return next(error);
 				}
-				next();
 			}, error => {
 				if (error) {
 					return reject(error);
@@ -805,13 +805,20 @@ module.exports = function(lnurl) {
 	Server.prototype.close = function() {
 		debug.info('Closing lnurl server...');
 		return new Promise((resolve, reject) => {
-			if (this.app && this.app.httpsServer) {
-				this.app.httpsServer.close(() => {
-					resolve();
-				});	
-			} else {
+			async.parallel([
+				next => {
+					this.store.close().then(next).catch(next);
+				},
+				next => {
+					if (!this.app || !this.app.httpsServer) return next();
+					this.app.httpsServer.close(() => {
+						next();
+					});
+				},
+			], error => {
+				if (error) return reject(error);
 				resolve();
-			}
+			});
 		});
 	};
 

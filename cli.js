@@ -109,6 +109,18 @@ program
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.tls.days
 	)
+	.option(
+		'--store.backend [value]',
+		'Which data store backend to use',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.store.backend
+	)
+	.option(
+		'--store.config [value]',
+		'The options object to use to configure the data store',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.store.config
+	)
 	.action(function() {
 		let options = _.pick(this, 'host', 'port', 'url', 'apiKeyHash', 'exposeWriteEndpoint');
 		_.each(['lightning', 'tls'], group => {

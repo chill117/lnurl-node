@@ -50,26 +50,34 @@ describe('Server: HTTP API', function() {
 	});
 
 	before(function(done) {
-		this.apiKey = 'ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67';
-		this.server = new lnurl.Server({
-			host: 'localhost',
-			port: 3000,
-			exposeWriteEndpoint: true,
-			lightning: {
-				backend: 'lnd',
-				config: {
-					hostname: this.lnd.hostname,
-					cert: this.lnd.cert,
-					macaroon: this.lnd.macaroon,
+		try {
+			this.apiKey = 'ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67';
+			this.server = new lnurl.Server({
+				host: 'localhost',
+				port: 3000,
+				apiKeyHash: '1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3',
+				exposeWriteEndpoint: true,
+				lightning: {
+					backend: 'lnd',
+					config: {
+						hostname: this.lnd.hostname,
+						cert: this.lnd.cert,
+						macaroon: this.lnd.macaroon,
+					},
 				},
-			},
-			tls: {
-				certPath: path.join(this.tmpDir, 'tls.cert'),
-				keyPath: path.join(this.tmpDir, 'tls.key'),
-			},
-			apiKeyHash: '1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3',
-		});
-		this.server.onListening(done);
+				tls: {
+					certPath: path.join(this.tmpDir, 'tls.cert'),
+					keyPath: path.join(this.tmpDir, 'tls.key'),
+				},
+				store: {
+					backend: process.env.LNURL_STORE_BACKEND || 'memory',
+					config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
+				},
+			});
+			this.server.onListening(done);
+		} catch (error) {
+			return done(error);
+		}
 	});
 
 	before(function(done) {

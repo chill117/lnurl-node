@@ -86,10 +86,7 @@ describe('Command-line interface', function() {
 
 		after(function(done) {
 			if (this.lnd && this.lnd.server) {
-				this.lnd.server.close(function() {
-					console.log('lnd server closed')
-					done();
-				});
+				this.lnd.server.close(done);
 			} else {
 				done();
 			}
@@ -112,9 +109,16 @@ describe('Command-line interface', function() {
 				}),
 				'--tls.certPath', certPath,
 				'--tls.keyPath', keyPath,
+				'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
+				'--store.config', JSON.stringify((process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {}),
 				'--apiKeyHash', '1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3',
 			]);
+			let errorFromStdErr;
+			child.stderr.once('data', data => {
+				errorFromStdErr = new Error(data.toString());
+			});
 			async.until(next => {
+				if (errorFromStdErr) return next(errorFromStdErr);
 				fs.readFile(certPath, (error, buffer) => {
 					if (error) return next();
 					const ca = buffer.toString();
