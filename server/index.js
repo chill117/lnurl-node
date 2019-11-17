@@ -2,9 +2,7 @@ module.exports = function(lnurl) {
 
 	const _ = require('underscore');
 	const async = require('async');
-	const BigNumber = require('bignumber.js');
 	const bodyParser = require('body-parser');
-	const bolt11 = require('bolt11');
 	const crypto = require('crypto');
 	const debug = {
 		info: require('debug')('lnurl:info'),
@@ -14,30 +12,22 @@ module.exports = function(lnurl) {
 	const express = require('express');
 	const fs = require('fs');
 	const https = require('https');
+	const HttpError = require('./HttpError');
 	const path = require('path');
 	const pem = require('pem');
 	const querystring = require('querystring');
 	const request = require('request');
-	const secp256k1 = require('secp256k1');
 
 	let Server = function(options) {
 		this.options = this.prepareOptions(options);
 		this.checkOptions();
 		this.prepareQueues();
+		this.prepareSubProtocols();
 		this.prepareLightning();
 		this.prepareStore();
 		this.createHttpsServer();
 		this._locks = {};
 	};
-
-	const HttpError = function(message, status) {
-		this.name = 'HttpError';
-		this.message = message;
-		this.status = status;
-		this.stack = (new Error()).stack;
-	};
-
-	HttpError.prototype = new Error;
 
 	Server.prototype.defaultOptions = {
 		// The host for the HTTPS server:
@@ -294,6 +284,10 @@ module.exports = function(lnurl) {
 		}).catch(debug.error);
 	};
 
+	Server.prototype.prepareSubProtocols = function() {
+		this.subprotocols = require('./subprotocols')(this);
+	};
+
 	Server.prototype.runSubProtocol = function(tag, method, secret, params) {
 		if (!_.isString(tag)) {
 			throw new Error('Invalid argument ("tag"): String expected.');
@@ -326,8 +320,7 @@ module.exports = function(lnurl) {
 		if (!_.isString(tag)) {
 			throw new Error('Invalid argument ("tag"): String expected.');
 		}
-		const subprotocols = _.result(this, 'subprotocols');
-		return subprotocols[tag];
+		return this.subprotocols[tag];
 	};
 
 	Server.prototype.validateSubProtocolParameters = function(tag, params) {
@@ -351,173 +344,6 @@ module.exports = function(lnurl) {
 			subprotocol.validate(params);
 			resolve();
 		});
-	};
-
-	Server.prototype.subprotocols = function() {
-		return {
-			channelRequest: {
-				params: {
-					required: ['localAmt', 'pushAmt'],
-				},
-				validate: (params) => {
-					let { localAmt, pushAmt } = params;
-					try {
-						localAmt = new BigNumber(localAmt);
-					} catch (error) {
-						throw new HttpError('Invalid parameter ("localAmt"): Number expected', 400);
-					}
-					try {
-						pushAmt = new BigNumber(pushAmt);
-					} catch (error) {
-						throw new HttpError('Invalid parameter ("pushAmt"): Number expected', 400);
-					}
-					if (!localAmt.isInteger()) {
-						throw new HttpError('Invalid parameter ("localAmt"): Integer expected', 400);
-					}
-					if (!pushAmt.isInteger()) {
-						throw new HttpError('Invalid parameter ("pushAmt"): Integer expected', 400);
-					}
-					if (!localAmt.isGreaterThan(0)) {
-						throw new HttpError('"localAmt" must be greater than zero', 400);
-					}
-					if (!pushAmt.isGreaterThanOrEqualTo(0)) {
-						throw new HttpError('"pushAmt" must be greater than or equal to zero', 400);
-					}
-					if (!localAmt.isGreaterThanOrEqualTo(pushAmt)) {
-						throw new HttpError('"localAmt" must be greater than or equal to "pushAmt"', 400);
-					}
-				},
-				info: (secret, params) => {
-					return this.ln.getNodeUri().then(nodeUri => {
-						return {
-							uri: nodeUri,
-							callback: this.getFullUrl('/lnurl'),
-							k1: secret,
-							tag: 'channelRequest',
-						};
-					});
-				},
-				action: (secret, params) => {
-					let { remoteid, localAmt, pushAmt, private } = params;
-					if (!remoteid) {
-						throw new HttpError('Missing required parameter: "remoteid"', 400);
-					}
-					if (_.isUndefined(private)) {
-						throw new HttpError('Missing required parameter: "private"', 400);
-					}
-					private = parseInt(private) === 1;
-					return this.ln.openChannel(remoteid, localAmt, pushAmt, private);
-				},
-			},
-			withdrawRequest: {
-				params: {
-					required: ['minWithdrawable', 'maxWithdrawable', 'defaultDescription'],
-				},
-				validate: (params) => {
-					let { minWithdrawable, maxWithdrawable, defaultDescription } = params;
-					try {
-						minWithdrawable = new BigNumber(minWithdrawable);
-					} catch (error) {
-						throw new HttpError('Invalid parameter ("minWithdrawable"): Number expected', 400);
-					}
-					try {
-						maxWithdrawable = new BigNumber(maxWithdrawable);
-					} catch (error) {
-						throw new HttpError('Invalid parameter ("maxWithdrawable"): Number expected', 400);
-					}
-					if (!minWithdrawable.isInteger()) {
-						throw new HttpError('Invalid parameter ("minWithdrawable"): Integer expected', 400);
-					}
-					if (!maxWithdrawable.isInteger()) {
-						throw new HttpError('Invalid parameter ("maxWithdrawable"): Integer expected', 400);
-					}
-					if (!minWithdrawable.isGreaterThan(0)) {
-						throw new HttpError('"minWithdrawable" must be greater than zero', 400);
-					}
-					if (!maxWithdrawable.isGreaterThanOrEqualTo(minWithdrawable)) {
-						throw new HttpError('"maxWithdrawable" must be greater than or equal to "minWithdrawable"', 400);
-					}
-					if (!_.isString(defaultDescription)) {
-						throw new HttpError('Invalid parameter ("defaultDescription"): String expected', 400);	
-					}
-				},
-				info: (secret, params) => {
-					return new Promise((resolve, reject) => {
-						const info = _.chain(params).pick('minWithdrawable', 'maxWithdrawable', 'defaultDescription').extend({
-							callback: this.getFullUrl('/lnurl'),
-							k1: secret,
-							tag: 'withdrawRequest',
-						}).value();
-						resolve(info);
-					});
-				},
-				action: (secret, params) => {
-					if (!params.pr) {
-						throw new HttpError('Missing required parameter: "pr"', 400);
-					}
-					let { minWithdrawable, maxWithdrawable, pr } = params;
-					let paymentRequests = pr.split(',');
-					const total = _.reduce(paymentRequests, (memo, paymentRequest) => {
-						let decoded;
-						try {
-							decoded = bolt11.decode(paymentRequest);
-						} catch (error) {
-							if (error.message === 'Not a proper lightning payment request') {
-								throw new HttpError('Invalid parameter ("pr"): Lightning payment request(s) expected', 400);
-							} else {
-								throw error;
-							}
-						}
-						return memo.plus(decoded.satoshis);
-					}, new BigNumber(0));
-					if (!total.isGreaterThanOrEqualTo(minWithdrawable)) {
-						throw new HttpError('Amount in invoice(s) must be greater than or equal to "minWithdrawable"', 400);
-					}
-					if (!total.isLessThanOrEqualTo(maxWithdrawable)) {
-						throw new HttpError('Amount in invoice(s) must be less than or equal to "maxWithdrawable"', 400);
-					}
-					// Pay all invoices.
-					return new Promise((resolve, reject) => {
-						async.each(paymentRequests, (paymentRequest, next) => {
-							this.ln.payInvoice(paymentRequest).then(() => {
-								next();
-							}).catch(next);
-						}, error => {
-							if (error) return reject(error);
-							resolve();
-						});
-					});
-				},
-			},
-			login: {
-				params: {
-					required: [],
-				},
-				validate: (params) => {
-				},
-				info: () => {
-					throw new HttpError('Invalid request. Expected querystring as follows: k1=SECRET&sig=SIGNATURE&key=LINKING_PUBKEY', 400)
-				},
-				action: (secret, params) => {
-					if (!params.sig) {
-						throw new HttpError('Missing required parameter: "sig"', 400);
-					}
-					if (!params.key) {
-						throw new HttpError('Missing required parameter: "key"', 400);
-					}
-					return new Promise((resolve, reject) => {
-						const k1 = Buffer.from(secret, 'hex');
-						const signature = Buffer.from(params.sig, 'hex');
-						const key = Buffer.from(params.key, 'hex')
-						const signatureOk = secp256k1.verify(k1, signature, key);
-						if (!signatureOk) {
-							throw new HttpError('Invalid signature', 400);
-						}
-						resolve();
-					});
-				},
-			},
-		};
 	};
 
 	Server.prototype.getDefaultUrl = function() {
