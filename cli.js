@@ -33,7 +33,7 @@ program
 	.command('generateApiKey')
 	.description('Generate a new API key for your lnurl server.')
 	.action(function() {
-		console.log(lnurl.generateApiKey());
+		console.log(JSON.stringify(lnurl.generateApiKey(), null, 2));
 	});
 
 program
@@ -68,16 +68,16 @@ program
 		lnurl.Server.prototype.getDefaultUrl()
 	)
 	.option(
-		'--apiKeyHash [value]',
-		'The hash (sha256) of the API key that is used to secure the write endpoint',
+		'--auth.apiKeys [values]',
+		'List of API keys that can be used to authorize privileged behaviors',
 		_.identity,
-		lnurl.Server.prototype.defaultOptions.apiKeyHash
+		lnurl.Server.prototype.defaultOptions.auth.apiKeys,
 	)
 	.option(
-		'--no-exposeWriteEndpoint',
-		'Do NOT expose the write endpoint',
+		'--auth.timeThreshold [value]',
+		'The tolerance (seconds) when checking the timestamp included with an HMAC',
 		_.identity,
-		false,
+		lnurl.Server.prototype.defaultOptions.auth.timeThreshold,
 	)
 	.option(
 		'--lightning.backend [value]',
@@ -138,9 +138,9 @@ program
 		if (this.configFile) {
 			options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
 		} else {
-			options = _.pick(this, 'host', 'port', 'url', 'apiKeyHash', 'exposeWriteEndpoint');
+			options = _.pick(this, 'host', 'port', 'url', 'exposeWriteEndpoint');
 		}
-		_.each(['lightning', 'tls', 'store'], group => {
+		_.each(['auth', 'lightning', 'tls', 'store'], group => {
 			options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
 				.keys()
 				.map(key => {
@@ -162,6 +162,9 @@ program
 				options[group].config = JSON.parse(options[group].config);
 			}
 		});
+		if (_.isString(options.auth.apiKeys)) {
+			options.auth.apiKeys = JSON.parse(options.auth.apiKeys);
+		}
 		lnurl.createServer(options);
 	});
 

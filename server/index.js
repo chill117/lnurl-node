@@ -21,6 +21,7 @@ module.exports = function(lnurl) {
 	let Server = function(options) {
 		this.options = this.prepareOptions(options);
 		this.checkOptions();
+		this.prepareApiKeys();
 		this.prepareQueues();
 		this.prepareSubProtocols();
 		this.prepareLightning();
@@ -36,10 +37,12 @@ module.exports = function(lnurl) {
 		port: 3000,
 		// The URL where the server is externally reachable:
 		url: null,
-		// The hash (sha256) of the API key that is used to secure the write endpoint:
-		apiKeyHash: null,
-		// Whether or not to expose the write endpoint:
-		exposeWriteEndpoint: false,
+		auth: {
+			// List of API keys that can be used to authorize privileged behaviors:
+			apiKeys: [],
+			// The tolerance (seconds) when checking the timestamp included with an HMAC:
+			timeThreshold: 300,
+		},
 		lightning: {
 			// Which LN backend to use (only lnd supported currently):
 			backend: 'lnd',
@@ -74,6 +77,7 @@ module.exports = function(lnurl) {
 		}
 		options = this.deepClone(options || {});
 		options = _.defaults(options || {}, this.defaultOptions);
+		options.auth = _.defaults(options.auth || {}, this.defaultOptions.auth);
 		options.lightning = _.defaults(options.lightning || {}, this.defaultOptions.lightning);
 		options.lightning.config = _.defaults(options.lightning.config || {}, this.defaultOptions.lightning.config);
 		options.tls = _.defaults(options.tls || {}, this.defaultOptions.tls);
@@ -86,21 +90,32 @@ module.exports = function(lnurl) {
 
 	Server.prototype.checkOptions = function() {
 		this.checkRequiredOptions();
-		if (this.options.apiKeyHash) {
-			if (!_.isString(this.options.apiKeyHash)) {
-				throw new Error('Invalid option ("apiKeyHash"): String expected');
+		if (this.options.auth.apiKeys) {
+			if (!_.isArray(this.options.auth.apiKeys)) {
+				throw new Error('Invalid option ("apiKeys"): Array expected');
 			}
-			if (!this.isHex(this.options.apiKeyHash)) {
-				throw new Error('Invalid option ("apiKeyHash"): Hexadecimal expected');
-			}
+			_.each(this.options.auth.apiKeys, apiKey => {
+				if (!_.isObject(apiKey)) {
+					throw new Error('Invalid option ("apiKeys"): Array of objects expected');
+				}
+				if (!apiKey.id || !this.isHex(apiKey.id) || !apiKey.key || !this.isHex(apiKey.key)) {
+					throw new Error('Invalid option ("apiKeys"): Each API key should include "id" and "key" hexadecimal strings.');
+				}
+			});
 		}
+		this.rejectUnknownOptions();
+	};
+
+	Server.prototype.rejectUnknownOptions = function() {
+		_.chain(this.defaultOptions).keys().each(key => {
+			if (_.isUndefined(this.defaultOptions[key])) {
+				throw new Error(`Unknown option: "${key}"`);
+			}
+		});
 	};
 
 	Server.prototype.checkRequiredOptions = function() {
 		let requiredOptions = ['host', 'port'];
-		if (this.options.exposeWriteEndpoint) {
-			requiredOptions.push('apiKeyHash');
-		}
 		_.each(requiredOptions, name => {
 			if (!this.options[name]) {
 				throw new Error(`Missing required option: "${name}"`);
@@ -108,27 +123,19 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.middleware = function() {
-		return {
-			log: (req, res, next) => {
-				debug.request(req.method + ' ' + req.url);
-				next();
-			},
-			requireApiKey: (req, res, next) => {
-				const apiKey = req.header('API-Key');
-				if (!apiKey) {
-					return next(new HttpError('Missing API key. This end-point requires that an API key to be passed via the "API-Key" HTTP header.', 403));
-				}
-				const apiKeyHash = this.hash(apiKey);
-				if (apiKeyHash !== this.options.apiKeyHash) {
-					return next(new HttpError('Invalid API key', 403));
-				}
-				next();
-			},
-			bodyParser: {
-				json: bodyParser.json(),
-			},
-		};
+	Server.prototype.prepareApiKeys = function() {
+		this.apiKeys = {};
+		_.each(this.options.auth.apiKeys, apiKey => {
+			let { id, key } = apiKey;
+			if (this.apiKeys[id]) {
+				throw new Error(`Duplicate API key identifier ("${id}")`);
+			}
+			this.apiKeys[id] = key;
+		});
+	};
+
+	Server.prototype.getApiKey = function(id) {
+		return this.apiKeys[id] || null;
 	};
 
 	Server.prototype.getTlsCertificate = function() {
@@ -202,63 +209,90 @@ module.exports = function(lnurl) {
 		this.listening = false;
 		const app = this.app = express();
 		const { host, port } = this.options;
-		const middleware = _.result(this, 'middleware');
 		app.use((req, res, next) => {
 			res.removeHeader('X-Powered-By');
+			debug.request(req.method + ' ' + req.url);
 			next();
 		});
-		app.use(middleware.log);
-		if (this.options.exposeWriteEndpoint) {
-			app.post('/lnurl',
-				middleware.requireApiKey,
-				middleware.bodyParser.json,
-				(req, res, next) => {
-					const tag = req.body.tag;
-					if (!this.hasSubProtocol(tag)) {
-						return next(new HttpError('Unknown tag', 400))
+		app.get('/lnurl',
+			(req, res, next) => {
+				/*
+					Signed requests must include:
+					s (signature)
+					id (API key ID)
+					t (timestamp)
+					n (nonce)
+				*/
+				const { s, id, t, n } = req.query;
+				if (s && id && t && n) {
+					const tag = req.query.tag;
+					// if (tag === 'login') {
+					// 	return next(new HttpError('The "login" subprotocol does not support API key signature authorization.'));
+					// }
+					// Looks like a signed request.
+					// Check that the query string is signed by an authorized API key.
+					const { id, s, t } = req.query;
+					const payload = querystring.stringify(_.omit(req.query, 's'));
+					if (this.isValidSignature(payload, s, id, t)) {
+						const params = _.omit(req.query, 's', 'id', 't', 'n', 'tag');
+						switch (tag) {
+							case 'login':
+								const { k1 } = req.query;
+								// Use the secret (k1) provided in the request.
+								return this.createUrl(k1, tag, params).then(() => {
+									req.query = { k1 };
+									next();
+								}).catch(next);
+							default:
+								return this.generateNewUrl(tag, params).then(result => {
+									req.query = { q: result.secret };
+									next();
+								}).catch(next);
+						}
+					} else {
+						return next(new HttpError('Invalid API key signature', 403));
 					}
-					const params = req.body.params;
-					this.generateNewUrl(tag, params).then(result => {
-						res.status(200).json(result);
-					}).catch(next);
+				} else {
+					// Do nothing.
+					next();
 				}
-			);
-		}
-		app.get('/lnurl', (req, res, next) => {
-			let error;
-			const secret = req.query.q || req.query.k1;
-			if (!secret) {
-				return next(new HttpError('Missing secret', 400));
-			}
-			if (this.isLocked(secret)) {
-				throw new HttpError('Invalid secret', 400);
-			}
-			this.lock(secret);
-			const hash = this.hash(secret);
-			this.fetchUrl(hash).then(url => {
-				if (!url) {
-					this.unlock(secret);
+			},
+			(req, res, next) => {
+				let error;
+				const secret = req.query.q || req.query.k1;
+				if (!secret) {
+					return next(new HttpError('Missing secret', 400));
+				}
+				if (this.isLocked(secret)) {
 					throw new HttpError('Invalid secret', 400);
 				}
-				const tag = url.tag;
-				const params = _.extend({}, req.query, url.params);
-				if (req.query.q) {
-					return this.runSubProtocol(tag, 'info', secret, params).then(info => {
-						return this.deleteUrl(hash).then(() => {
-							this.unlock(secret);
-							res.status(200).json(info);
+				this.lock(secret);
+				const hash = this.hash(secret);
+				this.fetchUrl(hash).then(url => {
+					if (!url) {
+						this.unlock(secret);
+						throw new HttpError('Invalid secret', 400);
+					}
+					const tag = url.tag;
+					const params = _.extend({}, req.query, url.params);
+					if (req.query.q) {
+						return this.runSubProtocol(tag, 'info', secret, params).then(info => {
+							return this.deleteUrl(hash).then(() => {
+								this.unlock(secret);
+								res.status(200).json(info);
+							});
 						});
-					});
-				} else {
-					return this.runSubProtocol(tag, 'action', secret, params).then(() => {
-						return this.deleteUrl(hash).then(() => {
-							this.unlock(secret);
-							res.status(200).json({ status: 'OK' });
+					} else {
+						return this.runSubProtocol(tag, 'action', secret, params).then(() => {
+							return this.deleteUrl(hash).then(() => {
+								this.unlock(secret);
+								res.status(200).json({ status: 'OK' });
+							});
 						});
-					});
-				}
-			}).catch(next);
-		});
+					}
+				}).catch(next);
+			}
+		);
 		app.use('*', (req, res, next) => {
 			next(new HttpError('Not found', 404));
 		});
@@ -282,6 +316,26 @@ module.exports = function(lnurl) {
 				debug.info(`HTTPS server listening at ${url}`);
 			});
 		}).catch(debug.error);
+	};
+
+	Server.prototype.isValidSignature = function(payload, signature, id, timestamp) {
+		const now = parseInt(Date.now() / 1000);
+		const threshold = this.options.auth.timeThreshold;
+		if (timestamp < now - threshold || timestamp > now + threshold) {
+			return false;
+		} 
+		const key = this.getApiKey(id);
+		if (!key) return false;
+		const expected = this.createSignature(payload, key);
+		return signature === expected;
+	};
+
+	Server.prototype.createSignature = function(data, key, algorithm) {
+		algorithm = algorithm || 'sha256';
+		if (_.isString(key)) {
+			key = Buffer.from(key, 'hex');
+		}
+		return crypto.createHmac(algorithm, key).update(data).digest('hex');
 	};
 
 	Server.prototype.prepareSubProtocols = function() {
@@ -398,9 +452,9 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.generateApiKey = function() {
-		const key = this.generateRandomKey();
-		const hash = this.hash(key);
-		return { key, hash };
+		const id = this.generateRandomKey(5);
+		const key = this.generateRandomKey(32);
+		return { id, key };
 	};
 
 	Server.prototype.generateNewUrl = function(tag, params) {
@@ -410,6 +464,20 @@ module.exports = function(lnurl) {
 				const encoded = lnurl.encode(url);
 				return { encoded, secret, url };
 			});
+		});
+	};
+
+	Server.prototype.createUrl = function(key, tag, params) {
+		const hash = this.hash(key);
+		return this.store.exists(hash).then(exists => {
+			if (exists) {
+				// Already exists.
+				// Generate another key.
+				key = null;
+			} else {
+				const data = { tag, params };
+				return this.store.save(hash, data);
+			}
 		});
 	};
 
@@ -431,18 +499,8 @@ module.exports = function(lnurl) {
 				try {
 					numAttempts++;
 					key = this.generateRandomKey();
-					const hash = this.hash(key);
-					return this.store.exists(hash).then(exists => {
-						if (exists) {
-							// Already exists.
-							// Generate another key.
-							key = null;
-						} else {
-							const data = { tag, params };
-							return this.store.save(hash, data).then(() => {
-								next();
-							}).catch(next);
-						}
+					return this.createUrl(key, tag, params).then(() => {
+						next();
 					}).catch(next);
 				} catch (error) {
 					return next(error);

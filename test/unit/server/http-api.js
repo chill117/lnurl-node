@@ -11,14 +11,20 @@ const url = require('url');
 
 const lnurl = require('../../../');
 
+const generatePreImage = function() {
+	return lnurl.Server.prototype.generateRandomKey(20);
+};
+
 const generatePaymentRequest = function(amount) {
+	const preimage = generatePreImage();
+	const paymentHash = lnurl.Server.prototype.hash(preimage);
 	const encoded = bolt11.encode({
 		coinType: 'regtest',
 		satoshis: amount,
 		tags: [
 			{
 				tagName: 'payment_hash',
-				data: lnurl.Server.prototype.generateApiKey().hash,
+				data: paymentHash,
 			},
 		],
 	});
@@ -51,12 +57,13 @@ describe('Server: HTTP API', function() {
 
 	before(function(done) {
 		try {
-			this.apiKey = 'ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67';
+			this.apiKey = lnurl.generateApiKey();
 			this.server = new lnurl.Server({
 				host: 'localhost',
 				port: 3000,
-				apiKeyHash: '1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3',
-				exposeWriteEndpoint: true,
+				auth: {
+					apiKeys: [this.apiKey],
+				},
 				lightning: {
 					backend: 'lnd',
 					config: {
@@ -101,281 +108,6 @@ describe('Server: HTTP API', function() {
 		} else {
 			done();
 		}
-	});
-
-	describe('POST /lnurl', function() {
-
-		it('missing API key', function(done) {
-			request.post({
-				url: 'https://localhost:3000/lnurl',
-				ca: this.ca,
-				json: true,
-			}, function(error, response, body) {
-				if (error) return done(error);
-				try {
-					expect(body).to.deep.equal({
-						status: 'ERROR',
-						reason: 'Missing API key. This end-point requires that an API key to be passed via the "API-Key" HTTP header.',
-					});
-				} catch (error) {
-					return done(error);
-				}
-				done();
-			});
-		});
-
-		it('invalid API key', function(done) {
-			request.post({
-				url: 'https://localhost:3000/lnurl',
-				ca: this.ca,
-				json: true,
-				headers: {
-					'API-Key': '469bf65fd2b3575a1604d62fc7a6a94f',
-				},
-			}, function(error, response, body) {
-				if (error) return done(error);
-				try {
-					expect(body).to.deep.equal({
-						status: 'ERROR',
-						reason: 'Invalid API key',
-					});
-				} catch (error) {
-					return done(error);
-				}
-				done();
-			});
-		});
-
-		describe('valid API key', function() {
-
-			it('unknown tag', function(done) {
-				request.post({
-					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
-					body: {
-						tag: 'unknown',
-					},
-					json: true,
-					headers: {
-						'API-Key': this.apiKey,
-					},
-				}, function(error, response, body) {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Unknown tag',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
-				});
-			});
-
-			let testsByTag = {};
-			testsByTag['channelRequest'] = [
-				{
-					params: {
-						localAmt: 0,
-						pushAmt: 0,
-					},
-					expected: {
-						status: 'ERROR',
-						reason: '"localAmt" must be greater than zero',
-					},
-				},
-				{
-					params: {
-						localAmt: 1,
-						pushAmt: -1,
-					},
-					expected: {
-						status: 'ERROR',
-						reason: '"pushAmt" must be greater than or equal to zero',
-					},
-				},
-				{
-					params: {
-						localAmt: 1000,
-						pushAmt: 1001,
-					},
-					expected: {
-						status: 'ERROR',
-						reason: '"localAmt" must be greater than or equal to "pushAmt"',
-					},
-				},
-				{
-					params: {
-						localAmt: 1000,
-						pushAmt: 0,
-					},
-					expected: function(body) {
-						expect(body).to.be.an('object');
-						expect(body.status).to.not.equal('ERROR');
-						expect(body.encoded).to.be.a('string');
-						expect(body.secret).to.be.a('string');
-						expect(body.url).to.be.a('string');
-						const decoded = lnurl.decode(body.encoded);
-						expect(decoded).to.equal(body.url);
-						url.parse(decoded);
-						url.parse(body.url);
-					},
-				},
-			];
-			_.each(['localAmt', 'pushAmt'], function(key) {
-				let params = {
-					localAmt: 1,
-					pushAmt: 0,
-				};
-				delete params[key];
-				testsByTag['channelRequest'].push({
-					params: params,
-					expected: {
-						status: 'ERROR',
-						reason: `Missing required parameter: "${key}"`,
-					},
-				});
-			});
-			_.each(['string', 0.1, {}, [], null, true], function(nonIntegerValue) {
-				_.each(['localAmt', 'pushAmt'], function(key) {
-					let params = {
-						localAmt: 1,
-						pushAmt: 0,
-					};
-					params[key] = nonIntegerValue;
-					testsByTag['channelRequest'].push({
-						params: params,
-						expected: {
-							status: 'ERROR',
-							reason: `Invalid parameter ("${key}"): Integer expected`,
-						},
-					});
-				});
-			});
-			testsByTag['withdrawRequest'] = [
-				{
-					params: {
-						minWithdrawable: 0,
-						maxWithdrawable: 200,
-						defaultDescription: 'service.com: withdrawRequest',
-					},
-					expected: {
-						status: 'ERROR',
-						reason: '"minWithdrawable" must be greater than zero',
-					},
-				},
-				{
-					params: {
-						minWithdrawable: 100,
-						maxWithdrawable: 99,
-						defaultDescription: 'service.com: withdrawRequest',
-					},
-					expected: {
-						status: 'ERROR',
-						reason: '"maxWithdrawable" must be greater than or equal to "minWithdrawable"',
-					},
-				},
-				{
-					params: {
-						minWithdrawable: 100,
-						maxWithdrawable: 200,
-						defaultDescription: 'service.com: withdrawRequest',
-					},
-					expected: function(body) {
-						expect(body).to.be.an('object');
-						expect(body.status).to.not.equal('ERROR');
-						expect(body.encoded).to.be.a('string');
-						expect(body.secret).to.be.a('string');
-						expect(body.url).to.be.a('string');
-						const decoded = lnurl.decode(body.encoded);
-						expect(decoded).to.equal(body.url);
-						url.parse(decoded);
-						url.parse(body.url);
-					},
-				},
-			];
-			_.each(['minWithdrawable', 'maxWithdrawable', 'defaultDescription'], function(key) {
-				let params = {
-					minWithdrawable: 100,
-					maxWithdrawable: 200,
-					defaultDescription: 'service.com: withdrawRequest',
-				};
-				delete params[key];
-				testsByTag['withdrawRequest'].push({
-					params: params,
-					expected: {
-						status: 'ERROR',
-						reason: `Missing required parameter: "${key}"`,
-					},
-				});
-			});
-			_.each(['string', 0.1, {}, [], null, true], function(nonIntegerValue) {
-				_.each(['minWithdrawable', 'maxWithdrawable'], function(key) {
-					let params = {
-						minWithdrawable: 100,
-						maxWithdrawable: 200,
-						defaultDescription: 'service.com: withdrawRequest',
-					};
-					params[key] = nonIntegerValue;
-					testsByTag['withdrawRequest'].push({
-						params: params,
-						expected: {
-							status: 'ERROR',
-							reason: `Invalid parameter ("${key}"): Integer expected`,
-						},
-					});
-				});
-			});
-			testsByTag['login'] = [
-				{
-					params: {},
-					expected: function(body) {
-						expect(body).to.be.an('object');
-						expect(body.status).to.not.equal('ERROR');
-						expect(body.encoded).to.be.a('string');
-						expect(body.secret).to.be.a('string');
-						expect(body.url).to.be.a('string');
-						const decoded = lnurl.decode(body.encoded);
-						expect(decoded).to.equal(body.url);
-						url.parse(decoded);
-						url.parse(body.url);
-					},
-				},
-			];
-			_.each(testsByTag, function(tests, tag) {
-				describe(`tag: "${tag}"`, function() {
-					_.each(tests, function(test) {
-						it('params: ' + JSON.stringify(test.params), function(done) {
-							request.post({
-								url: 'https://localhost:3000/lnurl',
-								ca: this.ca,
-								body: {
-									tag: tag,
-									params: test.params,
-								},
-								json: true,
-								headers: {
-									'API-Key': this.apiKey,
-								},
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									if (_.isFunction(test.expected)) {
-										test.expected.call(this, body);
-									} else {
-										expect(body).to.deep.equal(test.expected);
-									}
-								} catch (error) {
-									return done(error);
-								}
-								done();
-							});
-						});
-					});
-				});
-			});
-		});
 	});
 
 	describe('GET /lnurl', function() {
@@ -426,6 +158,298 @@ describe('Server: HTTP API', function() {
 					return done(error);
 				}
 				done();
+			});
+		});
+
+		describe('?s=SIGNATURE&id=API_KEY_ID&t=TIMESTAMP&n=NONCE&..', function() {
+
+			it('invalid authorization signature: unknown API key', function(done) {
+				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
+				const tag = 'channelRequest';
+				const params = {
+					localAmt: 1000,
+					pushAmt: 0,
+				};
+				const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
+				request.get({
+					url: 'https://localhost:3000/lnurl',
+					ca: this.ca,
+					qs: query,
+					json: true,
+				}, (error, response, body) => {
+					if (error) return done(error);
+					try {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Invalid API key signature',
+						});
+					} catch (error) {
+						return done(error);
+					}
+					done();
+				});
+			});
+
+			it('timestamp outside threshold', function(done) {
+				const tag = 'channelRequest';
+				const params = {
+					localAmt: 1000,
+					pushAmt: 0,
+				};
+				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params, {
+					timestamp: Date.now() - (this.server.options.auth.timeThreshold + 10),
+				});
+				request.get({
+					url: 'https://localhost:3000/lnurl',
+					ca: this.ca,
+					qs: query,
+					json: true,
+				}, (error, response, body) => {
+					if (error) return done(error);
+					try {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Invalid API key signature',
+						});
+					} catch (error) {
+						return done(error);
+					}
+					done();
+				});
+			});
+
+			describe('valid authorization signature', function() {
+
+				let testsByTag = {};
+				testsByTag['unknown'] = [
+					{
+						params: {},
+						expected: {
+							status: 'ERROR',
+							reason: 'Unknown subprotocol: "unknown"',
+						},
+					},
+				];
+				testsByTag['channelRequest'] = [
+					{
+						params: {
+							localAmt: 0,
+							pushAmt: 0,
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"localAmt" must be greater than zero',
+						},
+					},
+					{
+						params: {
+							localAmt: 1,
+							pushAmt: -1,
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"pushAmt" must be greater than or equal to zero',
+						},
+					},
+					{
+						params: {
+							localAmt: 1000,
+							pushAmt: 1001,
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"localAmt" must be greater than or equal to "pushAmt"',
+						},
+					},
+					{
+						params: {
+							localAmt: 1000,
+							pushAmt: 0,
+						},
+						expected: function(body) {
+							expect(body).to.be.an('object');
+							expect(body.k1).to.be.a('string');
+							expect(body.tag).to.equal('channelRequest');
+							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+							expect(body.uri).to.equal(this.lnd.nodeUri);
+						},
+					},
+				];
+				_.each(['localAmt', 'pushAmt'], function(key) {
+					let params = {
+						localAmt: 1,
+						pushAmt: 0,
+					};
+					delete params[key];
+					testsByTag['channelRequest'].push({
+						params: params,
+						expected: {
+							status: 'ERROR',
+							reason: `Missing required parameter: "${key}"`,
+						},
+					});
+				});
+				_.each(['string', 0.1, true], function(nonIntegerValue) {
+					_.each(['localAmt', 'pushAmt'], function(key) {
+						let params = {
+							localAmt: 1,
+							pushAmt: 0,
+						};
+						params[key] = nonIntegerValue;
+						testsByTag['channelRequest'].push({
+							params: params,
+							expected: {
+								status: 'ERROR',
+								reason: `Invalid parameter ("${key}"): Integer expected`,
+							},
+						});
+					});
+				});
+				testsByTag['withdrawRequest'] = [
+					{
+						params: {
+							minWithdrawable: 0,
+							maxWithdrawable: 200,
+							defaultDescription: 'service.com: withdrawRequest',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"minWithdrawable" must be greater than zero',
+						},
+					},
+					{
+						params: {
+							minWithdrawable: 100,
+							maxWithdrawable: 99,
+							defaultDescription: 'service.com: withdrawRequest',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"maxWithdrawable" must be greater than or equal to "minWithdrawable"',
+						},
+					},
+					{
+						params: {
+							minWithdrawable: 100,
+							maxWithdrawable: 200,
+							defaultDescription: 'service.com: withdrawRequest',
+						},
+						expected: function(body) {
+							expect(body).to.be.an('object');
+							expect(body.k1).to.be.a('string');
+							expect(body.tag).to.equal('withdrawRequest');
+							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+							expect(body.minWithdrawable).to.equal(100);
+							expect(body.maxWithdrawable).to.equal(200);
+							expect(body.defaultDescription).to.equal('service.com: withdrawRequest');
+						},
+					},
+				];
+				_.each(['minWithdrawable', 'maxWithdrawable', 'defaultDescription'], function(key) {
+					let params = {
+						minWithdrawable: 100,
+						maxWithdrawable: 200,
+						defaultDescription: 'service.com: withdrawRequest',
+					};
+					delete params[key];
+					testsByTag['withdrawRequest'].push({
+						params: params,
+						expected: {
+							status: 'ERROR',
+							reason: `Missing required parameter: "${key}"`,
+						},
+					});
+				});
+				_.each(['string', 0.1, true], function(nonIntegerValue) {
+					_.each(['minWithdrawable', 'maxWithdrawable'], function(key) {
+						let params = {
+							minWithdrawable: 100,
+							maxWithdrawable: 200,
+							defaultDescription: 'service.com: withdrawRequest',
+						};
+						params[key] = nonIntegerValue;
+						testsByTag['withdrawRequest'].push({
+							params: params,
+							expected: {
+								status: 'ERROR',
+								reason: `Invalid parameter ("${key}"): Integer expected`,
+							},
+						});
+					});
+				});
+				testsByTag['login'] = [
+					{
+						description: 'signed with different private key',
+						params: function() {
+							const linkingKey1 = generateLinkingKey();
+							const linkingKey2 = generateLinkingKey();
+							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
+							const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
+							return {
+								tag: 'login',
+								k1: k1.toString('hex'),
+								sig: signature.toString('hex'),
+								key: linkingKey2.pubKey.toString('hex'),
+							};
+						},
+						expected: {
+							status: 'ERROR',
+							reason: 'Invalid signature',
+						},
+					},
+					{
+						description: 'valid secret',
+						params: function() {
+							const { pubKey, privKey } = generateLinkingKey();
+							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
+							const { signature } = secp256k1.sign(k1, privKey);
+							const params = {
+								tag: 'login',
+								k1: k1.toString('hex'),
+								sig: signature.toString('hex'),
+								key: pubKey.toString('hex'),
+							};
+							return params;
+						},
+						expected: {
+							status: 'OK',
+						},
+					},
+				];
+				_.each(testsByTag, function(tests, tag) {
+					describe(`tag: "${tag}"`, function() {
+						_.each(tests, function(test) {
+							let description = test.description || ('params: ' + JSON.stringify(test.params));
+							it(description, function(done) {
+								let params;
+								if (_.isFunction(test.params)) {
+									params = test.params.call(this);
+								} else {
+									params = test.params;
+								}
+								const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+								request.get({
+									url: 'https://localhost:3000/lnurl',
+									ca: this.ca,
+									qs: query,
+									json: true,
+								}, (error, response, body) => {
+									if (error) return done(error);
+									try {
+										if (_.isFunction(test.expected)) {
+											test.expected.call(this, body);
+										} else {
+											expect(body).to.deep.equal(test.expected);
+										}
+									} catch (error) {
+										return done(error);
+									}
+									done();
+								});
+							});
+						});
+					});
+				});
 			});
 		});
 

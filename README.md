@@ -15,13 +15,13 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [Decoding an lnurl-encoded string](#decoding-an-lnurl-encoded-string)
   * [Generating a new API key](#generating-a-new-api-key)
   * [Running an lnurl server](#running-an-lnurl-server)
-  * [Create a new lnurl](#create-a-new-lnurl)
 * [API](#api)
   * [encode](#encode)
   * [decode](#decode)
   * [createServer](#createServer)
     * [options](#options-for-createserver-method)
   * [generateApiKey](#generateapikey)
+* [Signed LNURLs](#signed-lnurls)
 * [Configuring Data Store](#configuring-data-store)
   * [Redis](#redis)
   * [SQLite](#sqlite)
@@ -120,7 +120,7 @@ Encode a URL:
 lnurl encode "https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df"
 ```
 Expected output:
-```bash
+```
 lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns
 ```
 
@@ -132,7 +132,7 @@ Decode an lnurl:
 lnurl decode "lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns"
 ```
 Expected output:
-```bash
+```
 https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df
 ```
 
@@ -146,8 +146,8 @@ lnurl generateApiKey
 Expected output:
 ```json
 {
-	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
-	"hash": "1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3"
+	"id": "46f8cab814de07a8a65f",
+	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
 }
 ```
 
@@ -159,12 +159,14 @@ Start an lnurl application server:
 lnurl server \
 	--host="localhost" \
 	--port="3000" \
-	--apiKeyHash="1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3" \
+	--auth.apiKeys='[{"id:"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"}]' \
 	--lightning.backend="lnd" \
 	--lightning.config='{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
 ```
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
+* To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
+
 
 To print all available options for the server command:
 ```bash
@@ -172,42 +174,26 @@ lnurl server --help
 ```
 Expected output:
 ```bash
-  --host [value]               The host for the HTTPS server (default: "localhost")
-  --port [value]               The port for the HTTPS server (default: 3000)
-  --url [value]                The URL where the server is externally reachable (default: "https://localhost:3000")
-  --apiKeyHash [value]         The hash (sha256) of the API key that is used to secure the write endpoint (default: null)
-  --no-exposeWriteEndpoint     Do NOT expose the write endpoint
-  --lightning.backend [value]  Which LN backend to use (only lnd supported currently) (default: "lnd")
-  --lightning.config [value]   The configuration object to connect to the LN backend (default: {"hostname":"127.0.0.1:8080","cert":null,"macaroon":null})
-  --tls.certPath [value]       The full file path to the TLS certificate (default: "./tls.cert")
-  --tls.keyPath [value]        The full file path to the TLS certificate key (default: "./tls.key")
-  --no-tls.generate            Do NOT create TLS cert/key pair when does not already exist
-  --no-tls.selfSigned          Do NOT self-sign the certificate
-  --tls.days [value]           The length of validity of the self-signed certificate (default: 3650)
-  -h, --help                   output usage information
-```
+Start an lnurl application server.
 
-
-### Create a new lnurl
-
-Create a new lnurl-encoded URL via cURL:
-```bash
-curl -X POST \
-	--cacert ./tls.cert \
-	-H 'API-Key: ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67' \
-	-H 'Content-Type: application/json' \
-	-d '{"tag":"withdrawRequest","params":{"minWithdrawable":10000,"maxWithdrawable":50000,"defaultDescription":""}}' \
-	https://localhost:3000/lnurl
+Options:
+  --configFile [value]          Optionally load CLI options from a file (supported formats: ".json") (e.g "/path/to/lnurl-server.json") (default: null)
+  --host [value]                The host for the HTTPS server (default: "localhost")
+  --port [value]                The port for the HTTPS server (default: 3000)
+  --url [value]                 The URL where the server is externally reachable (default: "https://localhost:3000")
+  --auth.apiKeys [values]       List of API keys that can be used to authorize privileged behaviors (default: [])
+  --auth.timeThreshold [value]  The tolerance (seconds) when checking the timestamp included with an HMAC (default: 300)
+  --lightning.backend [value]   Which LN backend to use (only lnd supported currently) (default: "lnd")
+  --lightning.config [value]    The configuration object to connect to the LN backend (default: {"hostname":"127.0.0.1:8080","cert":null,"macaroon":null})
+  --tls.certPath [value]        The full file path to the TLS certificate (default: "./tls.cert")
+  --tls.keyPath [value]         The full file path to the TLS certificate key (default: "./tls.key")
+  --no-tls.generate             Do NOT create TLS cert/key pair when does not already exist
+  --no-tls.selfSigned           Do NOT self-sign the certificate
+  --tls.days [value]            The length of validity of the self-signed certificate (default: 3650)
+  --store.backend [value]       Which data store backend to use (default: "memory")
+  --store.config [value]        The options object to use to configure the data store (default: {})
+  -h, --help                    output usage information
 ```
-Sample response:
-```json
-{
-	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
-	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
-	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
-}
-```
-See [subprotocols](#subprotocols) for information about all supported lnurl subprotocols.
 
 
 ## API
@@ -262,6 +248,14 @@ const lnurl = require('lnurl');
 const server = lnurl.createServer({
 	host: 'localhost',
 	port: 3000,
+	auth: {
+		apiKeys: [
+			{
+				id: '46f8cab814de07a8a65f',
+				key: 'ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67',
+			},
+		],
+	},
 	lightning: {
 		backend: 'lnd',
 		config: {
@@ -274,6 +268,7 @@ const server = lnurl.createServer({
 ```
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
+* To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
 
 To generate a new lnurl that a client application can then consume:
 ```js
@@ -293,56 +288,6 @@ Expected output:
 ```
 
 
-#### Usage with write endpoint exposed
-
-Follow the usage example here if you would like to expose the write endpoint of the server as a web API over HTTPS.
-
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	host: 'localhost',
-	port: 3000,
-	exposeWriteEndpoint: true,
-	apiKeyHash: '1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3',
-	lightning: {
-		backend: 'lnd',
-		config: {
-			hostname: '127.0.0.1:8080',
-			cert: '/path/to/tls.cert',
-			macaroon: '/path/to/admin.macaroon',
-		},
-	},
-});
-```
-This example includes a valid API key and hash pair, but you should generate your own with the [generateApiKey](#generateapikey) method.
-
-Create a new lnurl via cURL:
-```bash
-curl -X POST \
-	--cacert ./tls.cert \
-	-H 'API-Key: ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67' \
-	-H 'Content-Type: application/json' \
-	-d '{"tag":"withdrawRequest","params":{"minWithdrawable":10000,"maxWithdrawable":50000,"defaultDescription":""}}' \
-	https://localhost:3000/lnurl
-```
-Sample response:
-```json
-{
-	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
-	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
-	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
-}
-```
-See [subprotocols](#subprotocols) for information about all supported lnurl subprotocols.
-
-To close the server:
-```js
-server.close().then(function() {
-	console.log('lnurl server closed');
-});
-```
-
-
 #### Options for createServer method
 
 ```js
@@ -353,10 +298,12 @@ server.close().then(function() {
 	port: 3000,
 	// The URL where the server is externally reachable:
 	url: null,
-	// The hash (sha256) of the API key that is used to secure the write endpoint:
-	apiKeyHash: null,
-	// Whether or not to expose the write endpoint:
-	exposeWriteEndpoint: false,
+	auth: {
+		// List of API keys that can be used to authorize privileged behaviors:
+		apiKeys: [],
+		// The tolerance (seconds) when checking the timestamp included with an HMAC:
+		timeThreshold: 300,
+	},
 	lightning: {
 		// Which LN backend to use (only lnd supported currently):
 		backend: 'lnd',
@@ -378,6 +325,10 @@ server.close().then(function() {
 		selfSigned: true,
 		// The length of validity of the self-signed certificate:
 		days: 3650,
+	},
+	store: {
+		backend: 'memory',
+		config: {},
 	},
 }
 ```
@@ -537,6 +488,63 @@ lnurl server \
 ```
 
 
+## Signed LNURLs
+
+It is possible to generate new lnurls in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - see [Generating a new API key](#generating-a-new-api-key).
+
+Here is a sample node.js script that generates a signed lnurl:
+```js
+const crypto = require('crypto');
+const querystring = require('querystring');
+
+const createSignature = function(data, key) {
+	key = Buffer.from(key, 'hex');
+	return crypto.createHmac('sha256', key).update(data).digest('hex')
+};
+
+const generateNonce = function(numberOfBytes) {
+	return crypto.randomBytes(numberOfBytes).toString('hex');
+};
+
+const apiKey = {
+	/* !! REPLACE THIS WITH YOUR APP'S API KEY !! */
+	id: '5619b36a2e',
+	key: '9841b58cbfb2067f139d4d4d1f97c5b7416ca4995eabd2ce036e27c7d2568cb4',
+};
+
+const { id, key } = apiKey;
+const nonce = generateNonce(10);
+const timestamp = parseInt(Date.now() / 1000);// seconds
+const query = {
+	id: id,
+	t: timestamp,
+	n: nonce,
+	tag: 'channelRequest',
+	// params:
+	localAmt: 1000,
+	pushAmt: 0,
+};
+const payload = querystring.stringify(query);
+query.s = createSignature(payload, key);
+const protocol = 'https:';
+const hostname = 'your-lnurl-server.com';
+const uri = '/lnurl';
+const signedUrl = `${protocol}//${hostname}${uri}?` + querystring.stringify(query);
+console.log(signedUrl);
+
+```
+The output of the above script will be something like this:
+```
+https://your-lnurl-server.com/lnurl?id=5619b36a2e&t=1574187915&n=ae0da0aa17d3f72db4f8&tag=channelRequest&localAmt=1000&pushAmt=0&s=3ed0391a5f17a7519c9d34b334d5dc165e668246a918c4a23a904e300835dce8
+```
+* `id` - the ID of the offline app's API key
+* `t` - timestamp (seconds) of when the signed lnurl was created; by default your lnurl server will have a threshold of +/- 5 minutes
+* `n` - randomly generated nonce
+* `s` - the signature created from the URL's querystring and the offline app's API key
+* `tag` - the subprotocol to use
+* `localAmt` and `pushAmt` - parameters that depend on which subprotocol being used
+
+
 ## Debugging
 
 This module uses [debug](https://github.com/visionmedia/debug) to output debug messages to the console. To output all debug messages, run your node app with the `DEBUG` environment variable:
@@ -555,6 +563,11 @@ To run all tests:
 ```
 npm test
 ```
+
+
+## Changelog
+
+See [CHANGELOG.md](https://github.com/chill117/lnurl-node/blob/master/CHANGELOG.md)
 
 
 ## License

@@ -2,6 +2,7 @@ const _ = require('underscore');
 const async = require('async');
 const expect = require('chai').expect;
 const fs = require('fs');
+const lnurl = require('../../');
 const path = require('path');
 const request = require('request');
 const spawn = require('child_process').spawn;
@@ -30,6 +31,19 @@ describe('Command-line interface', function() {
 			cmd: ['decode', 'lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns'],
 			expected: {
 				stdout: 'https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df',
+			},
+		},
+		{
+			cmd: ['generateApiKey'],
+			expected: {
+				stdout: function(result) {
+					result = JSON.parse(result);
+					expect(result).to.be.an('object');
+					expect(result.id).to.have.length(10);
+					expect(lnurl.Server.prototype.isHex(result.id)).to.equal(true);
+					expect(result.key).to.have.length(64);
+					expect(lnurl.Server.prototype.isHex(result.key)).to.equal(true);
+				},
 			},
 		},
 	];
@@ -93,14 +107,14 @@ describe('Command-line interface', function() {
 		});
 
 		it('runs', function(done) {
-			const apiKey = 'ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67';
+			const apiKey = lnurl.generateApiKey();
 			const certPath = path.join(this.tmpDir, 'tls.cert');
 			const keyPath = path.join(this.tmpDir, 'tls.key');
-			const lnurl = this.lnurl;
 			child = spawn(cli, [
 				'server',
 				'--host', 'localhost',
 				'--port', '3000',
+				'--auth.apiKeys', JSON.stringify([apiKey]),
 				'--lightning.backend', 'lnd',
 				'--lightning.config', JSON.stringify({
 					hostname: this.lnd.hostname,
@@ -111,7 +125,6 @@ describe('Command-line interface', function() {
 				'--tls.keyPath', keyPath,
 				'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
 				'--store.config', JSON.stringify((process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {}),
-				'--apiKeyHash', '1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3',
 			]);
 			let errorFromStdErr;
 			child.stderr.once('data', data => {
@@ -122,30 +135,25 @@ describe('Command-line interface', function() {
 				fs.readFile(certPath, (error, buffer) => {
 					if (error) return next();
 					const ca = buffer.toString();
-					request.post({
+					const tag = 'channelRequest';
+					const params = {
+						localAmt: 1000,
+						pushAmt: 1000,
+					};
+					const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
+					request.get({
 						url: 'https://localhost:3000/lnurl',
 						ca: ca,
-						body: {
-							tag: 'channelRequest',
-							params: {
-								localAmt: 1000,
-								pushAmt: 1000,
-							},
-						},
+						qs: query,
 						json: true,
-						headers: {
-							'API-Key': apiKey,
-						},
 					}, (error, response, body) => {
 						if (error) return next();
 						try {
 							expect(body).to.be.an('object');
-							expect(body.status).to.not.equal('ERROR');
-							expect(body.encoded).to.be.a('string');
-							expect(body.secret).to.be.a('string');
-							expect(body.url).to.be.a('string');
-							const decoded = lnurl.decode(body.encoded);
-							expect(decoded).to.equal(body.url);
+							expect(body.k1).to.be.a('string');
+							expect(body.tag).to.equal(tag);
+							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+							expect(body.uri).to.equal(this.lnd.nodeUri);
 						} catch (error) {
 							return next(error);
 						}

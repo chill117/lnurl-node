@@ -37,6 +37,8 @@ module.exports = function(server) {
 			if (!_.isString(defaultDescription)) {
 				throw new HttpError('Invalid parameter ("defaultDescription"): String expected', 400);	
 			}
+			params.minWithdrawable = minWithdrawable.toNumber();
+			params.maxWithdrawable = maxWithdrawable.toNumber();
 		},
 		info: (secret, params) => {
 			return new Promise((resolve, reject) => {

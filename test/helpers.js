@@ -7,6 +7,7 @@ const https = require('https');
 const lnurl = require('../');
 const path = require('path');
 const pem = require('pem');
+const querystring = require('querystring');
 const tmpDir = path.join(__dirname, 'tmp');
 
 module.exports = {
@@ -94,5 +95,24 @@ module.exports = {
 			};
 			return app;
 		},
+	},
+	prepareSignedRequest: function(apiKey, tag, params, overrides) {
+		overrides = overrides || {};
+		const { id, key } = apiKey;
+		const nonce = this.generateNonce(16);
+		const timestamp = overrides.timestamp || parseInt(Date.now() / 1000);
+		const query = _.extend({
+			id: id,
+			t: timestamp,
+			n: nonce,
+			tag: tag,
+		}, params);
+		const payload = querystring.stringify(query);
+		const signature = lnurl.Server.prototype.createSignature(payload, key);
+		query.s = signature;
+		return query;
+	},
+	generateNonce: function(numberOfBytes) {
+		return lnurl.Server.prototype.generateRandomKey(numberOfBytes);
 	},
 };
