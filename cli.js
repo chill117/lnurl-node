@@ -2,8 +2,10 @@
 
 const _ = require('underscore');
 const commander = require('commander');
+const fs = require('fs');
 
 const lnurl = require('./index');
+const path = require('path');
 const pkg = require('./package.json');
 const program = new commander.Command();
 
@@ -37,6 +39,16 @@ program
 program
 	.command('server')
 	.description('Start an lnurl application server.')
+	.option(
+		'--configFile [value]',
+		'Optionally load CLI options from a file (supported formats: ".json") (e.g "/path/to/lnurl-server.json")',
+		function(value) {
+			const filePath = path.resolve(value);
+			fs.statSync(filePath);
+			return filePath;
+		},
+		null
+	)
 	.option(
 		'--host [value]',
 		'The host for the HTTPS server',
@@ -122,12 +134,22 @@ program
 		lnurl.Server.prototype.defaultOptions.store.config
 	)
 	.action(function() {
-		let options = _.pick(this, 'host', 'port', 'url', 'apiKeyHash', 'exposeWriteEndpoint');
+		let options;
+		if (this.configFile) {
+			options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
+		} else {
+			options = _.pick(this, 'host', 'port', 'url', 'apiKeyHash', 'exposeWriteEndpoint');
+		}
 		_.each(['lightning', 'tls', 'store'], group => {
 			options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
 				.keys()
 				.map(key => {
-					const value = this[`${group}.${key}`];
+					let value;
+					if (!_.isUndefined(options[group])) {
+						value = options[group][key];
+					} else {
+						value = this[`${group}.${key}`];
+					}
 					if (_.isUndefined(value)) return null;
 					return [key, value];
 				})
