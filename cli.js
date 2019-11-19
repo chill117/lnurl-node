@@ -123,7 +123,7 @@ program
 	)
 	.action(function() {
 		let options = _.pick(this, 'host', 'port', 'url', 'apiKeyHash', 'exposeWriteEndpoint');
-		_.each(['lightning', 'tls'], group => {
+		_.each(['lightning', 'tls', 'store'], group => {
 			options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
 				.keys()
 				.map(key => {
@@ -135,9 +135,11 @@ program
 				.object()
 				.value();
 		});
-		if (_.isString(options.lightning.config)) {
-			options.lightning.config = JSON.parse(options.lightning.config);
-		}
+		_.each(['lightning', 'store'], group => {
+			if (_.isString(options[group].config)) {
+				options[group].config = JSON.parse(options[group].config);
+			}
+		});
 		lnurl.createServer(options);
 	});
 
