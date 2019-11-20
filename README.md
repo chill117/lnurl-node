@@ -172,8 +172,8 @@ To print all available options for the server command:
 ```bash
 lnurl server --help
 ```
-Expected output:
-```bash
+Output:
+```
 Start an lnurl application server.
 
 Options:
@@ -268,7 +268,6 @@ const server = lnurl.createServer({
 ```
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
-* To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
 
 To generate a new lnurl that a client application can then consume:
 ```js
@@ -286,6 +285,7 @@ Expected output:
 	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
+It is also possible to generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
 
 
 #### Options for createServer method
@@ -358,7 +358,7 @@ Expected output:
 
 ## Configuring Data Store
 
-By default the lnurl server will store data in memory - which is not ideal for several reasons - so it is strongly recommended that you configure a proper data store for your server. This module supports [Redis](#redis), [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
+By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [Redis](#redis), [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
 
 
 ### Redis
