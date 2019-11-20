@@ -1,4 +1,5 @@
-test/
+/examples/
+/test/
 .gitignore
 .npmignore
 .travis.yml
