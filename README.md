@@ -343,15 +343,15 @@ Generate a new API key for your lnurl server.
 Usage:
 ```js
 const lnurl = require('lnurl');
-const { key, hash } = lnurl.generateApiKey();
-console.log({ key, hash });
+const { id, key } = lnurl.generateApiKey();
+console.log({ id, key });
 ````
 
 Expected output:
 ```json
 {
-	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
-	"hash": "1449824c957f7d2b708c513da833b0ddafcfbfccefbd275b5402c103cb79a6d3"
+	"id": "46f8cab814de07a8a65f",
+	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
 }
 ```
 
