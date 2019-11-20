@@ -277,10 +277,8 @@ module.exports = function(lnurl) {
 					const params = _.extend({}, req.query, url.params);
 					if (req.query.q) {
 						return this.runSubProtocol(tag, 'info', secret, params).then(info => {
-							return this.deleteUrl(hash).then(() => {
-								this.unlock(secret);
-								res.status(200).json(info);
-							});
+							this.unlock(secret);
+							res.status(200).json(info);
 						});
 					} else {
 						return this.runSubProtocol(tag, 'action', secret, params).then(() => {

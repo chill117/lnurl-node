@@ -2,12 +2,10 @@ const _ = require('underscore');
 const bolt11 = require('bolt11');
 const crypto = require('crypto');
 const { expect } = require('chai');
-const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const request = require('request');
 const secp256k1 = require('secp256k1');
-const url = require('url');
 
 const lnurl = require('../../../');
 
@@ -112,34 +110,41 @@ describe('Server: HTTP API', function() {
 
 	describe('GET /lnurl', function() {
 
-		beforeEach(function() {
-			this.secrets = {};
-		});
+		const validParams = {
+			create: {
+				'channelRequest': {
+					localAmt: 1000,
+					pushAmt: 0,
+				},
+				'withdrawRequest': {
+					minWithdrawable: 1000,
+					maxWithdrawable: 2000,
+					defaultDescription: 'service.com: withdrawRequest',
+				},
+				'login': {},
+			},
+			action: {
+				'channelRequest': {
+					remoteid: 'PUBKEY@HOST:PORT',
+					private: 1,
+				},
+				'withdrawRequest': {
+					pr: generatePaymentRequest(1000),
+				},
+				'login': function() {
 
-		beforeEach(function() {
-			return this.server.generateNewUrl('channelRequest', {
-				localAmt: 1000,
-				pushAmt: 0,
-			}).then(result => {
-				this.secrets['channelRequest'] = result.secret;
-			});
-		});
+				},
+			},
+		};
 
-		beforeEach(function() {
-			return this.server.generateNewUrl('withdrawRequest', {
-				minWithdrawable: 1000,
-				maxWithdrawable: 2000,
-				defaultDescription: 'service.com: withdrawRequest',
-			}).then(result => {
-				this.secrets['withdrawRequest'] = result.secret;
-			});
-		});
-
-		beforeEach(function() {
-			return this.server.generateNewUrl('login').then(result => {
-				this.secrets['login'] = result.secret;
-			});
-		});
+		const prepareValidParams = function(step, tag) {
+			const params = validParams[step] && validParams[step][tag];
+			if (_.isFunction(params)) {
+				return params();
+			} else if (_.isObject(params)) {
+				return _.clone(params);
+			}
+		};
 
 		it('missing secret', function(done) {
 			request.get({
@@ -166,10 +171,7 @@ describe('Server: HTTP API', function() {
 			it('invalid authorization signature: unknown API key', function(done) {
 				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
 				const tag = 'channelRequest';
-				const params = {
-					localAmt: 1000,
-					pushAmt: 0,
-				};
+				const params = prepareValidParams('create', tag);
 				const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
 				request.get({
 					url: 'https://localhost:3000/lnurl',
@@ -192,13 +194,35 @@ describe('Server: HTTP API', function() {
 
 			it('timestamp outside threshold', function(done) {
 				const tag = 'channelRequest';
-				const params = {
-					localAmt: 1000,
-					pushAmt: 0,
-				};
+				const params = prepareValidParams('create', tag);
 				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params, {
 					timestamp: Date.now() - (this.server.options.auth.timeThreshold + 10),
 				});
+				request.get({
+					url: 'https://localhost:3000/lnurl',
+					ca: this.ca,
+					qs: query,
+					json: true,
+				}, (error, response, body) => {
+					if (error) return done(error);
+					try {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Invalid API key signature',
+						});
+					} catch (error) {
+						return done(error);
+					}
+					done();
+				});
+			});
+
+			it('query tampering', function(done) {
+				const tag = 'channelRequest';
+				const params = prepareValidParams('create', tag);
+				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+				query.localAmt = 500000;
+				query.pushAmt = 500000;
 				request.get({
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
@@ -262,10 +286,7 @@ describe('Server: HTTP API', function() {
 						},
 					},
 					{
-						params: {
-							localAmt: 1000,
-							pushAmt: 0,
-						},
+						params: prepareValidParams('create', 'channelRequest'),
 						expected: function(body) {
 							expect(body).to.be.an('object');
 							expect(body.k1).to.be.a('string');
@@ -276,12 +297,10 @@ describe('Server: HTTP API', function() {
 					},
 				];
 				_.each(['localAmt', 'pushAmt'], function(key) {
-					let params = {
-						localAmt: 1,
-						pushAmt: 0,
-					};
+					const tag = 'channelRequest';
+					let params = prepareValidParams('create', tag);
 					delete params[key];
-					testsByTag['channelRequest'].push({
+					testsByTag[tag].push({
 						params: params,
 						expected: {
 							status: 'ERROR',
@@ -291,12 +310,10 @@ describe('Server: HTTP API', function() {
 				});
 				_.each(['string', 0.1, true], function(nonIntegerValue) {
 					_.each(['localAmt', 'pushAmt'], function(key) {
-						let params = {
-							localAmt: 1,
-							pushAmt: 0,
-						};
+						const tag = 'channelRequest';
+						let params = prepareValidParams('create', tag);
 						params[key] = nonIntegerValue;
-						testsByTag['channelRequest'].push({
+						testsByTag[tag].push({
 							params: params,
 							expected: {
 								status: 'ERROR',
@@ -329,30 +346,24 @@ describe('Server: HTTP API', function() {
 						},
 					},
 					{
-						params: {
-							minWithdrawable: 100,
-							maxWithdrawable: 200,
-							defaultDescription: 'service.com: withdrawRequest',
-						},
+						params: prepareValidParams('create', 'withdrawRequest'),
 						expected: function(body) {
 							expect(body).to.be.an('object');
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('withdrawRequest');
 							expect(body.callback).to.equal('https://localhost:3000/lnurl');
-							expect(body.minWithdrawable).to.equal(100);
-							expect(body.maxWithdrawable).to.equal(200);
-							expect(body.defaultDescription).to.equal('service.com: withdrawRequest');
+							const params = prepareValidParams('create', 'withdrawRequest');
+							expect(body.minWithdrawable).to.equal(params.minWithdrawable);
+							expect(body.maxWithdrawable).to.equal(params.maxWithdrawable);
+							expect(body.defaultDescription).to.equal(params.defaultDescription);
 						},
 					},
 				];
 				_.each(['minWithdrawable', 'maxWithdrawable', 'defaultDescription'], function(key) {
-					let params = {
-						minWithdrawable: 100,
-						maxWithdrawable: 200,
-						defaultDescription: 'service.com: withdrawRequest',
-					};
+					const tag = 'withdrawRequest';
+					let params = prepareValidParams('create', tag);
 					delete params[key];
-					testsByTag['withdrawRequest'].push({
+					testsByTag[tag].push({
 						params: params,
 						expected: {
 							status: 'ERROR',
@@ -362,13 +373,10 @@ describe('Server: HTTP API', function() {
 				});
 				_.each(['string', 0.1, true], function(nonIntegerValue) {
 					_.each(['minWithdrawable', 'maxWithdrawable'], function(key) {
-						let params = {
-							minWithdrawable: 100,
-							maxWithdrawable: 200,
-							defaultDescription: 'service.com: withdrawRequest',
-						};
+						const tag = 'withdrawRequest';
+						let params = prepareValidParams('create', tag);
 						params[key] = nonIntegerValue;
-						testsByTag['withdrawRequest'].push({
+						testsByTag[tag].push({
 							params: params,
 							expected: {
 								status: 'ERROR',
@@ -379,7 +387,7 @@ describe('Server: HTTP API', function() {
 				});
 				testsByTag['login'] = [
 					{
-						description: 'signed with different private key',
+						description: 'invalid signature: signed with different private key',
 						params: function() {
 							const linkingKey1 = generateLinkingKey();
 							const linkingKey2 = generateLinkingKey();
@@ -398,7 +406,7 @@ describe('Server: HTTP API', function() {
 						},
 					},
 					{
-						description: 'valid secret',
+						description: 'valid signature',
 						params: function() {
 							const { pubKey, privKey } = generateLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
@@ -483,7 +491,7 @@ describe('Server: HTTP API', function() {
 					description: 'valid secret',
 					expected: function(body) {
 						expect(body).to.deep.equal({
-							k1: this.secrets['channelRequest'],
+							k1: this.secret,
 							tag: 'channelRequest',
 							callback: 'https://localhost:3000/lnurl',
 							uri: this.lnd.nodeUri,
@@ -496,7 +504,7 @@ describe('Server: HTTP API', function() {
 					description: 'valid secret',
 					expected: function(body) {
 						expect(body).to.deep.equal({
-							k1: this.secrets['withdrawRequest'],
+							k1: this.secret,
 							tag: 'withdrawRequest',
 							callback: 'https://localhost:3000/lnurl',
 							minWithdrawable: 1000,
@@ -517,18 +525,22 @@ describe('Server: HTTP API', function() {
 			];
 			_.each(testsByTag, function(tests, tag) {
 				describe(`tag: "${tag}"`, function() {
+					beforeEach(function() {
+						this.secret = null;
+						const params = prepareValidParams('create', tag);
+						return this.server.generateNewUrl(tag, params).then(result => {
+							this.secret = result.secret;
+						});
+					});
 					_.each(tests, function(test) {
 						it(test.description, function(done) {
 							request.get({
 								url: 'https://localhost:3000/lnurl',
 								ca: this.ca,
 								qs: {
-									q: this.secrets[tag],
+									q: this.secret,
 								},
 								json: true,
-								headers: {
-									'API-Key': this.apiKey,
-								},
 							}, (error, response, body) => {
 								if (error) return done(error);
 								try {
@@ -572,19 +584,10 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			const validParams = {
-				'channelRequest': {
-					remoteid: 'PUBKEY@HOST:PORT',
-					private: 1,
-				},
-				'withdrawRequest': {
-					pr: generatePaymentRequest(1000),
-				},
-			};
 			let testsByTag = {};
 			testsByTag['channelRequest'] = [
 				{
-					params: validParams.channelRequest,
+					params: validParams.action.channelRequest,
 					expected: {
 						status: 'OK',
 					},
@@ -592,7 +595,7 @@ describe('Server: HTTP API', function() {
 			];
 			testsByTag['withdrawRequest'] = [
 				{
-					params: validParams.withdrawRequest,
+					params: validParams.action.withdrawRequest,
 					expected: function(body) {
 							expect(body).to.deep.equal({
 							status: 'OK',
@@ -672,7 +675,7 @@ describe('Server: HTTP API', function() {
 					params: function() {
 						const linkingKey1 = generateLinkingKey();
 						const linkingKey2 = generateLinkingKey();
-						const k1 = Buffer.from(this.secrets['login'], 'hex');
+						const k1 = Buffer.from(this.secret, 'hex');
 						const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
 						const params = {
 							sig: signature.toString('hex'),
@@ -706,7 +709,7 @@ describe('Server: HTTP API', function() {
 					description: 'valid signature',
 					params: function() {
 						const { pubKey, privKey } = generateLinkingKey();
-						const k1 = Buffer.from(this.secrets['login'], 'hex');
+						const k1 = Buffer.from(this.secret, 'hex');
 						const { signature } = secp256k1.sign(k1, privKey);
 						const params = {
 							sig: signature.toString('hex'),
@@ -719,7 +722,7 @@ describe('Server: HTTP API', function() {
 					},
 				},
 			];
-			_.each(validParams, function(params, tag) {
+			_.each(validParams.action, function(params, tag) {
 				_.chain(params).keys().each(function(key) {
 					testsByTag[tag] = testsByTag[tag] || [];
 					testsByTag[tag].push({
@@ -733,6 +736,13 @@ describe('Server: HTTP API', function() {
 			});
 			_.each(testsByTag, function(tests, tag) {
 				describe(`tag: "${tag}"`, function() {
+					beforeEach(function() {
+						this.secret = null;
+						const params = prepareValidParams('create', tag);
+						return this.server.generateNewUrl(tag, params).then(result => {
+							this.secret = result.secret;
+						});
+					});
 					_.each(tests, function(test) {
 						let description = test.description || ('params: ' + JSON.stringify(test.params));
 						it(description, function(done) {
@@ -743,7 +753,7 @@ describe('Server: HTTP API', function() {
 								params = test.params;
 							}
 							params = _.extend({}, params, {
-								k1: this.secrets[tag],
+								k1: this.secret,
 							});
 							request.get({
 								url: 'https://localhost:3000/lnurl',
@@ -768,37 +778,84 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			it('one-time-use', function(done) {
-				const doRequest = (cb) => {
+			describe('other', function() {
+
+				const doRequest = function(step, cb) {
+					const params = prepareValidParams(step, tag) || {};
+					if (step === 'info') {
+						params.q = this.secret;
+					} else {
+						params.k1 = this.secret;
+					}
 					request.get({
 						url: 'https://localhost:3000/lnurl',
 						ca: this.ca,
-						qs: {
-							k1: this.secrets['withdrawRequest'],
-							pr: generatePaymentRequest(1200),
-						},
+						qs: params,
 						json: true,
 					}, cb);
 				};
-				doRequest((error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({ status: 'OK' });
-					} catch (error) {
-						return done(error);
-					}
-					doRequest((error, response, body) => {
+
+				const tag = 'withdrawRequest';
+				beforeEach(function() {
+					this.doRequest = doRequest.bind(this);
+					this.secret = null;
+					const params = prepareValidParams('create', tag);
+					return this.server.generateNewUrl(tag, params).then(result => {
+						this.secret = result.secret;
+					});
+				});
+
+				it('full client-server UX flow', function(done) {
+					this.doRequest('info', (error, response, body) => {
 						if (error) return done(error);
 						try {
-							expect(body).to.deep.equal({
-								status: 'ERROR',
-								reason: 'Invalid secret',
-							});
+							expect(body).to.be.an('object');
+							expect(body.k1).to.be.a('string');
+							expect(body.tag).to.equal(tag);
+							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+							const params = prepareValidParams('create', tag);
+							expect(body.minWithdrawable).to.equal(params.minWithdrawable);
+							expect(body.maxWithdrawable).to.equal(params.maxWithdrawable);
+							expect(body.defaultDescription).to.equal(params.defaultDescription);
 						} catch (error) {
 							return done(error);
 						}
-						done();
-					})
+						this.doRequest('action', (error, response, body) => {
+							if (error) return done(error);
+							try {
+								expect(body).to.deep.equal({ status: 'OK' });
+								this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+							} catch (error) {
+								return done(error);
+							}
+							done();
+						});
+					});
+				});
+
+				it('one-time-use', function(done) {
+					this.doRequest('action', (error, response, body) => {
+						if (error) return done(error);
+						try {
+							expect(body).to.deep.equal({ status: 'OK' });
+							this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+						} catch (error) {
+							return done(error);
+						}
+						this.doRequest('action', (error, response, body) => {
+							if (error) return done(error);
+							try {
+								expect(body).to.deep.equal({
+									status: 'ERROR',
+									reason: 'Invalid secret',
+								});
+								this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+							} catch (error) {
+								return done(error);
+							}
+							done();
+						})
+					});
 				});
 			});
 		});
