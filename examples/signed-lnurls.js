@@ -17,14 +17,16 @@ const apiKey = {
 };
 
 const { id, key } = apiKey;
-const nonce = generateNonce(12);
+const nonce = generateNonce(8);
 const query = {
 	id: id,
 	n: nonce,
-	tag: 'channelRequest',
-	// params:
-	localAmt: 1000,
-	pushAmt: 0,
+	// Note that tag and params can be shortened to improve scannability of QR codes.
+	// See "Shorter Signed LNURLs" for more info:
+	// https://github.com/chill117/lnurl-node#shorter-signed-lnurls
+	tag: 'withdrawRequest',
+	minWithdrawable: 1000,
+	maxWithdrawable: 500000,
 };
 const payload = querystring.stringify(query);
 query.s = createSignature(payload, key);

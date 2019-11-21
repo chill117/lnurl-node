@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { expect } = require('chai');
 const fs = require('fs');
 const path = require('path');
+const querystring = require('querystring');
 const secp256k1 = require('secp256k1');
 
 const lnurl = require('../../../');
@@ -216,10 +217,82 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			it('one-time-use', function(done) {
-				const tag = 'withdrawRequest';
+			_.each(['id', 'n', 'tag'], function(field) {
+				it(`missing "${field}"`, function(done) {
+					const tag = 'channelRequest';
+					const params = prepareValidParams('create', tag);
+					let overrides = {};
+					overrides[field] = '';
+					const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params, overrides);
+					this.helpers.request('get', {
+						url: 'https://localhost:3000/lnurl',
+						ca: this.ca,
+						qs: query,
+						json: true,
+					}, (error, response, body) => {
+						if (error) return done(error);
+						try {
+							expect(body).to.deep.equal({
+								status: 'ERROR',
+								reason: `Failed API key signature check: Missing "${field}"`,
+							});
+						} catch (error) {
+							return done(error);
+						}
+						done();
+					});
+				});
+			});
+
+			it('out-of-order query string', function(done) {
+				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+				let query = _.extend({
+					n: this.helpers.generateNonce(10),
+					tag: tag,
+					id: this.apiKey.id,
+				}, params);
+				const payload = querystring.stringify(query);
+				const signature = lnurl.Server.prototype.createSignature(payload, this.apiKey.key);
+				query.s = signature;
+				const outOfOrderQuery = _.extend({
+					s: query.s,
+					tag: query.tag,
+					id: query.id,
+					n: query.n,
+				}, params);
+				this.helpers.request('get', {
+					url: 'https://localhost:3000/lnurl',
+					ca: this.ca,
+					qs: outOfOrderQuery,
+					json: true,
+				}, (error, response, body) => {
+					if (error) return done(error);
+					try {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Invalid API key signature',
+						});
+					} catch (error) {
+						return done(error);
+					}
+					done();
+				});
+			});
+
+			it('shortened query', function(done) {
+				const tag = 'channelRequest';
+				const params = prepareValidParams('create', tag);
+				let query = {
+					id: this.apiKey.id,
+					n: this.helpers.generateNonce(10),
+					t: tag,
+					pl: params.localAmt,
+					pp: params.pushAmt,
+				};
+				const payload = querystring.stringify(query);
+				const signature = lnurl.Server.prototype.createSignature(payload, this.apiKey.key);
+				query.s = signature;
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
@@ -233,18 +306,36 @@ describe('Server: HTTP API', function() {
 					} catch (error) {
 						return done(error);
 					}
+					done();
+				});
+			});
+
+			it('one-time-use', function(done) {
+				const tag = 'withdrawRequest';
+				const params = prepareValidParams('create', tag);
+				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+				this.helpers.request('get', {
+					url: 'https://localhost:3000/lnurl',
+					ca: this.ca,
+					qs: query,
+					json: true,
+				}, (error, response1, body1) => {
+					if (error) return done(error);
+					try {
+						expect(body1).to.be.an('object');
+						expect(body1.status).to.not.equal('ERROR');
+					} catch (error) {
+						return done(error);
+					}
 					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: this.ca,
 						qs: query,
 						json: true,
-					}, (error, response, body) => {
+					}, (error, response2, body2) => {
 						if (error) return done(error);
 						try {
-							expect(body).to.deep.equal({
-								status: 'ERROR',
-								reason: 'API key signature already consumed',
-							});
+							expect(body2).to.deep.equal(body1);
 						} catch (error) {
 							return done(error);
 						}

@@ -97,14 +97,15 @@ module.exports = {
 			return app;
 		},
 	},
-	prepareSignedRequest: function(apiKey, tag, params) {
+	prepareSignedRequest: function(apiKey, tag, params, overrides) {
+		overrides = overrides || {};
 		const { id, key } = apiKey;
 		const nonce = this.generateNonce(12);
 		const query = _.extend({
 			id: id,
 			n: nonce,
 			tag: tag,
-		}, params);
+		}, params, overrides);
 		const payload = querystring.stringify(query);
 		const signature = lnurl.Server.prototype.createSignature(payload, key);
 		query.s = signature;

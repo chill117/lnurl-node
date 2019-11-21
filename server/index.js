@@ -33,8 +33,10 @@ module.exports = function(lnurl) {
 		host: 'localhost',
 		// The port for the HTTPS server:
 		port: 3000,
-		// The URL where the server is externally reachable:
+		// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
 		url: null,
+		// The URI path of the HTTPS end-point:
+		endpoint: '/lnurl',
 		auth: {
 			// List of API keys that can be used to authorize privileged behaviors:
 			apiKeys: [],
@@ -210,20 +212,29 @@ module.exports = function(lnurl) {
 			debug.request(req.method + ' ' + req.url);
 			next();
 		});
-		app.get('/lnurl',
+		app.get(this.options.endpoint,
 			(req, res, next) => {
-				/*
-					Signed LNURLs must include:
-					id (API key ID)
-					n (nonce)
-					s (signature)
-					tag (subprotocol to be used)
-				*/
-				if (req.query.id && req.query.n && req.query.s && req.query.tag) {
+				// Signed LNURLs.
+				if (req.query.s) {
 					// Looks like a signed request.
-					const { id, n, s, tag } = req.query;
 					// Payload is everything in the querystring less the signature itself.
+					// Should be *before* the unshortening.
 					const payload = querystring.stringify(_.omit(req.query, 's'));
+					// Unshorten the query (only for signed LNURLs).
+					req.query = this.unshortenQuery(req.query);
+					/*
+						Signed LNURLs must include:
+						id (API key ID)
+						n (nonce)
+						s (signature)
+						tag (subprotocol to be used)
+					*/
+					_.each(['id', 'n', 'tag'], field => {
+						if (!req.query[field]) {
+							throw new HttpError(`Failed API key signature check: Missing "${field}"`, 400);
+						}
+					});
+					const { id, n, s, tag } = req.query;
 					// Check that the query string is signed by an authorized API key.
 					if (this.isValidSignature(payload, s, id)) {
 						const params = _.omit(req.query, 's', 'id', 'n', 'tag');
@@ -239,22 +250,21 @@ module.exports = function(lnurl) {
 								secret = this.hash(`${id}-${s}`);
 								break;
 						}
+						switch (tag) {
+							case 'login':
+								req.query = { k1: secret };
+								break;
+							default:
+								req.query = { q: secret };
+								break;
+						}
 						return this.createUrl(secret, tag, params).then(() => {
-							switch (tag) {
-								case 'login':
-									req.query = { k1: secret };
-									break;
-								default:
-									req.query = { q: secret };
-									break;
-							}
 							next();
 						}).catch(error => {
-							if (/duplicate/i.test(error.message)) {
-								next(new HttpError('API key signature already consumed', 403));
-							} else {
-								next(error);
+							if (!/duplicate/i.test(error.message)) {
+								return next(error);
 							}
+							next();
 						});
 					} else {
 						return next(new HttpError('Invalid API key signature', 403));
@@ -340,6 +350,55 @@ module.exports = function(lnurl) {
 			key = Buffer.from(key, 'hex');
 		}
 		return crypto.createHmac(algorithm, key).update(data).digest('hex');
+	};
+
+	Server.prototype.unshortenQuery = function(query) {
+		let unshortened = _.clone(query);
+		const fromTo = {
+			query: {
+				't': 'tag',
+			},
+			tags: {
+				'c': 'channelRequest',
+				'w': 'withdrawRequest',
+				'l': 'login',
+			},
+			params: {
+				'channelRequest': {
+					'pl': 'localAmt',
+					'pp': 'pushAmt',
+				},
+				'withdrawRequest': {
+					'pn': 'minWithdrawable',
+					'px': 'maxWithdrawable',
+					'pd': 'defaultDescription',
+				},
+				'login': {
+				},
+			}
+		};
+		_.each(fromTo.query, (to, from) => {
+			if (!_.isUndefined(unshortened[from])) {
+				unshortened[to] = unshortened[from];
+				delete unshortened[from];
+			}
+		});
+		let tag = unshortened.tag;
+		if (tag) {
+			if (fromTo.tags[tag]) {
+				tag = unshortened.tag = fromTo.tags[tag];
+			}
+			const params = fromTo.params[tag];
+			if (params) {
+				_.each(params, (to, from) => {
+					if (!_.isUndefined(unshortened[from])) {
+						unshortened[to] = unshortened[from];
+						delete unshortened[from];
+					}
+				});
+			}
+		}
+		return unshortened;
 	};
 
 	Server.prototype.runSubProtocol = function(tag, method, secret, params) {
@@ -452,7 +511,7 @@ module.exports = function(lnurl) {
 	Server.prototype.generateNewUrl = function(tag, params) {
 		return this.validateSubProtocolParameters(tag, params).then(() => {
 			return this.generateSecret(tag, params).then(secret => {
-				const url = this.getFullUrl('/lnurl', { q: secret });
+				const url = this.getFullUrl(this.options.endpoint, { q: secret });
 				const encoded = lnurl.encode(url);
 				return { encoded, secret, url };
 			});

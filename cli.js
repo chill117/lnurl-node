@@ -68,6 +68,12 @@ program
 		lnurl.Server.prototype.getDefaultUrl()
 	)
 	.option(
+		'--endpoint [value]',
+		'The URI path of the HTTPS end-point',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.endpoint
+	)
+	.option(
 		'--auth.apiKeys [values]',
 		'List of API keys that can be used to authorize privileged behaviors',
 		_.identity,

@@ -22,6 +22,11 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
     * [options](#options-for-createserver-method)
   * [generateApiKey](#generateapikey)
 * [Signed LNURLs](#signed-lnurls)
+  * [Shorter Signed LNURLs](#shorter-signed-lnurls)
+    * [Subprotocol Short Names](#subprotocol-short-names)
+    * [Query Parameter Short Names](#query-parameter-short-names)
+    * [E-notation for integer values](#e-notation-for-integer-values)
+    * [Set a shorter endpoint path](#set-a-shorter-endpoint-path)
 * [Configuring Data Store](#configuring-data-store)
   * [Redis](#redis)
   * [SQLite](#sqlite)
@@ -181,6 +186,7 @@ Options:
   --host [value]                The host for the HTTPS server (default: "localhost")
   --port [value]                The port for the HTTPS server (default: 3000)
   --url [value]                 The URL where the server is externally reachable (default: "https://localhost:3000")
+  --endpoint [value]            The URI path of the HTTPS end-point (default: "/lnurl")
   --auth.apiKeys [values]       List of API keys that can be used to authorize privileged behaviors (default: [])
   --lightning.backend [value]   Which LN backend to use (only lnd supported currently) (default: "lnd")
   --lightning.config [value]    The configuration object to connect to the LN backend (default: {"hostname":"127.0.0.1:8080","cert":null,"macaroon":null})
@@ -295,8 +301,10 @@ It is also possible to generate lnurls in a separate (or even offline) applicati
 	host: 'localhost',
 	// The port for the HTTPS server:
 	port: 3000,
-	// The URL where the server is externally reachable:
+	// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
 	url: null,
+	// The URI path of the HTTPS end-point:
+	endpoint: '/lnurl',
 	auth: {
 		// List of API keys that can be used to authorize privileged behaviors:
 		apiKeys: [],
@@ -510,14 +518,16 @@ const apiKey = {
 };
 
 const { id, key } = apiKey;
-const nonce = generateNonce(12);
+const nonce = generateNonce(8);
 const query = {
 	id: id,
 	n: nonce,
-	tag: 'channelRequest',
-	// params:
-	localAmt: 1000,
-	pushAmt: 0,
+	// Note that tag and params can be shortened to improve scannability of QR codes.
+	// See "Shorter Signed LNURLs" for more info:
+	// https://github.com/chill117/lnurl-node#shorter-signed-lnurls
+	tag: 'withdrawRequest',
+	minWithdrawable: 1000,
+	maxWithdrawable: 500000,
 };
 const payload = querystring.stringify(query);
 query.s = createSignature(payload, key);
@@ -526,17 +536,131 @@ const hostname = 'your-lnurl-server.com';
 const uri = '/lnurl';
 const signedUrl = `${protocol}//${hostname}${uri}?` + querystring.stringify(query);
 console.log(signedUrl);
-
 ```
 The output of the above script will be something like this:
 ```
-https://your-lnurl-server.com/lnurl?id=5619b36a2e&n=ae0da0aa17d3f72db4f8&tag=channelRequest&localAmt=1000&pushAmt=0&s=3ed0391a5f17a7519c9d34b334d5dc165e668246a918c4a23a904e300835dce8
+https://your-lnurl-server.com/lnurl?id=5619b36a2e&n=1f69afb26c643302&tag=withdrawRequest&minWithdrawable=1000&maxWithdrawable=500000&s=7ef95168e1afa90834ec98b0ebe7a5dc93b4a7e7345d0a1f9e3be3caaebf8925
 ```
 * `id` - the ID of the offline app's API key
 * `n` - randomly generated nonce
 * `s` - the signature created from the URL's querystring and the offline app's API key
 * `tag` - the subprotocol to use
-* `localAmt` and `pushAmt` - parameters that depend on which subprotocol being used
+* `minWithdrawable` and `maxWithdrawable` - parameters that depend on which subprotocol being used
+
+And the URL when encoded as a bech32-encoded string:
+```
+lnurl1dp68gurn8ghj77t0w4ez6mrww4excttnv4e8vetj9e3k7mf0d3h82unv8a5kg0f4xccnjc3nxesnyefxdc7nze3k89skvc3jxe3nvdpnxvcryfn5v9nn6amfw35xgunpwafx2ut4v4ehgfndd9h9w6t5dpj8ycthv93xcefaxycrqvpxd4shs4mfw35xgunpwaskymr9856nqvpsxqczvueaxajkvwf4xymrsef3v9nxzwfs8qengetr8yuxyvr9vfjnwcf4v33njvmzx3snwefhxv6r2epsvyckvwt9xd3x2vmrv9sk2cnx8qunydglm8pum
+```
+
+
+### Shorter Signed LNURLs
+
+With more information contained in the LNURL, the resulting rendered QR code becomes more difficult for mobile applications to scan. To help with this, there are a few tricks that can reduce the length of your signed LNURLs.
+
+#### Subprotocol Short Names
+
+It is possible to shorten the subprotocol name:
+
+| name              | shortened |
+| ----------------- | --------- |
+| `channelRequest`  | `c`       |
+| `withdrawRequest` | `w`       |
+| `login`           | `l`       |
+
+The following example:
+```
+tag=channelRequest&..
+```
+Can be shortened to:
+```
+tag=c&..
+```
+
+
+#### Query Parameter Short Names
+
+| name    | shortened | notes                      |
+| ------- | --------- | -------------------------- |
+| `tag`   | `t`       | the subprotocol to be used |
+
+The following example:
+```
+tag=channelRequest&..
+```
+Can be shortened to:
+```
+t=channelRequest&..
+```
+
+Parameters for "channelRequest":
+
+| name       | shortened |
+| ---------- | --------- |
+| `localAmt` | `pl`      |
+| `pushAmt`  | `pp`      |
+
+The following example:
+```
+tag=channelRequest&localAmt=1000&pushAmt=1000
+```
+Can be shortened to:
+```
+t=c&pl=1000&pp=1000
+```
+
+Parameters for "withdrawRequest":
+
+| name                 | shortened |
+| -------------------- | --------- |
+| `minWithdrawable`    | `pn`      |
+| `maxWithdrawable`    | `px`      |
+| `defaultDescription` | `pd`      |
+
+The following example:
+```
+tag=withdrawRequest&minWithdrawable=1000&maxWithdrawable=500000
+```
+Can be shortened to:
+```
+t=w&pn=1000&px=500000
+```
+
+Parameters for "login":
+
+_None_
+
+#### E-notation for integer values
+
+It is possible to pass integers in e-notation. For example:
+```
+pn=1000000&px=5000000
+```
+Can be shortened to:
+```
+pn=1e6&px=5e6
+```
+
+
+#### Set a shorter endpoint path
+
+You can set a shorter path for your server's HTTPS end-point via the `endpoint` option:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	endpoint: '/a',
+	// ...
+});
+```
+And then a signed LNURL could look something like this instead:
+```
+https://your-lnurl-server.com/a?id=5619b36a2e&n=e4b058f353d0bff5&t=w&pn=1&px=5e4&s=975b38202ac17430cb981c4987071f25685123750f4a7af9d9d87290c88e017e
+```
+Encoded as:
+```
+lnurl1dp68gurn8ghj77t0w4ez6mrww4excttnv4e8vetj9e3k7mf0vylkjepax5mrzwtzxvmxzvn9yehr6ef5vgcr2wrxxv6nxepsvfnxvdfxws7hwfnsdc7nzfns0q7n2ef5yeen6wfhx43rxwpjxqexzce3xu6rxvrrvgunsvtrxsunsdesxuckvv34xcur2vfjxvmn2vrxx3snwctx89jrjepcxuerjvrr8qux2vp3xajslvwjm7
+```
+Which is about __25%__ shorter than the original unshortened LNURL.
 
 
 ## Debugging
