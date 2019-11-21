@@ -330,7 +330,7 @@ module.exports = function(lnurl) {
 
 	Server.prototype.createSignature = function(data, key, algorithm) {
 		algorithm = algorithm || 'sha256';
-		if (_.isString(key)) {
+		if (_.isString(key) && this.isHex(key)) {
 			key = Buffer.from(key, 'hex');
 		}
 		return crypto.createHmac(algorithm, key).update(data).digest('hex');
