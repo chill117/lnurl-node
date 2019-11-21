@@ -1,7 +1,5 @@
-module.exports = function(server) {
-	return {
-		channelRequest: require('./channelRequest')(server),
-		login: require('./login')(server),
-		withdrawRequest: require('./withdrawRequest')(server),
-	};
+module.exports = {
+	channelRequest: require('./channelRequest'),
+	login: require('./login'),
+	withdrawRequest: require('./withdrawRequest'),
 };

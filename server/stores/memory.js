@@ -9,9 +9,7 @@ module.exports = function(lnurl) {
 
 	Store.prototype.save = function(hash, data) {
 		return new Promise((resolve, reject) => {
-			if (!_.isUndefined(this._store[hash])) {
-				throw new Error(`Failed to save URL. Hash already used: "${hash}"`);
-			}
+			data = this.deepClone(data);
 			this._store[hash] = data;
 			resolve();
 		});

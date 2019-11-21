@@ -74,12 +74,6 @@ program
 		lnurl.Server.prototype.defaultOptions.auth.apiKeys,
 	)
 	.option(
-		'--auth.timeThreshold [value]',
-		'The tolerance (seconds) when checking the timestamp included with an HMAC',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.auth.timeThreshold,
-	)
-	.option(
 		'--lightning.backend [value]',
 		'Which LN backend to use (only lnd supported currently)',
 		_.identity,

@@ -17,11 +17,9 @@ const apiKey = {
 };
 
 const { id, key } = apiKey;
-const nonce = generateNonce(10);
-const timestamp = parseInt(Date.now() / 1000);// seconds
+const nonce = generateNonce(12);
 const query = {
 	id: id,
-	t: timestamp,
 	n: nonce,
 	tag: 'channelRequest',
 	// params:

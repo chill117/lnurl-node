@@ -182,7 +182,6 @@ Options:
   --port [value]                The port for the HTTPS server (default: 3000)
   --url [value]                 The URL where the server is externally reachable (default: "https://localhost:3000")
   --auth.apiKeys [values]       List of API keys that can be used to authorize privileged behaviors (default: [])
-  --auth.timeThreshold [value]  The tolerance (seconds) when checking the timestamp included with an HMAC (default: 300)
   --lightning.backend [value]   Which LN backend to use (only lnd supported currently) (default: "lnd")
   --lightning.config [value]    The configuration object to connect to the LN backend (default: {"hostname":"127.0.0.1:8080","cert":null,"macaroon":null})
   --tls.certPath [value]        The full file path to the TLS certificate (default: "./tls.cert")
@@ -301,8 +300,6 @@ It is also possible to generate lnurls in a separate (or even offline) applicati
 	auth: {
 		// List of API keys that can be used to authorize privileged behaviors:
 		apiKeys: [],
-		// The tolerance (seconds) when checking the timestamp included with an HMAC:
-		timeThreshold: 300,
 	},
 	lightning: {
 		// Which LN backend to use (only lnd supported currently):
@@ -513,11 +510,9 @@ const apiKey = {
 };
 
 const { id, key } = apiKey;
-const nonce = generateNonce(10);
-const timestamp = parseInt(Date.now() / 1000);// seconds
+const nonce = generateNonce(12);
 const query = {
 	id: id,
-	t: timestamp,
 	n: nonce,
 	tag: 'channelRequest',
 	// params:
@@ -535,10 +530,9 @@ console.log(signedUrl);
 ```
 The output of the above script will be something like this:
 ```
-https://your-lnurl-server.com/lnurl?id=5619b36a2e&t=1574187915&n=ae0da0aa17d3f72db4f8&tag=channelRequest&localAmt=1000&pushAmt=0&s=3ed0391a5f17a7519c9d34b334d5dc165e668246a918c4a23a904e300835dce8
+https://your-lnurl-server.com/lnurl?id=5619b36a2e&n=ae0da0aa17d3f72db4f8&tag=channelRequest&localAmt=1000&pushAmt=0&s=3ed0391a5f17a7519c9d34b334d5dc165e668246a918c4a23a904e300835dce8
 ```
 * `id` - the ID of the offline app's API key
-* `t` - timestamp (seconds) of when the signed lnurl was created; by default your lnurl server will have a threshold of +/- 5 minutes
 * `n` - randomly generated nonce
 * `s` - the signature created from the URL's querystring and the offline app's API key
 * `tag` - the subprotocol to use

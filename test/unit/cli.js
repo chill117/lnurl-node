@@ -4,7 +4,6 @@ const expect = require('chai').expect;
 const fs = require('fs');
 const lnurl = require('../../');
 const path = require('path');
-const request = require('request');
 const spawn = require('child_process').spawn;
 
 describe('Command-line interface', function() {
@@ -141,7 +140,7 @@ describe('Command-line interface', function() {
 						pushAmt: 1000,
 					};
 					const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
-					request.get({
+					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: ca,
 						qs: query,

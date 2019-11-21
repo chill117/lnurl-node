@@ -2,7 +2,6 @@ module.exports = function(lnurl) {
 
 	const _ = require('underscore');
 	const async = require('async');
-	const bodyParser = require('body-parser');
 	const crypto = require('crypto');
 	const debug = {
 		info: require('debug')('lnurl:info'),
@@ -16,14 +15,13 @@ module.exports = function(lnurl) {
 	const path = require('path');
 	const pem = require('pem');
 	const querystring = require('querystring');
-	const request = require('request');
+	const subprotocols = require('./subprotocols');
 
 	let Server = function(options) {
 		this.options = this.prepareOptions(options);
 		this.checkOptions();
 		this.prepareApiKeys();
 		this.prepareQueues();
-		this.prepareSubProtocols();
 		this.prepareLightning();
 		this.prepareStore();
 		this.createHttpsServer();
@@ -40,8 +38,6 @@ module.exports = function(lnurl) {
 		auth: {
 			// List of API keys that can be used to authorize privileged behaviors:
 			apiKeys: [],
-			// The tolerance (seconds) when checking the timestamp included with an HMAC:
-			timeThreshold: 300,
 		},
 		lightning: {
 			// Which LN backend to use (only lnd supported currently):
@@ -217,38 +213,49 @@ module.exports = function(lnurl) {
 		app.get('/lnurl',
 			(req, res, next) => {
 				/*
-					Signed requests must include:
-					s (signature)
+					Signed LNURLs must include:
 					id (API key ID)
-					t (timestamp)
 					n (nonce)
+					s (signature)
+					tag (subprotocol to be used)
 				*/
-				const { s, id, t, n } = req.query;
-				if (s && id && t && n) {
-					const tag = req.query.tag;
-					// if (tag === 'login') {
-					// 	return next(new HttpError('The "login" subprotocol does not support API key signature authorization.'));
-					// }
+				if (req.query.id && req.query.n && req.query.s && req.query.tag) {
 					// Looks like a signed request.
-					// Check that the query string is signed by an authorized API key.
-					const { id, s, t } = req.query;
+					const { id, n, s, tag } = req.query;
+					// Payload is everything in the querystring less the signature itself.
 					const payload = querystring.stringify(_.omit(req.query, 's'));
-					if (this.isValidSignature(payload, s, id, t)) {
-						const params = _.omit(req.query, 's', 'id', 't', 'n', 'tag');
+					// Check that the query string is signed by an authorized API key.
+					if (this.isValidSignature(payload, s, id)) {
+						const params = _.omit(req.query, 's', 'id', 'n', 'tag');
+						let secret;
 						switch (tag) {
 							case 'login':
-								const { k1 } = req.query;
 								// Use the secret (k1) provided in the request.
-								return this.createUrl(k1, tag, params).then(() => {
-									req.query = { k1 };
-									next();
-								}).catch(next);
+								secret = req.query.k1;
+								break;
 							default:
-								return this.generateNewUrl(tag, params).then(result => {
-									req.query = { q: result.secret };
-									next();
-								}).catch(next);
+								// Use the hash of API key ID + signature as the secret.
+								// This will make each signed lnurl one-time-use only.
+								secret = this.hash(`${id}-${s}`);
+								break;
 						}
+						return this.createUrl(secret, tag, params).then(() => {
+							switch (tag) {
+								case 'login':
+									req.query = { k1: secret };
+									break;
+								default:
+									req.query = { q: secret };
+									break;
+							}
+							next();
+						}).catch(error => {
+							if (/duplicate/i.test(error.message)) {
+								next(new HttpError('API key signature already consumed', 403));
+							} else {
+								next(error);
+							}
+						});
 					} else {
 						return next(new HttpError('Invalid API key signature', 403));
 					}
@@ -273,6 +280,10 @@ module.exports = function(lnurl) {
 						this.unlock(secret);
 						throw new HttpError('Invalid secret', 400);
 					}
+					if (url.used === true) {
+						this.unlock(secret);
+						throw new HttpError('Already used', 400);
+					}
 					const tag = url.tag;
 					const params = _.extend({}, req.query, url.params);
 					if (req.query.q) {
@@ -282,7 +293,7 @@ module.exports = function(lnurl) {
 						});
 					} else {
 						return this.runSubProtocol(tag, 'action', secret, params).then(() => {
-							return this.deleteUrl(hash).then(() => {
+							return this.markUsedUrl(hash).then(() => {
 								this.unlock(secret);
 								res.status(200).json({ status: 'OK' });
 							});
@@ -316,12 +327,7 @@ module.exports = function(lnurl) {
 		}).catch(debug.error);
 	};
 
-	Server.prototype.isValidSignature = function(payload, signature, id, timestamp) {
-		const now = parseInt(Date.now() / 1000);
-		const threshold = this.options.auth.timeThreshold;
-		if (timestamp < now - threshold || timestamp > now + threshold) {
-			return false;
-		} 
+	Server.prototype.isValidSignature = function(payload, signature, id) {
 		const key = this.getApiKey(id);
 		if (!key) return false;
 		const expected = this.createSignature(payload, key);
@@ -334,10 +340,6 @@ module.exports = function(lnurl) {
 			key = Buffer.from(key, 'hex');
 		}
 		return crypto.createHmac(algorithm, key).update(data).digest('hex');
-	};
-
-	Server.prototype.prepareSubProtocols = function() {
-		this.subprotocols = require('./subprotocols')(this);
 	};
 
 	Server.prototype.runSubProtocol = function(tag, method, secret, params) {
@@ -361,7 +363,7 @@ module.exports = function(lnurl) {
 		if (!_.isObject(params)) {
 			throw new Error('Invalid argument ("params"): Object expected.');
 		}
-		return subprotocol[method](secret, params);
+		return subprotocol[method].call(this, secret, params);
 	};
 
 	Server.prototype.hasSubProtocol = function(tag) {
@@ -372,7 +374,7 @@ module.exports = function(lnurl) {
 		if (!_.isString(tag)) {
 			throw new Error('Invalid argument ("tag"): String expected.');
 		}
-		return this.subprotocols[tag];
+		return subprotocols[tag];
 	};
 
 	Server.prototype.validateSubProtocolParameters = function(tag, params) {
@@ -393,7 +395,7 @@ module.exports = function(lnurl) {
 					throw new HttpError(`Missing required parameter: "${key}"`, 400);
 				}
 			});
-			subprotocol.validate(params);
+			subprotocol.validate.call(this, params);
 			resolve();
 		});
 	};
@@ -429,14 +431,6 @@ module.exports = function(lnurl) {
 		this.store = new Store(config);
 	};
 
-	Server.prototype.fetchUrl = function(hash) {
-		return this.store.fetch(hash);
-	};
-
-	Server.prototype.deleteUrl = function(hash) {
-		return this.store.delete(hash);
-	};
-
 	Server.prototype.isLocked = function(secret) {
 		return this._locks[secret] === true;
 	};
@@ -466,16 +460,31 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.createUrl = function(key, tag, params) {
+		return this.validateSubProtocolParameters(tag, params).then(() => {
+			return this.saveUrl(key, tag, params);
+		});
+	};
+
+	Server.prototype.saveUrl = function(key, tag, params) {
 		const hash = this.hash(key);
 		return this.store.exists(hash).then(exists => {
 			if (exists) {
-				// Already exists.
-				// Generate another key.
-				key = null;
+				throw new Error(`Cannot save duplicate URL (hash: "${hash}")`);
 			} else {
-				const data = { tag, params };
+				const data = { tag, params, used: false };
 				return this.store.save(hash, data);
 			}
+		});
+	};
+
+	Server.prototype.fetchUrl = function(hash) {
+		return this.store.fetch(hash);
+	};
+
+	Server.prototype.markUsedUrl = function(hash) {
+		return this.fetchUrl(hash).then(data => {
+			data.used = true;
+			return this.store.save(hash, data);
 		});
 	};
 
@@ -497,9 +506,16 @@ module.exports = function(lnurl) {
 				try {
 					numAttempts++;
 					key = this.generateRandomKey();
-					return this.createUrl(key, tag, params).then(() => {
+					return this.saveUrl(key, tag, params).then(() => {
 						next();
-					}).catch(next);
+					}).catch(error => {
+						if (/duplicate/i.test(error.message)) {
+							key = null;
+							next();
+						} else {
+							next(error);
+						}
+					});
 				} catch (error) {
 					return next(error);
 				}
@@ -520,20 +536,14 @@ module.exports = function(lnurl) {
 		return crypto.randomBytes(numberOfBytes).toString('hex');
 	};
 
-	Server.prototype.hash = function(hexOrBuffer) {
-		let buffer;
-		if (_.isString(hexOrBuffer)) {
-			if (!this.isHex(hexOrBuffer)) {
-				throw new Error('Invalid argument ("hexOrBuffer"): String or buffer expected.');
-			}
-			buffer = Buffer.from(hexOrBuffer, 'hex');
-		} else if (Buffer.isBuffer(hexOrBuffer)) {
-			buffer = hexOrBuffer;
+	Server.prototype.hash = function(data) {
+		if (!_.isString(data) && !Buffer.isBuffer(data)) {
+			throw new Error('Invalid argument ("data"): String or buffer expected.');
 		}
-		if (!Buffer.isBuffer(buffer)) {
-			throw new Error('Invalid argument ("hexOrBuffer"): String or buffer expected.');
+		if (_.isString(data) && this.isHex(data)) {
+			data = Buffer.from(data, 'hex');
 		}
-		return crypto.createHash('sha256').update(buffer).digest('hex');
+		return crypto.createHash('sha256').update(data).digest('hex');
 	};
 
 	Server.prototype.prepareLightning = function() {

@@ -9,6 +9,7 @@ const path = require('path');
 const pem = require('pem');
 const querystring = require('querystring');
 const tmpDir = path.join(__dirname, 'tmp');
+const url = require('url');
 
 module.exports = {
 	lnurl: lnurl,
@@ -96,14 +97,11 @@ module.exports = {
 			return app;
 		},
 	},
-	prepareSignedRequest: function(apiKey, tag, params, overrides) {
-		overrides = overrides || {};
+	prepareSignedRequest: function(apiKey, tag, params) {
 		const { id, key } = apiKey;
-		const nonce = this.generateNonce(16);
-		const timestamp = overrides.timestamp || parseInt(Date.now() / 1000);
+		const nonce = this.generateNonce(12);
 		const query = _.extend({
 			id: id,
-			t: timestamp,
 			n: nonce,
 			tag: tag,
 		}, params);
@@ -114,5 +112,36 @@ module.exports = {
 	},
 	generateNonce: function(numberOfBytes) {
 		return lnurl.Server.prototype.generateRandomKey(numberOfBytes);
+	},
+	request: function(method, requestOptions, cb) {
+		const done = _.once(cb);
+		const parsedUrl = url.parse(requestOptions.url);
+		let options = _.chain(requestOptions).pick('ca').extend({
+			method: method.toUpperCase(),
+			hostname: parsedUrl.hostname,
+			port: parsedUrl.port,
+			path: parsedUrl.path,
+		}).value();
+		if (requestOptions.qs) {
+			options.path += '?' + querystring.stringify(requestOptions.qs);
+		}
+		const req = https.request(options, function(res) {
+			let body = '';
+			res.on('data', function(buffer) {
+				body += buffer.toString();
+			});
+			res.on('end', function() {
+				if (requestOptions.json) {
+					try {
+						body = JSON.parse(body);
+					} catch (error) {
+						return done(error);
+					}
+				}
+				done(null, res, body);
+			});
+		});
+		req.once('error', done);
+		req.end();
 	},
 };

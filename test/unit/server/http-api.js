@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const { expect } = require('chai');
 const fs = require('fs');
 const path = require('path');
-const request = require('request');
 const secp256k1 = require('secp256k1');
 
 const lnurl = require('../../../');
@@ -147,7 +146,7 @@ describe('Server: HTTP API', function() {
 		};
 
 		it('missing secret', function(done) {
-			request.get({
+			this.helpers.request('get', {
 				url: 'https://localhost:3000/lnurl',
 				ca: this.ca,
 				qs: {},
@@ -166,39 +165,14 @@ describe('Server: HTTP API', function() {
 			});
 		});
 
-		describe('?s=SIGNATURE&id=API_KEY_ID&t=TIMESTAMP&n=NONCE&..', function() {
+		describe('?s=SIGNATURE&id=API_KEY_ID&n=NONCE&..', function() {
 
 			it('invalid authorization signature: unknown API key', function(done) {
 				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
-				request.get({
-					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
-					qs: query,
-					json: true,
-				}, (error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Invalid API key signature',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
-				});
-			});
-
-			it('timestamp outside threshold', function(done) {
-				const tag = 'channelRequest';
-				const params = prepareValidParams('create', tag);
-				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params, {
-					timestamp: Date.now() - (this.server.options.auth.timeThreshold + 10),
-				});
-				request.get({
+				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
 					qs: query,
@@ -223,7 +197,7 @@ describe('Server: HTTP API', function() {
 				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
-				request.get({
+				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
 					qs: query,
@@ -239,6 +213,43 @@ describe('Server: HTTP API', function() {
 						return done(error);
 					}
 					done();
+				});
+			});
+
+			it('one-time-use', function(done) {
+				const tag = 'withdrawRequest';
+				const params = prepareValidParams('create', tag);
+				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+				this.helpers.request('get', {
+					url: 'https://localhost:3000/lnurl',
+					ca: this.ca,
+					qs: query,
+					json: true,
+				}, (error, response, body) => {
+					if (error) return done(error);
+					try {
+						expect(body).to.be.an('object');
+						expect(body.status).to.not.equal('ERROR');
+					} catch (error) {
+						return done(error);
+					}
+					this.helpers.request('get', {
+						url: 'https://localhost:3000/lnurl',
+						ca: this.ca,
+						qs: query,
+						json: true,
+					}, (error, response, body) => {
+						if (error) return done(error);
+						try {
+							expect(body).to.deep.equal({
+								status: 'ERROR',
+								reason: 'API key signature already consumed',
+							});
+						} catch (error) {
+							return done(error);
+						}
+						done();
+					});
 				});
 			});
 
@@ -436,7 +447,7 @@ describe('Server: HTTP API', function() {
 									params = test.params;
 								}
 								const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
-								request.get({
+								this.helpers.request('get', {
 									url: 'https://localhost:3000/lnurl',
 									ca: this.ca,
 									qs: query,
@@ -464,7 +475,7 @@ describe('Server: HTTP API', function() {
 		describe('?q=SECRET', function() {
 
 			it('invalid secret', function(done) {
-				request.get({
+				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
 					qs: {
@@ -534,7 +545,7 @@ describe('Server: HTTP API', function() {
 					});
 					_.each(tests, function(test) {
 						it(test.description, function(done) {
-							request.get({
+							this.helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
 								ca: this.ca,
 								qs: {
@@ -563,7 +574,7 @@ describe('Server: HTTP API', function() {
 		describe('?k1=SECRET&..', function() {
 
 			it('invalid secret', function(done) {
-				request.get({
+				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.ca,
 					qs: {
@@ -755,7 +766,7 @@ describe('Server: HTTP API', function() {
 							params = _.extend({}, params, {
 								k1: this.secret,
 							});
-							request.get({
+							this.helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
 								ca: this.ca,
 								qs: params,
@@ -787,7 +798,7 @@ describe('Server: HTTP API', function() {
 					} else {
 						params.k1 = this.secret;
 					}
-					request.get({
+					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: this.ca,
 						qs: params,
@@ -847,7 +858,7 @@ describe('Server: HTTP API', function() {
 							try {
 								expect(body).to.deep.equal({
 									status: 'ERROR',
-									reason: 'Invalid secret',
+									reason: 'Already used',
 								});
 								this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
 							} catch (error) {

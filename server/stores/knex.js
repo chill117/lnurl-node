@@ -52,7 +52,12 @@ module.exports = function(lnurl) {
 	Store.prototype.save = function(hash, data) {
 		return this.onReady().then(() => {
 			data = JSON.stringify(data);
-			return this.db.insert({ hash, data }).into('urls');
+			return this.exists(hash).then(exists => {
+				if (exists) {
+					return this.db('urls').update({ data }).where('hash', hash);
+				}
+				return this.db.insert({ hash, data }).into('urls');
+			});
 		});
 	};
 
