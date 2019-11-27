@@ -41,7 +41,7 @@ module.exports = {
 	info: function(secret, params) {
 		return new Promise((resolve, reject) => {
 			const info = _.chain(params).pick('minWithdrawable', 'maxWithdrawable', 'defaultDescription').extend({
-				callback: this.getFullUrl('/lnurl'),
+				callback: this.getCallbackUrl(),
 				k1: secret,
 				tag: 'withdrawRequest',
 			}).value();

@@ -38,7 +38,7 @@ module.exports = {
 		return this.ln.getNodeUri().then(nodeUri => {
 			return {
 				uri: nodeUri,
-				callback: this.getFullUrl('/lnurl'),
+				callback: this.getCallbackUrl(),
 				k1: secret,
 				tag: 'channelRequest',
 			};

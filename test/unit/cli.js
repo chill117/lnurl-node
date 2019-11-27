@@ -89,20 +89,8 @@ describe('Command-line interface', function() {
 
 	describe('server [options]', function() {
 
-		before(function(done) {
-			this.lnd = this.helpers.backends.lnd(done);
-		});
-
 		beforeEach(function() {
 			this.lnd.requests = [];
-		});
-
-		after(function(done) {
-			if (this.lnd && this.lnd.server) {
-				this.lnd.server.close(done);
-			} else {
-				done();
-			}
 		});
 
 		it('runs', function(done) {

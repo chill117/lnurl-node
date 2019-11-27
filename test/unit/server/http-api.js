@@ -45,10 +45,6 @@ const generateLinkingKey = function() {
 
 describe('Server: HTTP API', function() {
 
-	before(function(done) {
-		this.lnd = this.helpers.backends.lnd(done);
-	});
-
 	beforeEach(function() {
 		this.lnd.requests = [];
 	});
@@ -56,30 +52,13 @@ describe('Server: HTTP API', function() {
 	before(function(done) {
 		try {
 			this.apiKey = lnurl.generateApiKey();
-			this.server = new lnurl.Server({
-				host: 'localhost',
-				port: 3000,
+			this.server = this.helpers.createServer({
 				auth: {
 					apiKeys: [this.apiKey],
 				},
-				lightning: {
-					backend: 'lnd',
-					config: {
-						hostname: this.lnd.hostname,
-						cert: this.lnd.cert,
-						macaroon: this.lnd.macaroon,
-					},
-				},
-				tls: {
-					certPath: path.join(this.tmpDir, 'tls.cert'),
-					keyPath: path.join(this.tmpDir, 'tls.key'),
-				},
-				store: {
-					backend: process.env.LNURL_STORE_BACKEND || 'memory',
-					config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
-				},
 			});
-			this.server.onListening(done);
+			this.server.once('error', done);
+			this.server.once('listening', done);
 		} catch (error) {
 			return done(error);
 		}
@@ -95,17 +74,7 @@ describe('Server: HTTP API', function() {
 	});
 
 	after(function() {
-		if (this.server) {
-			return this.server.close();
-		}
-	});
-
-	after(function(done) {
-		if (this.lnd && this.lnd.server) {
-			this.lnd.server.close(done);
-		} else {
-			done();
-		}
+		if (this.server) return this.server.close();
 	});
 
 	describe('GET /lnurl', function() {

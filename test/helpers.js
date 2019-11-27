@@ -11,9 +11,38 @@ const querystring = require('querystring');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
+let backends = {
+	lnd: [],
+};
+
 module.exports = {
 	lnurl: lnurl,
 	tmpDir: tmpDir,
+	createServer: function(options) {
+		options = _.defaults(options || {}, {
+			host: 'localhost',
+			port: 3000,
+			lightning: {
+				backend: 'lnd',
+				config: {},
+			},
+			tls: {
+				certPath: path.join(tmpDir, 'tls.cert'),
+				keyPath: path.join(tmpDir, 'tls.key'),
+			},
+			store: {
+				backend: process.env.LNURL_STORE_BACKEND || 'memory',
+				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
+			},
+		});
+		const defaultLightningConfig = backends.lnd[0];
+		options.lightning.config = _.defaults(options.lightning.config, {
+			hostname: defaultLightningConfig.hostname,
+			cert: defaultLightningConfig.cert,
+			macaroon: defaultLightningConfig.macaroon,
+		});
+		return lnurl.createServer(options);
+	},
 	backends: {
 		lnd: function(done) {
 			const app = new express();
@@ -94,6 +123,7 @@ module.exports = {
 				}).length;
 				expect(numRequests).to.equal(total);
 			};
+			backends.lnd.push(app);
 			return app;
 		},
 	},

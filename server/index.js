@@ -15,24 +15,30 @@ module.exports = function(lnurl) {
 	const path = require('path');
 	const pem = require('pem');
 	const querystring = require('querystring');
+	const SafeEventEmitter = require('./SafeEventEmitter');
 	const subprotocols = require('./subprotocols');
+	const util = require('util');
 
 	let Server = function(options) {
 		this.options = this.prepareOptions(options);
+		this.state = 'initializing';
 		this.checkOptions();
 		this.prepareApiKeys();
-		this.prepareQueues();
 		this.prepareLightning();
 		this.prepareStore();
 		this.createHttpsServer();
 		this._locks = {};
 	};
 
+	util.inherits(Server, SafeEventEmitter);
+
 	Server.prototype.defaultOptions = {
 		// The host for the HTTPS server:
 		host: 'localhost',
 		// The port for the HTTPS server:
 		port: 3000,
+		// Whether or not to start listening when the server is created:
+		listen: true,
 		// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
 		url: null,
 		// The URI path of the HTTPS end-point:
@@ -178,33 +184,8 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.prepareQueues = function() {
-		this.queues = {
-			onListening: async.queue((task, next) => {
-				try {
-					// Synchronous tasks.
-					task.fn();
-				} catch (error) {
-					debug.error(error);
-				}
-				next();
-			}, 1/* concurrency */)
-		};
-		// Pause all queues to delay execution of tasks until later.
-		_.invoke(this.queues, 'pause');
-	};
-
-	Server.prototype.onListening = function(fn) {
-		this.queues.onListening.push({ fn });
-	};
-
-	Server.prototype.isListening = function() {
-		return this.listening === true;
-	};
-
 	Server.prototype.createHttpsServer = function() {
 		debug.info('Creating HTTPS server...');
-		this.listening = false;
 		const app = this.app = express();
 		const { host, port } = this.options;
 		app.use((req, res, next) => {
@@ -324,17 +305,42 @@ module.exports = function(lnurl) {
 			res.status(error.status).json({ status: 'ERROR', reason: error.message });
 		});
 		this.getTlsCertificate().then(tls => {
-			app.httpsServer = https.createServer({
-				key: tls.key,
-				cert: tls.cert,
-			}, app).listen(port, host, (error) => {
-				if (error) return debug.error(error);
-				this.listening = true;
-				this.queues.onListening.resume();
+			if (this.state === 'initializing') {
+				app.httpsServer = https.createServer({
+					key: tls.key,
+					cert: tls.cert,
+				}, app);
+				if (this.options.listen) {
+					return this.listen();
+				}
+			}
+		}).catch(error => {
+			this.state = 'initialization:failed';
+			this.emit('error', error);
+			debug.error(error);
+		});
+	};
+
+	Server.prototype.listen = function() {
+		if (this.state === 'closing') {
+			throw new Error('Cannot start listening while server is closing');
+		}
+		if (this.state === 'closed') {
+			throw new Error('Cannot start listening after the server has been closed');
+		}
+		if (this.state === 'listening') {
+			throw new Error('Server is already listening');
+		}
+		return new Promise((resolve, reject) => {
+			const { port, host } = this.options;
+			this.app.httpsServer.listen(port, host, error => {
+				if (error) return reject(error);
+				this.state = 'listening';
+				this.emit('listening');
 				const { url } = this.options;
 				debug.info(`HTTPS server listening at ${url}`);
 			});
-		}).catch(debug.error);
+		});
 	};
 
 	Server.prototype.isValidSignature = function(payload, signature, id) {
@@ -465,22 +471,19 @@ module.exports = function(lnurl) {
 		return defaultUrl;
 	};
 
-	Server.prototype.getFullUrl = function(uri, params) {
-		if (!_.isString(uri)) {
-			throw new Error('Invalid argument ("uri"): String expected.');
-		}
+	Server.prototype.getCallbackUrl = function(params) {
 		if (_.isUndefined(params)) {
 			params = {};
 		}
 		if (!_.isObject(params)) {
 			throw new Error('Invalid argument ("params"): Object expected.');
 		}
-		const baseUrl = this.options.url;
-		let fullUrl = `${baseUrl}${uri}`;
+		const { endpoint, url } = this.options;
+		let callbackUrl = `${url}${endpoint}`;
 		if (!_.isEmpty(params)) {
-			fullUrl += '?' + querystring.stringify(params);
+			callbackUrl += '?' + querystring.stringify(params);
 		}
-		return fullUrl;
+		return callbackUrl;
 	};
 
 	Server.prototype.prepareStore = function() {
@@ -511,7 +514,7 @@ module.exports = function(lnurl) {
 	Server.prototype.generateNewUrl = function(tag, params) {
 		return this.validateSubProtocolParameters(tag, params).then(() => {
 			return this.generateSecret(tag, params).then(secret => {
-				const url = this.getFullUrl(this.options.endpoint, { q: secret });
+				const url = this.getCallbackUrl({ q: secret });
 				const encoded = lnurl.encode(url);
 				return { encoded, secret, url };
 			});
@@ -625,6 +628,12 @@ module.exports = function(lnurl) {
 
 	Server.prototype.close = function() {
 		debug.info('Closing lnurl server...');
+		if (this.state === 'closed') {
+			throw new Error('Server already closed');
+		} else if (this.state === 'closing') {
+			throw new Error('Server is already in the process of closing');
+		}
+		this.state = 'closing';
 		return new Promise((resolve, reject) => {
 			async.parallel([
 				next => {
@@ -633,11 +642,16 @@ module.exports = function(lnurl) {
 				next => {
 					if (!this.app || !this.app.httpsServer) return next();
 					this.app.httpsServer.close(() => {
+						this.app.httpsServer = null;
 						next();
 					});
 				},
 			], error => {
-				if (error) return reject(error);
+				if (error) {
+					this.state = 'closing:failed';
+					return reject(error);
+				}
+				this.state = 'closed';
 				resolve();
 			});
 		});
