@@ -268,29 +268,27 @@ module.exports = function(lnurl) {
 				const hash = this.hash(secret);
 				this.fetchUrl(hash).then(url => {
 					if (!url) {
-						this.unlock(secret);
 						throw new HttpError('Invalid secret', 400);
 					}
 					if (url.used === true) {
-						this.unlock(secret);
 						throw new HttpError('Already used', 400);
 					}
 					const tag = url.tag;
 					const params = _.extend({}, req.query, url.params);
 					if (req.query.q) {
 						return this.runSubProtocol(tag, 'info', secret, params).then(info => {
-							this.unlock(secret);
 							res.status(200).json(info);
 						});
 					} else {
 						return this.runSubProtocol(tag, 'action', secret, params).then(() => {
 							return this.markUsedUrl(hash).then(() => {
-								this.unlock(secret);
 								res.status(200).json({ status: 'OK' });
 							});
 						});
 					}
-				}).catch(next);
+				}).catch(next).finally(() => {
+					this.unlock(secret);
+				});
 			}
 		);
 		app.use('*', (req, res, next) => {
