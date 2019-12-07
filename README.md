@@ -368,9 +368,9 @@ By default the lnurl server will store data in memory - which is not ideal for s
 
 ### Redis
 
-To use Redis as your data store you will need to install the [redis module](https://github.com/NodeRedis/node_redis) wherever you are running your lnurl server:
+To use Redis as your data store you will need to install the [ioredis module](https://github.com/luin/ioredis) wherever you are running your lnurl server:
 ```bash
-npm install redis
+npm install ioredis
 ```
 Then you can run your server via the API as follows:
 ```js
@@ -380,7 +380,7 @@ const server = lnurl.createServer({
 	store: {
 		backend: 'redis',
 		config: {
-			prefix: 'lnurl_',
+			prefix: 'lnurl:',
 		},
 	},
 	// ...
@@ -390,7 +390,7 @@ Or via the CLI:
 ```bash
 lnurl server \
 	--store.backend="redis" \
-	--store.config='{"prefix":"lnurl_"}'
+	--store.config='{"prefix":"lnurl:"}'
 ```
 
 

@@ -9,9 +9,9 @@ script: npm test
 
 jobs:
   include:
-    - env: LNURL_STORE_BACKEND=redis LNURL_STORE_CONFIG='{"prefix":"lnurl_"}'
+    - env: LNURL_STORE_BACKEND=redis LNURL_STORE_CONFIG='{"prefix":"lnurl:"}'
       services: redis-server
-      before_script: npm install redis
+      before_script: npm install ioredis
     - env: LNURL_STORE_BACKEND=knex LNURL_STORE_CONFIG='{"client":"sqlite3","connection":{"filename":"db.sqlite3"}}'
       before_script: npm install knex sqlite3
     - env: LNURL_STORE_BACKEND=knex LNURL_STORE_CONFIG='{"client":"mysql","connection":{"host":"127.0.0.1","user":"root","password":"","database":"lnurl_test"}}'
