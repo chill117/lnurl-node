@@ -64,15 +64,6 @@ describe('Server: HTTP API', function() {
 		}
 	});
 
-	before(function(done) {
-		const { certPath } = this.server.options.tls;
-		fs.readFile(certPath, (error, buffer) => {
-			if (error) return done(error);
-			this.ca = buffer.toString();
-			done();
-		});
-	});
-
 	after(function() {
 		if (this.server) return this.server.close();
 	});
@@ -118,7 +109,7 @@ describe('Server: HTTP API', function() {
 		it('missing secret', function(done) {
 			this.helpers.request('get', {
 				url: 'https://localhost:3000/lnurl',
-				ca: this.ca,
+				ca: this.server.ca,
 				qs: {},
 				json: true,
 			}, function(error, response, body) {
@@ -144,7 +135,7 @@ describe('Server: HTTP API', function() {
 				const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: query,
 					json: true,
 				}, (error, response, body) => {
@@ -169,7 +160,7 @@ describe('Server: HTTP API', function() {
 				query.pushAmt = 500000;
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: query,
 					json: true,
 				}, (error, response, body) => {
@@ -195,7 +186,7 @@ describe('Server: HTTP API', function() {
 					const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params, overrides);
 					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
-						ca: this.ca,
+						ca: this.server.ca,
 						qs: query,
 						json: true,
 					}, (error, response, body) => {
@@ -232,7 +223,7 @@ describe('Server: HTTP API', function() {
 				}, params);
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: outOfOrderQuery,
 					json: true,
 				}, (error, response, body) => {
@@ -264,7 +255,7 @@ describe('Server: HTTP API', function() {
 				query.s = signature;
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: query,
 					json: true,
 				}, (error, response, body) => {
@@ -285,7 +276,7 @@ describe('Server: HTTP API', function() {
 				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: query,
 					json: true,
 				}, (error, response1, body1) => {
@@ -298,7 +289,7 @@ describe('Server: HTTP API', function() {
 					}
 					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
-						ca: this.ca,
+						ca: this.server.ca,
 						qs: query,
 						json: true,
 					}, (error, response2, body2) => {
@@ -509,7 +500,7 @@ describe('Server: HTTP API', function() {
 								const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
 								this.helpers.request('get', {
 									url: 'https://localhost:3000/lnurl',
-									ca: this.ca,
+									ca: this.server.ca,
 									qs: query,
 									json: true,
 								}, (error, response, body) => {
@@ -537,7 +528,7 @@ describe('Server: HTTP API', function() {
 			it('invalid secret', function(done) {
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: {
 						q: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
@@ -607,7 +598,7 @@ describe('Server: HTTP API', function() {
 						it(test.description, function(done) {
 							this.helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.ca,
+								ca: this.server.ca,
 								qs: {
 									q: this.secret,
 								},
@@ -636,7 +627,7 @@ describe('Server: HTTP API', function() {
 			it('invalid secret', function(done) {
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.ca,
+					ca: this.server.ca,
 					qs: {
 						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
@@ -828,7 +819,7 @@ describe('Server: HTTP API', function() {
 							});
 							this.helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.ca,
+								ca: this.server.ca,
 								qs: params,
 								json: true,
 							}, (error, response, body) => {
@@ -860,7 +851,7 @@ describe('Server: HTTP API', function() {
 					}
 					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
-						ca: this.ca,
+						ca: this.server.ca,
 						qs: params,
 						json: true,
 					}, cb);

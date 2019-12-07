@@ -24,6 +24,7 @@ module.exports = function(lnurl) {
 		this.state = 'initializing';
 		this.checkOptions();
 		this.prepareApiKeys();
+		this.prepareHooks();
 		this.prepareLightning();
 		this.prepareStore();
 		this.createHttpsServer();
@@ -31,6 +32,8 @@ module.exports = function(lnurl) {
 	};
 
 	util.inherits(Server, SafeEventEmitter);
+
+	Server.HttpError = HttpError;
 
 	Server.prototype.defaultOptions = {
 		// The host for the HTTPS server:
@@ -72,6 +75,11 @@ module.exports = function(lnurl) {
 		store: {
 			backend: 'memory',
 			config: {},
+		},
+		middleware: {
+			signedLnurl: {
+				afterCheckSignature: null,
+			},
 		},
 	};
 
@@ -188,73 +196,14 @@ module.exports = function(lnurl) {
 		debug.info('Creating HTTPS server...');
 		const app = this.app = express();
 		const { host, port } = this.options;
-		app.use((req, res, next) => {
-			res.removeHeader('X-Powered-By');
-			debug.request(req.method + ' ' + req.url);
-			next();
-		});
+		const middleware = _.result(this, 'middleware');
+		app.use(middleware.stripHeaders);
+		app.use(middleware.logRequests);
 		app.get(this.options.endpoint,
-			(req, res, next) => {
-				// Signed LNURLs.
-				if (req.query.s) {
-					// Looks like a signed request.
-					// Payload is everything in the querystring less the signature itself.
-					// Should be *before* the unshortening.
-					const payload = querystring.stringify(_.omit(req.query, 's'));
-					// Unshorten the query (only for signed LNURLs).
-					req.query = this.unshortenQuery(req.query);
-					/*
-						Signed LNURLs must include:
-						id (API key ID)
-						n (nonce)
-						s (signature)
-						tag (subprotocol to be used)
-					*/
-					_.each(['id', 'n', 'tag'], field => {
-						if (!req.query[field]) {
-							throw new HttpError(`Failed API key signature check: Missing "${field}"`, 400);
-						}
-					});
-					const { id, n, s, tag } = req.query;
-					// Check that the query string is signed by an authorized API key.
-					if (this.isValidSignature(payload, s, id)) {
-						const params = _.omit(req.query, 's', 'id', 'n', 'tag');
-						let secret;
-						switch (tag) {
-							case 'login':
-								// Use the secret (k1) provided in the request.
-								secret = req.query.k1;
-								break;
-							default:
-								// Use the hash of API key ID + signature as the secret.
-								// This will make each signed lnurl one-time-use only.
-								secret = this.hash(`${id}-${s}`);
-								break;
-						}
-						switch (tag) {
-							case 'login':
-								req.query = { k1: secret };
-								break;
-							default:
-								req.query = { q: secret };
-								break;
-						}
-						return this.createUrl(secret, tag, params).then(() => {
-							next();
-						}).catch(error => {
-							if (!/duplicate/i.test(error.message)) {
-								return next(error);
-							}
-							next();
-						});
-					} else {
-						return next(new HttpError('Invalid API key signature', 403));
-					}
-				} else {
-					// Do nothing.
-					next();
-				}
-			},
+			middleware.signedLnurl.unshortenQuery,
+			middleware.signedLnurl.checkSignature,
+			middleware.signedLnurl.afterCheckSignature,
+			middleware.signedLnurl.createUrl,
 			(req, res, next) => {
 				let error;
 				const secret = req.query.q || req.query.k1;
@@ -296,17 +245,8 @@ module.exports = function(lnurl) {
 				});
 			}
 		);
-		app.use('*', (req, res, next) => {
-			next(new HttpError('Not found', 404));
-		});
-		app.use((error, req, res, next) => {
-			if (!error.status) {
-				debug.error(error);
-				error = new Error('Unexpected error');
-				error.status = 500;
-			}
-			res.status(error.status).json({ status: 'ERROR', reason: error.message });
-		});
+		app.use('*', middleware.notFound);
+		app.use(middleware.catchError);
 		this.getTlsCertificate().then(tls => {
 			if (this.state === 'initializing') {
 				app.httpsServer = https.createServer({
@@ -340,10 +280,132 @@ module.exports = function(lnurl) {
 				if (error) return reject(error);
 				this.state = 'listening';
 				this.emit('listening');
-				const { url } = this.options;
-				debug.info(`HTTPS server listening at ${url}`);
+				debug.info(`HTTPS server listening at https://${host}:${port}/`);
 			});
 		});
+	};
+
+	Server.prototype.middleware = function() {
+		return {
+			stripHeaders: function(req, res, next) {
+				res.removeHeader('X-Powered-By');
+				next();
+			},
+			logRequests: function(req, res, next) {
+				debug.request(req.method + ' ' + req.url);
+				next();
+			},
+			notFound: function(req, res, next) {
+				next(new HttpError('Not found', 404));
+			},
+			catchError: function(error, req, res, next) {
+				if (!error.status) {
+					debug.error(error);
+					error = new Error('Unexpected error');
+					error.status = 500;
+				}
+				res.status(error.status).json({ status: 'ERROR', reason: error.message });
+			},
+			signedLnurl: {
+				unshortenQuery: (req, res, next) => {
+					if (req.query.s) {
+						// Only unshorten signed LNURLs.
+						// Save the original query for signature validation later.
+						req.originalQuery = _.clone(req.query);
+						req.query = this.unshortenQuery(req.query);
+					}
+					next();
+				},
+				checkSignature: (req, res, next) => {
+					if (!req.query.s) return next();
+					/*
+						Signed LNURLs must include:
+						id (API key ID)
+						n (nonce)
+						s (signature)
+						tag (subprotocol to be used)
+					*/
+					_.each(['id', 'n', 'tag'], field => {
+						if (!req.query[field]) {
+							throw new HttpError(`Failed API key signature check: Missing "${field}"`, 400);
+						}
+					});
+					// Payload is everything in the querystring less the signature itself.
+					const payload = querystring.stringify(_.omit(req.originalQuery, 's'));
+					const { s, id } = req.query;
+					// Check that the query string is signed by an authorized API key.
+					if (!this.isValidSignature(payload, s, id)) {
+						// Invalid signature.
+						return next(new HttpError('Invalid API key signature', 403));
+					}
+					// Valid signature.
+					next();
+				},
+				afterCheckSignature: this.prepareMiddlewareHook('signedLnurl:afterCheckSignature'),
+				createUrl: (req, res, next) => {
+					if (!req.query.s) return next();
+					const { tag } = req.query;
+					const params = _.omit(req.query, 's', 'id', 'n', 'tag');
+					let secret;
+					switch (tag) {
+						case 'login':
+							// Use the secret (k1) provided in the request.
+							secret = req.query.k1;
+							req.query = { k1: secret };
+							break;
+						default:
+							// Use the hash of API key ID + signature as the secret.
+							// This will make each signed lnurl one-time-use only.
+							const { s, id } = req.query;
+							secret = this.hash(`${id}-${s}`);
+							req.query = { q: secret };
+							break;
+					}
+					return this.createUrl(secret, tag, params).then(() => {
+						next();
+					}).catch(error => {
+						if (!/duplicate/i.test(error.message)) {
+							return next(error);
+						}
+						next();
+					});
+				},
+			},
+		};
+	};
+
+	Server.prototype.prepareHooks = function() {
+		this.hooks = _.chain([
+			'middleware:signedLnurl:afterCheckSignature',
+		]).map(name => {
+			return [name, []];
+		}).object().value();
+	};
+
+	Server.prototype.isValidHook = function(name) {
+		return !_.isUndefined(this.hooks[name]);
+	};
+
+	Server.prototype.bindToHook = function(name, fn) {
+		if (!this.isValidHook(name)) {
+			throw new Error(`Cannot bind to unknown hook: "${name}"`);
+		}
+		this.hooks[name].push(fn);
+	};
+
+	Server.prototype.getCallbacksBoundToHook = function(name) {
+		return this.hooks[name] || [];
+	};
+
+	Server.prototype.prepareMiddlewareHook = function(middlewareName) {
+		const name = `middleware:${middlewareName}`;
+		return (req, res, next) => {
+			const callbacks = this.getCallbacksBoundToHook(name);
+			const customMiddlewares = _.map(callbacks, fn => {
+				return fn.bind(this, req, res);
+			});
+			async.series(customMiddlewares, next);
+		};
 	};
 
 	Server.prototype.isValidSignature = function(payload, signature, id) {

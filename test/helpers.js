@@ -41,7 +41,12 @@ module.exports = {
 			cert: defaultLightningConfig.cert,
 			macaroon: defaultLightningConfig.macaroon,
 		});
-		return lnurl.createServer(options);
+		const server = lnurl.createServer(options);
+		server.once('listening', () => {
+			const { certPath } = server.options.tls;
+			server.ca = fs.readFileSync(certPath).toString();
+		});
+		return server;
 	},
 	backends: {
 		lnd: function(done) {

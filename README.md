@@ -23,6 +23,9 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [createServer](#createServer)
     * [options](#options-for-createserver-method)
   * [generateApiKey](#generateapikey)
+* [Hooks](#hooks)
+  * [Middleware Hooks](#middleware-hooks)
+    * [middleware:signedLnurl:afterCheckSignature](#middlewaresignedLnurlafterCheckSignature)
 * [Signed LNURLs](#signed-lnurls)
   * [Shorter Signed LNURLs](#shorter-signed-lnurls)
     * [Subprotocol Short Names](#subprotocol-short-names)
@@ -373,135 +376,31 @@ Expected output:
 ```
 
 
-## Configuring Data Store
+## Hooks
 
-By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [Redis](#redis), [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
+It is possible to further customize your lnurl server by using hooks to run custom application code at key points in the server application flow.
 
+### Middleware Hooks
 
-### Redis
+Special type of hook that allows you to add your own custom middleware functions to your lnurl server. The callback function you provide to this kind of hook is executed as [express middleware](https://expressjs.com/en/guide/using-middleware.html).
 
-To use Redis as your data store you will need to install the [ioredis module](https://github.com/luin/ioredis) wherever you are running your lnurl server:
-```bash
-npm install ioredis
-```
-Then you can run your server via the API as follows:
+#### middleware:signedLnurl:afterCheckSignature
+
+After a request has passed the signed-lnurl authorization signature check.
+
+Example usage:
 ```js
 const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'redis',
-		config: {
-			prefix: 'lnurl:',
-		},
-	},
-	// ...
+const server = lnurl.createServer();
+server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
+	// Your custom middleware.
+	// It is possible to modify the req.query object, like this:
+	req.query.extra = 'example changing the query object';
+	// Fail the request by calling next with an error:
+	next(new Error('Your custom error message'));
+	// Or call next without any arguments to continue processing the request:
+	next();
 });
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="redis" \
-	--store.config='{"prefix":"lnurl:"}'
-```
-
-
-### SQLite
-
-To use SQLite as your data store you will need to install the [sqlite3 module](https://github.com/mapbox/node-sqlite3) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
-```bash
-npm install knex sqlite3
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'knex',
-		config: {
-			client: 'sqlite3',
-			connection: {
-				filename: './lnurl-server.sqlite3',
-			},
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="knex" \
-	--store.config='{"client":"sqlite3","connection":{"filename":"./lnurl-server.sqlite3"}}'
-```
-
-
-### MySQL
-
-To use MySQL as your data store you will need to install the [mysql module](https://github.com/mysqljs/mysql) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
-```bash
-npm install knex mysql
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'knex',
-		config: {
-			client: 'mysql',
-			connection: {
-				host: '127.0.0.1',
-				user: 'lnurl_server',
-				password: '',
-				database: 'lnurl_server',
-			},
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="knex" \
-	--store.config='{"client":"mysql","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
-```
-
-
-### PostgreSQL
-
-To use PostgreSQL as your data store you will need to install the [postgres module](https://github.com/brianc/node-postgres) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
-```bash
-npm install knex pg
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'knex',
-		config: {
-			client: 'postgres',
-			connection: {
-				host: '127.0.0.1',
-				user: 'lnurl_server',
-				password: '',
-				database: 'lnurl_server',
-			},
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="knex" \
-	--store.config='{"client":"postgres","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
 ```
 
 
@@ -673,6 +572,138 @@ Encoded as:
 lnurl1dp68gurn8ghj77t0w4ez6mrww4excttnv4e8vetj9e3k7mf0vylkjepax5mrzwtzxvmxzvn9yehr6ef5vgcr2wrxxv6nxepsvfnxvdfxws7hwfnsdc7nzfns0q7n2ef5yeen6wfhx43rxwpjxqexzce3xu6rxvrrvgunsvtrxsunsdesxuckvv34xcur2vfjxvmn2vrxx3snwctx89jrjepcxuerjvrr8qux2vp3xajslvwjm7
 ```
 Which is about __25%__ shorter than the original unshortened LNURL.
+
+
+## Configuring Data Store
+
+By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [Redis](#redis), [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
+
+
+### Redis
+
+To use Redis as your data store you will need to install the [ioredis module](https://github.com/luin/ioredis) wherever you are running your lnurl server:
+```bash
+npm install ioredis
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'redis',
+		config: {
+			prefix: 'lnurl:',
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="redis" \
+	--store.config='{"prefix":"lnurl:"}'
+```
+
+
+### SQLite
+
+To use SQLite as your data store you will need to install the [sqlite3 module](https://github.com/mapbox/node-sqlite3) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex sqlite3
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'sqlite3',
+			connection: {
+				filename: './lnurl-server.sqlite3',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"sqlite3","connection":{"filename":"./lnurl-server.sqlite3"}}'
+```
+
+
+### MySQL
+
+To use MySQL as your data store you will need to install the [mysql module](https://github.com/mysqljs/mysql) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex mysql
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'mysql',
+			connection: {
+				host: '127.0.0.1',
+				user: 'lnurl_server',
+				password: '',
+				database: 'lnurl_server',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"mysql","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
+```
+
+
+### PostgreSQL
+
+To use PostgreSQL as your data store you will need to install the [postgres module](https://github.com/brianc/node-postgres) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex pg
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'postgres',
+			connection: {
+				host: '127.0.0.1',
+				user: 'lnurl_server',
+				password: '',
+				database: 'lnurl_server',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"postgres","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
+```
 
 
 ## Debugging
