@@ -286,8 +286,13 @@ module.exports = function(lnurl) {
 							});
 						});
 					}
-				}).catch(next).finally(() => {
+				// NOTE:
+				// promise.finally() not supported by nodejs <= 8.
+				}).then(() => {
 					this.unlock(secret);
+				}).catch(error => {
+					this.unlock(secret);
+					next(error);
 				});
 			}
 		);
