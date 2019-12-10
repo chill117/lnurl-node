@@ -6,9 +6,11 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
 
 * [Installation](#installation)
 * [Subprotocols](#subprotocols)
-  * [channel](#channel)
-  * [withdraw](#withdraw)
-  * [auth](#auth)
+  * [channelRequest](#channelRequest)
+  * [hostedChannelRequest](#hostedChannelRequest)
+  * [login](#login)
+  * [withdrawRequest](#withdrawRequest)
+  * [payRequest](#payRequest)
 * [Command-line interface](#command-line-interface)
   * [Help menu](#help-menu)
   * [Encoding a URL](#encoding-a-url)
@@ -55,7 +57,7 @@ This will install `lnurl` and add it to your application's `package.json` file.
 
 The [lnurl specification](https://github.com/btcontract/lnurl-rfc/blob/master/spec.md) has defined a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported (or soon-to-be) are defined here in this section.
 
-### channel
+### channelRequest
 
 Server parameters:
 
@@ -72,7 +74,26 @@ Client parameters:
 | `private`  | `boolean` | `0` or `1`      |
 
 
-### withdraw
+### hostedChannelRequest
+
+_not yet implemented_
+
+
+### login
+
+Server parameters:
+
+_None_
+
+Client parameters:
+
+| name  | type  | notes                             |
+| ------| ----- | --------------------------------- |
+| `sig` | `hex` | `sign(k1, <private linking key>)` |
+| `key` | `hex` | public linking key                |
+
+
+### withdrawRequest
 
 Server parameters:
 
@@ -91,18 +112,9 @@ Client parameters:
 * Note that `pr` can contain multiple payment requests (separated by commas)
 
 
-### auth
+### payRequest
 
-Server parameters:
-
-_None_
-
-Client parameters:
-
-| name  | type  | notes                            |
-| ------| ----- | -------------------------------- |
-| `sig` | `hex` | `sign(k1, <private linking key>)` |
-| `key` | `hex` | public linking key               |
+_not yet implemented_
 
 
 
