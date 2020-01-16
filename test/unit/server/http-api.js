@@ -26,7 +26,7 @@ const generatePaymentRequest = function(amount) {
 			},
 		],
 	});
-	const nodePrivateKey = lnurl.Server.prototype.generateApiKey().key;
+	const nodePrivateKey = lnurl.Server.prototype.generateRandomKey();
 	const signed = bolt11.sign(encoded, nodePrivateKey);
 	return signed.paymentRequest;
 };

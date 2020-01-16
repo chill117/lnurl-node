@@ -2,8 +2,17 @@ const crypto = require('crypto');
 const querystring = require('querystring');
 
 const createSignature = function(data, key) {
-	key = Buffer.from(key, 'hex');
-	return crypto.createHmac('sha256', key).update(data).digest('hex')
+	if (typeof key === 'string' isHex(key)) {
+		key = Buffer.from(key, 'hex');
+	}
+	return crypto.createHmac('sha256', key).update(data).digest('hex');
+};
+
+const isHex = function(hex) {
+	if (!_.isString(hex)) {
+		throw new Error('Invalid argument ("hex"): String expected.');
+	}
+	return Buffer.from(hex, 'hex').toString('hex') === hex;
 };
 
 const generateNonce = function(numberOfBytes) {

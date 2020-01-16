@@ -38,10 +38,55 @@ describe('Command-line interface', function() {
 				stdout: function(result) {
 					result = JSON.parse(result);
 					expect(result).to.be.an('object');
-					expect(result.id).to.have.length(10);
+					expect(result.id).to.be.a('string');
+					expect(result.key).to.be.a('string');
+					const { id, key } = result;
+					const { numBytes } = lnurl.Server.prototype.defaultOptions.apiKey;
+					expect(id).to.have.length(numBytes.id * 2);
+					expect(key).to.have.length(numBytes.key * 2);
 					expect(lnurl.Server.prototype.isHex(result.id)).to.equal(true);
-					expect(result.key).to.have.length(64);
 					expect(lnurl.Server.prototype.isHex(result.key)).to.equal(true);
+				},
+			},
+		},
+		{
+			cmd: [
+				'generateApiKey',
+				'--encoding', 'base64',
+			],
+			expected: {
+				stdout: function(result) {
+					result = JSON.parse(result);
+					expect(result).to.be.an('object');
+					expect(result.id).to.be.a('string');
+					expect(result.key).to.be.a('string');
+					const id = Buffer.from(result.id, 'base64').toString('hex');
+					const key = Buffer.from(result.key, 'base64').toString('hex');
+					const { numBytes } = lnurl.Server.prototype.defaultOptions.apiKey;
+					expect(id).to.have.length(numBytes.id * 2);
+					expect(key).to.have.length(numBytes.key * 2);
+					expect(lnurl.Server.prototype.isHex(id)).to.equal(true);
+					expect(lnurl.Server.prototype.isHex(key)).to.equal(true);
+				},
+			},
+		},
+		{
+			cmd: [
+				'generateApiKey',
+				'--numBytes.id', '7',
+				'--numBytes.key', '40',
+			],
+			expected: {
+				stdout: function(result) {
+					result = JSON.parse(result);
+					expect(result).to.be.an('object');
+					expect(result.id).to.be.a('string');
+					expect(result.key).to.be.a('string');
+					const { id, key } = result;
+					expect(id).to.have.length(14);
+					expect(key).to.have.length(80);
+					expect(lnurl.Server.prototype.isHex(id)).to.equal(true);
+					expect(lnurl.Server.prototype.isHex(key)).to.equal(true);
 				},
 			},
 		},

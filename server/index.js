@@ -50,6 +50,13 @@ module.exports = function(lnurl) {
 			// List of API keys that can be used to authorize privileged behaviors:
 			apiKeys: [],
 		},
+		apiKey: {
+			encoding: 'hex',
+			numBytes: {
+				id: 5,
+				key: 32,
+			},
+		},
 		lightning: {
 			// Which LN backend to use (only lnd supported currently):
 			backend: 'lnd',
@@ -81,6 +88,7 @@ module.exports = function(lnurl) {
 				afterCheckSignature: null,
 			},
 		},
+
 	};
 
 	Server.prototype.prepareOptions = function(options) {
@@ -90,6 +98,7 @@ module.exports = function(lnurl) {
 		options = this.deepClone(options || {});
 		options = _.defaults(options || {}, this.defaultOptions);
 		options.auth = _.defaults(options.auth || {}, this.defaultOptions.auth);
+		options.apiKey = _.defaults(options.apiKey || {}, this.defaultOptions.apiKey);
 		options.lightning = _.defaults(options.lightning || {}, this.defaultOptions.lightning);
 		options.lightning.config = _.defaults(options.lightning.config || {}, this.defaultOptions.lightning.config);
 		options.tls = _.defaults(options.tls || {}, this.defaultOptions.tls);
@@ -570,9 +579,14 @@ module.exports = function(lnurl) {
 		this._locks[secret] = null;
 	};
 
-	Server.prototype.generateApiKey = function() {
-		const id = this.generateRandomKey(5);
-		const key = this.generateRandomKey(32);
+	Server.prototype.generateApiKey = function(options) {
+		options = this.deepClone(options || {});
+		const defaultOptions = this.options || this.defaultOptions;
+		options = _.defaults({}, options || {}, defaultOptions.apiKey);
+		options.numBytes = _.defaults({}, options.numBytes || {}, defaultOptions.apiKey.numBytes);
+		const { encoding, numBytes } = options;
+		const id = this.generateRandomKey(numBytes.id, encoding);
+		const key = this.generateRandomKey(numBytes.key, encoding);
 		return { id, key };
 	};
 
@@ -658,9 +672,10 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.generateRandomKey = function(numberOfBytes) {
+	Server.prototype.generateRandomKey = function(numberOfBytes, encoding) {
 		numberOfBytes = numberOfBytes || 32;
-		return crypto.randomBytes(numberOfBytes).toString('hex');
+		encoding = encoding || 'hex';
+		return crypto.randomBytes(numberOfBytes).toString(encoding);
 	};
 
 	Server.prototype.hash = function(data) {

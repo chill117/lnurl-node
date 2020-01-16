@@ -32,8 +32,30 @@ program
 program
 	.command('generateApiKey')
 	.description('Generate a new API key for your lnurl server.')
+	.option(
+		'--encoding [value]',
+		'Encoding to use for ID and key (hex or base64)',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.apiKey.encoding,
+	)
+	.option(
+		'--numBytes.id [value]',
+		'Number of random bytes to generate for API key ID',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.apiKey.numBytes.id,
+	)
+	.option(
+		'--numBytes.key [value]',
+		'Number of random bytes to generate for API key',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.apiKey.numBytes.key,
+	)
 	.action(function() {
-		console.log(JSON.stringify(lnurl.generateApiKey(), null, 2));
+		let options = _.pick(this, 'encoding');
+		options.numBytes = {};
+		options.numBytes.id = parseInt(this['numBytes.id']);
+		options.numBytes.key = parseInt(this['numBytes.key']);
+		console.log(JSON.stringify(lnurl.generateApiKey(options), null, 2));
 	});
 
 program

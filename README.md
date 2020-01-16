@@ -170,6 +170,13 @@ Expected output:
 	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
 }
 ```
+Available options for this command:
+```
+Options:
+  --encoding [value]      Encoding to use for ID and key (hex or base64) (default: "hex")
+  --numBytes.id [value]   Number of random bytes to generate for API key ID (default: 5)
+  --numBytes.key [value]  Number of random bytes to generate for API key (default: 32)
+```
 
 
 ### Running an lnurl server
@@ -374,6 +381,16 @@ Expected output:
 	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
 }
 ```
+Available options:
+```js
+{
+	encoding: 'hex',
+	numBytes: {
+		id: 5,
+		key: 32
+	}
+}
+```
 
 
 ## Hooks
@@ -408,47 +425,7 @@ server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, re
 
 It is possible to generate new lnurls in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - see [Generating a new API key](#generating-a-new-api-key).
 
-Here is a sample node.js script that generates a signed lnurl:
-```js
-const crypto = require('crypto');
-const querystring = require('querystring');
-
-const createSignature = function(data, key) {
-	key = Buffer.from(key, 'hex');
-	return crypto.createHmac('sha256', key).update(data).digest('hex')
-};
-
-const generateNonce = function(numberOfBytes) {
-	return crypto.randomBytes(numberOfBytes).toString('hex');
-};
-
-const apiKey = {
-	/* !! REPLACE THIS WITH YOUR APP'S API KEY !! */
-	id: '5619b36a2e',
-	key: '9841b58cbfb2067f139d4d4d1f97c5b7416ca4995eabd2ce036e27c7d2568cb4',
-};
-
-const { id, key } = apiKey;
-const nonce = generateNonce(8);
-const query = {
-	id: id,
-	n: nonce,
-	// Note that tag and params can be shortened to improve scannability of QR codes.
-	// See "Shorter Signed LNURLs" for more info:
-	// https://github.com/chill117/lnurl-node#shorter-signed-lnurls
-	tag: 'withdrawRequest',
-	minWithdrawable: 1000,
-	maxWithdrawable: 500000,
-};
-const payload = querystring.stringify(query);
-query.s = createSignature(payload, key);
-const protocol = 'https:';
-const hostname = 'your-lnurl-server.com';
-const uri = '/lnurl';
-const signedUrl = `${protocol}//${hostname}${uri}?` + querystring.stringify(query);
-console.log(signedUrl);
-```
-The output of the above script will be something like this:
+See the script [signed-lnurls.js](https://github.com/chill117/lnurl-node/blob/master/examples/signed-lnurls.js) for an example of how to create signed LNURLs. The output of the script will be something like this:
 ```
 https://your-lnurl-server.com/lnurl?id=5619b36a2e&n=1f69afb26c643302&tag=withdrawRequest&minWithdrawable=1000&maxWithdrawable=500000&s=7ef95168e1afa90834ec98b0ebe7a5dc93b4a7e7345d0a1f9e3be3caaebf8925
 ```

@@ -22,8 +22,8 @@ let lnurl = {
 	createServer(options) {
 		return new this.Server(options);
 	},
-	generateApiKey() {
-		return this.Server.prototype.generateApiKey();
+	generateApiKey(options) {
+		return this.Server.prototype.generateApiKey(options);
 	},
 };
 

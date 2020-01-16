@@ -56,7 +56,7 @@ module.exports = {
 			const certPath = path.join(tmpDir, 'lnd-tls.cert');
 			const keyPath = path.join(tmpDir, 'lnd-tls.key');
 			const macaroonPath = path.join(tmpDir, 'lnd-admin.macaroon');
-			const macaroon = lnurl.generateApiKey().key;
+			const macaroon = lnurl.Server.prototype.generateRandomKey();
 			app.use('*', (req, res, next) => {
 				app.requests.push(req);
 				if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {

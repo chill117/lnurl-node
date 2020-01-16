@@ -13,7 +13,21 @@ describe('generateRandomKey([numberOfBytes])', function() {
 
 	const tests = [
 		{
-			numberOfBytes: 20,
+			args: {
+				numberOfBytes: null,
+				encoding: null,
+			},
+			expected: function(result) {
+				expect(result).to.be.a('string');
+				expect(result).to.have.length(64);
+				expect(lnurl.Server.prototype.isHex(result)).to.equal(true);
+			},
+		},
+		{
+			args: {
+				numberOfBytes: 20,
+				encoding: 'hex',
+			},
 			expected: function(result) {
 				expect(result).to.be.a('string');
 				expect(result).to.have.length(40);
@@ -21,19 +35,24 @@ describe('generateRandomKey([numberOfBytes])', function() {
 			},
 		},
 		{
-			numberOfBytes: null,
+			args: {
+				numberOfBytes: 12,
+				encoding: 'base64',
+			},
 			expected: function(result) {
 				expect(result).to.be.a('string');
-				expect(result).to.have.length(64);
-				expect(lnurl.Server.prototype.isHex(result)).to.equal(true);
+				expect(lnurl.Server.prototype.isHex(result)).to.equal(false);
+				const hex = Buffer.from(result, 'base64').toString('hex');
+				expect(hex).to.have.length(24);
+				expect(lnurl.Server.prototype.isHex(hex)).to.equal(true);
 			},
 		},
 	];
 
 	_.each(tests, function(test) {
-		const { numberOfBytes } = test;
-		it(`generates key (numberOfBytes = ${numberOfBytes})`, function() {
-			const result = fn(numberOfBytes);
+		it(JSON.stringify(test.args), function() {
+			const args = _.values(test.args);
+			const result = fn.apply(undefined, args);
 			if (_.isFunction(test.expected)) {
 				test.expected.call(this, result);
 			} else {
