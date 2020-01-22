@@ -51,10 +51,16 @@ describe('Server: HTTP API', function() {
 
 	before(function(done) {
 		try {
-			this.apiKey = lnurl.generateApiKey();
+			const apiKeys = [
+				lnurl.generateApiKey(),
+				lnurl.generateApiKey({
+					encoding: 'base64',
+				}),
+			];
+			this.apiKeys = apiKeys;
 			this.server = this.helpers.createServer({
 				auth: {
-					apiKeys: [this.apiKey],
+					apiKeys: apiKeys,
 				},
 			});
 			this.server.once('error', done);
@@ -155,7 +161,8 @@ describe('Server: HTTP API', function() {
 			it('query tampering', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+				const apiKey = this.apiKeys[0];
+				const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
 				this.helpers.request('get', {
@@ -181,9 +188,10 @@ describe('Server: HTTP API', function() {
 				it(`missing "${field}"`, function(done) {
 					const tag = 'channelRequest';
 					const params = prepareValidParams('create', tag);
+					const apiKey = this.apiKeys[0];
 					let overrides = {};
 					overrides[field] = '';
-					const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params, overrides);
+					const query = this.helpers.prepareSignedRequest(apiKey, tag, params, overrides);
 					this.helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: this.server.ca,
@@ -207,13 +215,14 @@ describe('Server: HTTP API', function() {
 			it('out-of-order query string', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
+				const apiKey = this.apiKeys[0];
 				let query = _.extend({
 					n: this.helpers.generateNonce(10),
 					tag: tag,
-					id: this.apiKey.id,
+					id: apiKey.id,
 				}, params);
 				const payload = querystring.stringify(query);
-				const signature = lnurl.Server.prototype.createSignature(payload, this.apiKey.key);
+				const signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
 				query.s = signature;
 				const outOfOrderQuery = _.extend({
 					s: query.s,
@@ -243,15 +252,16 @@ describe('Server: HTTP API', function() {
 			it('shortened query', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
+				const apiKey = this.apiKeys[0];
 				let query = {
-					id: this.apiKey.id,
+					id: apiKey.id,
 					n: this.helpers.generateNonce(10),
 					t: tag,
 					pl: params.localAmt,
 					pp: params.pushAmt,
 				};
 				const payload = querystring.stringify(query);
-				const signature = lnurl.Server.prototype.createSignature(payload, this.apiKey.key);
+				const signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
 				query.s = signature;
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
@@ -273,7 +283,8 @@ describe('Server: HTTP API', function() {
 			it('one-time-use', function(done) {
 				const tag = 'withdrawRequest';
 				const params = prepareValidParams('create', tag);
-				const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+				const apiKey = this.apiKeys[0];
+				const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
 				this.helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
@@ -497,7 +508,8 @@ describe('Server: HTTP API', function() {
 								} else {
 									params = test.params;
 								}
-								const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+								const apiKey = this.apiKeys[0];
+								const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
 								this.helpers.request('get', {
 									url: 'https://localhost:3000/lnurl',
 									ca: this.server.ca,

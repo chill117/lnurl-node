@@ -119,8 +119,8 @@ module.exports = function(lnurl) {
 				if (!_.isObject(apiKey)) {
 					throw new Error('Invalid option ("apiKeys"): Array of objects expected');
 				}
-				if (!apiKey.id || !this.isHex(apiKey.id) || !apiKey.key || !this.isHex(apiKey.key)) {
-					throw new Error('Invalid option ("apiKeys"): Each API key should include "id" and "key" hexadecimal strings.');
+				if (!apiKey.id || !apiKey.key) {
+					throw new Error('Invalid option ("apiKeys"): Each API key should include "id" and "key".');
 				}
 			});
 		}
