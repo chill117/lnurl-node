@@ -33,6 +33,22 @@ describe('Command-line interface', function() {
 			},
 		},
 		{
+			description: 'pipe to `lnurl encode`',
+			cmd: ['encode'],
+			stdin: 'https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df',
+			expected: {
+				stdout: 'lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns',
+			},
+		},
+		{
+			description: 'pipe to `lnurl decode`',
+			cmd: ['decode'],
+			stdin: 'lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns',
+			expected: {
+				stdout: 'https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df',
+			},
+		},
+		{
 			cmd: ['generateApiKey'],
 			expected: {
 				stdout: function(result) {
@@ -101,7 +117,8 @@ describe('Command-line interface', function() {
 	});
 
 	_.each(tests, function(test) {
-		it(test.cmd.join(' '), function(done) {
+		const description = test.description || test.cmd.join(' ');
+		it(description, function(done) {
 			done = _.once(done);
 			child = spawn(cli, test.cmd);
 			let results = {
@@ -114,6 +131,10 @@ describe('Command-line interface', function() {
 			child.stderr.on('data', function(data) {
 				results.stderr += data.toString();
 			});
+			if (test.stdin) {
+				child.stdin.write(test.stdin);
+			}
+			child.stdin.end();
 			child.on('close', () => {
 				try {
 					_.each(test.expected, (expected, type) => {
@@ -162,6 +183,7 @@ describe('Command-line interface', function() {
 			child.stderr.once('data', data => {
 				errorFromStdErr = new Error(data.toString());
 			});
+			child.stdin.end();
 			async.until(next => {
 				if (errorFromStdErr) return next(errorFromStdErr);
 				fs.readFile(certPath, (error, buffer) => {

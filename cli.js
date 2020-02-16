@@ -8,23 +8,30 @@ const lnurl = require('./index');
 const path = require('path');
 const pkg = require('./package.json');
 const program = new commander.Command();
+let stdin = '';
 
 program
 	.version(pkg.version)
 	.description(pkg.description);
 
 program
-	.command('encode <url>')
+	.command('encode [url]')
 	.description('Encode a url as a bech32-encoded string.')
 	.action(function(url) {
+		if (stdin) {
+			url = stdin.replace('\n', '');
+		}
 		const encoded = lnurl.encode(url);
 		console.log(encoded);
 	});
 
 program
-	.command('decode <encoded>')
+	.command('decode [encoded]')
 	.description('Decode a bech32-encoded lnurl.')
 	.action(function(encoded) {
+		if (stdin) {
+			encoded = stdin.replace('\n', '');
+		}
 		const url = lnurl.decode(encoded);
 		console.log(url);
 	});
@@ -190,4 +197,16 @@ program
 		lnurl.createServer(options);
 	});
 
-program.parse(process.argv);
+if (process.stdin.isTTY) {
+	program.parse(process.argv);
+} else {
+	process.stdin.on('readable', function() {
+		var chunk = this.read();
+		if (chunk !== null) {
+			stdin += chunk;
+		}
+	});
+	process.stdin.on('end', function() {
+		program.parse(process.argv); 
+	});
+}

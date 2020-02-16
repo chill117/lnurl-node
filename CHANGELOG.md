@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * CLI: Can now pipe to encode/decode
 * v0.3.0:
   * `generateApiKey()` (both API and CLI) has new options for setting the encoding (hex or base64) and number of random bytes
 * v0.2.0:
