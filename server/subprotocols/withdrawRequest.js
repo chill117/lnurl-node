@@ -35,8 +35,8 @@ module.exports = {
 		if (!_.isString(defaultDescription)) {
 			throw new HttpError('Invalid parameter ("defaultDescription"): String expected', 400);	
 		}
-		params.minWithdrawable = minWithdrawable.toNumber();
-		params.maxWithdrawable = maxWithdrawable.toNumber();
+		params.minWithdrawable = minWithdrawable.toString();
+		params.maxWithdrawable = maxWithdrawable.toString();
 	},
 	info: function(secret, params) {
 		return new Promise((resolve, reject) => {
@@ -65,7 +65,7 @@ module.exports = {
 					throw error;
 				}
 			}
-			return memo.plus(decoded.satoshis);
+			return memo.plus(decoded.millisatoshis);
 		}, new BigNumber(0));
 		if (!total.isGreaterThanOrEqualTo(minWithdrawable)) {
 			throw new HttpError('Amount in invoice(s) must be greater than or equal to "minWithdrawable"', 400);

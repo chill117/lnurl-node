@@ -18,7 +18,7 @@ const generatePaymentRequest = function(amount) {
 	const paymentHash = lnurl.Server.prototype.hash(preimage);
 	const encoded = bolt11.encode({
 		coinType: 'regtest',
-		satoshis: amount,
+		millisatoshis: amount,
 		tags: [
 			{
 				tagName: 'payment_hash',
@@ -83,8 +83,8 @@ describe('Server: HTTP API', function() {
 					pushAmt: 0,
 				},
 				'withdrawRequest': {
-					minWithdrawable: 1000,
-					maxWithdrawable: 2000,
+					minWithdrawable: '1000000',
+					maxWithdrawable: '2000000',
 					defaultDescription: 'service.com: withdrawRequest',
 				},
 				'login': {},
@@ -95,7 +95,7 @@ describe('Server: HTTP API', function() {
 					private: 1,
 				},
 				'withdrawRequest': {
-					pr: generatePaymentRequest(1000),
+					pr: generatePaymentRequest('1000000'),
 				},
 				'login': function() {
 
@@ -399,7 +399,7 @@ describe('Server: HTTP API', function() {
 					{
 						params: {
 							minWithdrawable: 0,
-							maxWithdrawable: 200,
+							maxWithdrawable: 200000,
 							defaultDescription: 'service.com: withdrawRequest',
 						},
 						expected: {
@@ -409,8 +409,8 @@ describe('Server: HTTP API', function() {
 					},
 					{
 						params: {
-							minWithdrawable: 100,
-							maxWithdrawable: 99,
+							minWithdrawable: 100000,
+							maxWithdrawable: 99000,
 							defaultDescription: 'service.com: withdrawRequest',
 						},
 						expected: {
@@ -581,8 +581,8 @@ describe('Server: HTTP API', function() {
 							k1: this.secret,
 							tag: 'withdrawRequest',
 							callback: 'https://localhost:3000/lnurl',
-							minWithdrawable: 1000,
-							maxWithdrawable: 2000,
+							minWithdrawable: '1000000',
+							maxWithdrawable: '2000000',
 							defaultDescription: 'service.com: withdrawRequest',
 						});
 					},
@@ -681,9 +681,9 @@ describe('Server: HTTP API', function() {
 					description: 'multiple payment requests (total OK)',
 					params: {
 						pr: [
-							generatePaymentRequest(700),
-							generatePaymentRequest(800),
-							generatePaymentRequest(400),
+							generatePaymentRequest('700000'),
+							generatePaymentRequest('800000'),
+							generatePaymentRequest('400000'),
 						].join(','),
 					},
 					expected: function(body) {
@@ -693,7 +693,7 @@ describe('Server: HTTP API', function() {
 				},
 				{
 					params: {
-						pr: generatePaymentRequest(500),
+						pr: generatePaymentRequest('500000'),
 					},
 					expected: {
 						status: 'ERROR',
@@ -704,8 +704,8 @@ describe('Server: HTTP API', function() {
 					description: 'multiple payment requests (total < minWithdrawable)',
 					params: {
 						pr: [
-							generatePaymentRequest(300),
-							generatePaymentRequest(500),
+							generatePaymentRequest('300000'),
+							generatePaymentRequest('500000'),
 						].join(','),
 					},
 					expected: {
@@ -715,7 +715,7 @@ describe('Server: HTTP API', function() {
 				},
 				{
 					params: {
-						pr: generatePaymentRequest(5000),
+						pr: generatePaymentRequest('5000000'),
 					},
 					expected: function(body) {
 							expect(body).to.deep.equal({
@@ -729,9 +729,9 @@ describe('Server: HTTP API', function() {
 					description: 'multiple payment requests (total > maxWithdrawable)',
 					params: {
 						pr: [
-							generatePaymentRequest(700),
-							generatePaymentRequest(800),
-							generatePaymentRequest(800),
+							generatePaymentRequest('700000'),
+							generatePaymentRequest('800000'),
+							generatePaymentRequest('800000'),
 						].join(','),
 					},
 					expected: function(body) {
