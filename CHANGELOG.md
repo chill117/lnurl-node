@@ -1,9 +1,9 @@
 # Changelog
 
-* TBD:
-  * CLI: Can now pipe to encode/decode
 * v0.3.0:
   * `generateApiKey()` (both API and CLI) has new options for setting the encoding (hex or base64) and number of random bytes
+  * CLI: Can now pipe to encode/decode
+  * Fix for withdrawRequest: Now using MilliSatoshis for amounts rather than Satoshis.
 * v0.2.0:
   * Added hooks for custom application code including custom middleware. See [Hooks](https://github.com/chill117/lnurl-node/blob/master/README.md#hooks) for more information.
   * Now supports API key authorization via HMAC. This allows other (even offline!) applications to create authorized lnurls for your lnurl server. See [Signed LNURLs](https://github.com/chill117/lnurl-node/blob/master/README.md#signed-lnurls) for more information.
