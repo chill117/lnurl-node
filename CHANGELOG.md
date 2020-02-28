@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.3.1:
+  * Use Number type for min/maxWithdrawable (lnurl-withdraw)
 * v0.3.0:
   * `generateApiKey()` (both API and CLI) has new options for setting the encoding (hex or base64) and number of random bytes
   * CLI: Can now pipe to encode/decode
