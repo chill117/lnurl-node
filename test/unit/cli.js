@@ -155,8 +155,16 @@ describe('Command-line interface', function() {
 
 	describe('server [options]', function() {
 
+		before(function(done) {
+			this.ln = this.helpers.prepareMockLightningNode('lnd', done);
+		});
+
 		beforeEach(function() {
-			this.lnd.requests = [];
+			this.ln.requests = [];
+		});
+
+		after(function(done) {
+			this.ln.close(done);
 		});
 
 		it('runs', function(done) {
@@ -168,12 +176,8 @@ describe('Command-line interface', function() {
 				'--host', 'localhost',
 				'--port', '3000',
 				'--auth.apiKeys', JSON.stringify([apiKey]),
-				'--lightning.backend', 'lnd',
-				'--lightning.config', JSON.stringify({
-					hostname: this.lnd.hostname,
-					cert: this.lnd.cert,
-					macaroon: this.lnd.macaroon,
-				}),
+				'--lightning.backend', this.ln.backend,
+				'--lightning.config', JSON.stringify(this.ln.config),
 				'--tls.certPath', certPath,
 				'--tls.keyPath', keyPath,
 				'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
@@ -207,7 +211,7 @@ describe('Command-line interface', function() {
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal(tag);
 							expect(body.callback).to.equal('https://localhost:3000/lnurl');
-							expect(body.uri).to.equal(this.lnd.nodeUri);
+							expect(body.uri).to.equal(this.ln.nodeUri);
 						} catch (error) {
 							return next(error);
 						}

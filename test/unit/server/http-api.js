@@ -1,52 +1,22 @@
 const _ = require('underscore');
-const bolt11 = require('bolt11');
-const crypto = require('crypto');
 const { expect } = require('chai');
-const fs = require('fs');
-const path = require('path');
+const helpers = require('../../helpers');
+const lnurl = require('../../../');
 const querystring = require('querystring');
 const secp256k1 = require('secp256k1');
 
-const lnurl = require('../../../');
-
-const generatePreImage = function() {
-	return lnurl.Server.prototype.generateRandomKey(20);
-};
-
-const generatePaymentRequest = function(amount) {
-	const preimage = generatePreImage();
-	const paymentHash = lnurl.Server.prototype.hash(preimage);
-	const encoded = bolt11.encode({
-		coinType: 'regtest',
-		millisatoshis: amount,
-		tags: [
-			{
-				tagName: 'payment_hash',
-				data: paymentHash,
-			},
-		],
-	});
-	const nodePrivateKey = lnurl.Server.prototype.generateRandomKey();
-	const signed = bolt11.sign(encoded, nodePrivateKey);
-	return signed.paymentRequest;
-};
-
-const generateLinkingKey = function() {
-	let privKey;
-	do {
-		privKey = crypto.randomBytes(32);
-	} while (!secp256k1.privateKeyVerify(privKey))
-	const pubKey = secp256k1.publicKeyCreate(privKey);
-	return {
-		pubKey: pubKey,
-		privKey: privKey,
-	};
-};
-
 describe('Server: HTTP API', function() {
 
+	before(function(done) {
+		this.ln = helpers.prepareMockLightningNode('lnd', done);
+	});
+
 	beforeEach(function() {
-		this.lnd.requests = [];
+		this.ln.requests = [];
+	});
+
+	after(function(done) {
+		this.ln.close(done);
 	});
 
 	before(function(done) {
@@ -58,9 +28,13 @@ describe('Server: HTTP API', function() {
 				}),
 			];
 			this.apiKeys = apiKeys;
-			this.server = this.helpers.createServer({
+			this.server = helpers.createServer({
 				auth: {
 					apiKeys: apiKeys,
+				},
+				lightning: {
+					backend: this.ln.backend,
+					config: this.ln.config,
 				},
 			});
 			this.server.once('error', done);
@@ -95,11 +69,9 @@ describe('Server: HTTP API', function() {
 					private: 1,
 				},
 				'withdrawRequest': {
-					pr: generatePaymentRequest(1000000),
+					pr: helpers.generatePaymentRequest(1000000),
 				},
-				'login': function() {
-
-				},
+				'login': {},
 			},
 		};
 
@@ -113,7 +85,7 @@ describe('Server: HTTP API', function() {
 		};
 
 		it('missing secret', function(done) {
-			this.helpers.request('get', {
+			helpers.request('get', {
 				url: 'https://localhost:3000/lnurl',
 				ca: this.server.ca,
 				qs: {},
@@ -138,8 +110,8 @@ describe('Server: HTTP API', function() {
 				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
-				this.helpers.request('get', {
+				const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: query,
@@ -162,10 +134,10 @@ describe('Server: HTTP API', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = this.apiKeys[0];
-				const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
+				const query = helpers.prepareSignedRequest(apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
-				this.helpers.request('get', {
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: query,
@@ -191,8 +163,8 @@ describe('Server: HTTP API', function() {
 					const apiKey = this.apiKeys[0];
 					let overrides = {};
 					overrides[field] = '';
-					const query = this.helpers.prepareSignedRequest(apiKey, tag, params, overrides);
-					this.helpers.request('get', {
+					const query = helpers.prepareSignedRequest(apiKey, tag, params, overrides);
+					helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: this.server.ca,
 						qs: query,
@@ -217,7 +189,7 @@ describe('Server: HTTP API', function() {
 				const params = prepareValidParams('create', tag);
 				const apiKey = this.apiKeys[0];
 				let query = _.extend({
-					n: this.helpers.generateNonce(10),
+					n: helpers.generateNonce(10),
 					tag: tag,
 					id: apiKey.id,
 				}, params);
@@ -230,7 +202,7 @@ describe('Server: HTTP API', function() {
 					id: query.id,
 					n: query.n,
 				}, params);
-				this.helpers.request('get', {
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: outOfOrderQuery,
@@ -255,7 +227,7 @@ describe('Server: HTTP API', function() {
 				const apiKey = this.apiKeys[0];
 				let query = {
 					id: apiKey.id,
-					n: this.helpers.generateNonce(10),
+					n: helpers.generateNonce(10),
 					t: tag,
 					pl: params.localAmt,
 					pp: params.pushAmt,
@@ -263,7 +235,7 @@ describe('Server: HTTP API', function() {
 				const payload = querystring.stringify(query);
 				const signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
 				query.s = signature;
-				this.helpers.request('get', {
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: query,
@@ -284,8 +256,8 @@ describe('Server: HTTP API', function() {
 				const tag = 'withdrawRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = this.apiKeys[0];
-				const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
-				this.helpers.request('get', {
+				const query = helpers.prepareSignedRequest(apiKey, tag, params);
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: query,
@@ -298,7 +270,7 @@ describe('Server: HTTP API', function() {
 					} catch (error) {
 						return done(error);
 					}
-					this.helpers.request('get', {
+					helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: this.server.ca,
 						qs: query,
@@ -365,7 +337,7 @@ describe('Server: HTTP API', function() {
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('channelRequest');
 							expect(body.callback).to.equal('https://localhost:3000/lnurl');
-							expect(body.uri).to.equal(this.lnd.nodeUri);
+							expect(body.uri).to.equal(this.ln.nodeUri);
 						},
 					},
 				];
@@ -462,8 +434,8 @@ describe('Server: HTTP API', function() {
 					{
 						description: 'invalid signature: signed with different private key',
 						params: function() {
-							const linkingKey1 = generateLinkingKey();
-							const linkingKey2 = generateLinkingKey();
+							const linkingKey1 = helpers.generateLinkingKey();
+							const linkingKey2 = helpers.generateLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
 							const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
 							return {
@@ -481,7 +453,7 @@ describe('Server: HTTP API', function() {
 					{
 						description: 'valid signature',
 						params: function() {
-							const { pubKey, privKey } = generateLinkingKey();
+							const { pubKey, privKey } = helpers.generateLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
 							const { signature } = secp256k1.sign(k1, privKey);
 							const params = {
@@ -509,8 +481,8 @@ describe('Server: HTTP API', function() {
 									params = test.params;
 								}
 								const apiKey = this.apiKeys[0];
-								const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
-								this.helpers.request('get', {
+								const query = helpers.prepareSignedRequest(apiKey, tag, params);
+								helpers.request('get', {
 									url: 'https://localhost:3000/lnurl',
 									ca: this.server.ca,
 									qs: query,
@@ -538,7 +510,7 @@ describe('Server: HTTP API', function() {
 		describe('?q=SECRET', function() {
 
 			it('invalid secret', function(done) {
-				this.helpers.request('get', {
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: {
@@ -568,7 +540,7 @@ describe('Server: HTTP API', function() {
 							k1: this.secret,
 							tag: 'channelRequest',
 							callback: 'https://localhost:3000/lnurl',
-							uri: this.lnd.nodeUri,
+							uri: this.ln.nodeUri,
 						});
 					},
 				},
@@ -608,7 +580,7 @@ describe('Server: HTTP API', function() {
 					});
 					_.each(tests, function(test) {
 						it(test.description, function(done) {
-							this.helpers.request('get', {
+							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
 								ca: this.server.ca,
 								qs: {
@@ -637,7 +609,7 @@ describe('Server: HTTP API', function() {
 		describe('?k1=SECRET&..', function() {
 
 			it('invalid secret', function(done) {
-				this.helpers.request('get', {
+				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
 					ca: this.server.ca,
 					qs: {
@@ -674,26 +646,30 @@ describe('Server: HTTP API', function() {
 							expect(body).to.deep.equal({
 							status: 'OK',
 						});
-						this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+						this.ln.expectRequests('post', '/v1/channels/transactions', 1);
 					},
 				},
 				{
 					description: 'multiple payment requests (total OK)',
-					params: {
-						pr: [
-							generatePaymentRequest(700000),
-							generatePaymentRequest(800000),
-							generatePaymentRequest(400000),
-						].join(','),
+					params: function() {
+						return {
+							pr: [
+								helpers.generatePaymentRequest(700000),
+								helpers.generatePaymentRequest(800000),
+								helpers.generatePaymentRequest(400000),
+							].join(','),
+						};
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({ status: 'OK' });
-						this.lnd.expectRequests('post', '/v1/channels/transactions', 3);
+						this.ln.expectRequests('post', '/v1/channels/transactions', 3);
 					},
 				},
 				{
-					params: {
-						pr: generatePaymentRequest(500000),
+					params: function() {
+						return {
+							pr: helpers.generatePaymentRequest(500000),
+						};
 					},
 					expected: {
 						status: 'ERROR',
@@ -702,11 +678,13 @@ describe('Server: HTTP API', function() {
 				},
 				{
 					description: 'multiple payment requests (total < minWithdrawable)',
-					params: {
-						pr: [
-							generatePaymentRequest(300000),
-							generatePaymentRequest(500000),
-						].join(','),
+					params: function() {
+						return {
+							pr: [
+								helpers.generatePaymentRequest(300000),
+								helpers.generatePaymentRequest(500000),
+							].join(','),
+						};
 					},
 					expected: {
 						status: 'ERROR',
@@ -714,32 +692,36 @@ describe('Server: HTTP API', function() {
 					},
 				},
 				{
-					params: {
-						pr: generatePaymentRequest(5000000),
+					params: function() {
+						return {
+							pr: helpers.generatePaymentRequest(5000000),
+						};
 					},
 					expected: function(body) {
 							expect(body).to.deep.equal({
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
-						this.lnd.expectRequests('post', '/v1/channels/transactions', 0);
+						this.ln.expectRequests('post', '/v1/channels/transactions', 0);
 					},
 				},
 				{
 					description: 'multiple payment requests (total > maxWithdrawable)',
-					params: {
-						pr: [
-							generatePaymentRequest(700000),
-							generatePaymentRequest(800000),
-							generatePaymentRequest(800000),
-						].join(','),
+					params: function() {
+						return {
+							pr: [
+								helpers.generatePaymentRequest(700000),
+								helpers.generatePaymentRequest(800000),
+								helpers.generatePaymentRequest(800000),
+							].join(','),
+						};
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
-						this.lnd.expectRequests('post', '/v1/channels/transactions', 0);
+						this.ln.expectRequests('post', '/v1/channels/transactions', 0);
 					},
 				},
 			];
@@ -747,8 +729,8 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'signed with different private key',
 					params: function() {
-						const linkingKey1 = generateLinkingKey();
-						const linkingKey2 = generateLinkingKey();
+						const linkingKey1 = helpers.generateLinkingKey();
+						const linkingKey2 = helpers.generateLinkingKey();
 						const k1 = Buffer.from(this.secret, 'hex');
 						const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
 						const params = {
@@ -765,7 +747,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'signed different secret',
 					params: function() {
-						const { pubKey, privKey } = generateLinkingKey();
+						const { pubKey, privKey } = helpers.generateLinkingKey();
 						const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
 						const { signature } = secp256k1.sign(k1, privKey);
 						const params = {
@@ -782,7 +764,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'valid signature',
 					params: function() {
-						const { pubKey, privKey } = generateLinkingKey();
+						const { pubKey, privKey } = helpers.generateLinkingKey();
 						const k1 = Buffer.from(this.secret, 'hex');
 						const { signature } = secp256k1.sign(k1, privKey);
 						const params = {
@@ -829,7 +811,7 @@ describe('Server: HTTP API', function() {
 							params = _.extend({}, params, {
 								k1: this.secret,
 							});
-							this.helpers.request('get', {
+							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
 								ca: this.server.ca,
 								qs: params,
@@ -861,7 +843,7 @@ describe('Server: HTTP API', function() {
 					} else {
 						params.k1 = this.secret;
 					}
-					this.helpers.request('get', {
+					helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
 						ca: this.server.ca,
 						qs: params,
@@ -898,7 +880,7 @@ describe('Server: HTTP API', function() {
 							if (error) return done(error);
 							try {
 								expect(body).to.deep.equal({ status: 'OK' });
-								this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+								this.ln.expectRequests('post', '/v1/channels/transactions', 1);
 							} catch (error) {
 								return done(error);
 							}
@@ -912,7 +894,7 @@ describe('Server: HTTP API', function() {
 						if (error) return done(error);
 						try {
 							expect(body).to.deep.equal({ status: 'OK' });
-							this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+							this.ln.expectRequests('post', '/v1/channels/transactions', 1);
 						} catch (error) {
 							return done(error);
 						}
@@ -923,7 +905,7 @@ describe('Server: HTTP API', function() {
 									status: 'ERROR',
 									reason: 'Already used',
 								});
-								this.lnd.expectRequests('post', '/v1/channels/transactions', 1);
+								this.ln.expectRequests('post', '/v1/channels/transactions', 1);
 							} catch (error) {
 								return done(error);
 							}

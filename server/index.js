@@ -62,9 +62,7 @@ module.exports = function(lnurl) {
 			backend: 'lnd',
 			// The configuration object to connect to the LN backend:
 			config: {
-				hostname: '127.0.0.1:8080',
-				cert: null,
-				macaroon: null,
+				// Defaults here depend on the LN backend used.
 			},
 		},
 		tls: {

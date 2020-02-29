@@ -5,8 +5,14 @@ const https = require('https');
 const url = require('url');
 
 let Lightning = function(options) {
-	this.options = options || {};
+	this.options = _.defaults(options || {}, this.defaultOptions);
 	this.checkOptions();
+};
+
+Lightning.prototype.defaultOptions = {
+	hostname: '127.0.0.1:8080',
+	cert: null,
+	macaroon: null,
 };
 
 Lightning.prototype.requiredOptions = ['hostname', 'cert', 'macaroon'];

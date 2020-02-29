@@ -1,19 +1,18 @@
 const _ = require('underscore');
-const async = require('async');
+const bolt11 = require('bolt11');
+const crypto = require('crypto');
 const { expect } = require('chai');
-const express = require('express');
 const fs = require('fs');
 const https = require('https');
 const lnurl = require('../');
 const path = require('path');
-const pem = require('pem');
+const mocks = require('./mocks');
 const querystring = require('querystring');
+const secp256k1 = require('secp256k1');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
-let backends = {
-	lnd: [],
-};
+let mockLightningNodes = [];
 
 module.exports = {
 	lnurl: lnurl,
@@ -22,10 +21,7 @@ module.exports = {
 		options = _.defaults(options || {}, {
 			host: 'localhost',
 			port: 3000,
-			lightning: {
-				backend: 'lnd',
-				config: {},
-			},
+			lightning: {},
 			tls: {
 				certPath: path.join(tmpDir, 'tls.cert'),
 				keyPath: path.join(tmpDir, 'tls.key'),
@@ -35,12 +31,13 @@ module.exports = {
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
 			},
 		});
-		const defaultLightningConfig = backends.lnd[0];
-		options.lightning.config = _.defaults(options.lightning.config, {
-			hostname: defaultLightningConfig.hostname,
-			cert: defaultLightningConfig.cert,
-			macaroon: defaultLightningConfig.macaroon,
-		});
+		const defaultLightningNode = _.first(mockLightningNodes);
+		if (defaultLightningNode) {
+			if (!options.lightning.backend) {
+				options.lightning.backend = defaultLightningNode.backend;
+			}
+			options.lightning.config = _.defaults(options.lightning.config || {}, defaultLightningNode.config);
+		}
 		const server = lnurl.createServer(options);
 		server.once('listening', () => {
 			const { certPath } = server.options.tls;
@@ -48,89 +45,29 @@ module.exports = {
 		});
 		return server;
 	},
-	backends: {
-		lnd: function(done) {
-			const app = new express();
-			const host = 'localhost';
-			const port = 8080;
-			const certPath = path.join(tmpDir, 'lnd-tls.cert');
-			const keyPath = path.join(tmpDir, 'lnd-tls.key');
-			const macaroonPath = path.join(tmpDir, 'lnd-admin.macaroon');
-			const macaroon = lnurl.Server.prototype.generateRandomKey();
-			app.use('*', (req, res, next) => {
-				app.requests.push(req);
-				if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {
-					return res.status(400).end();
-				}
-				next();
-			});
-			app.get('/v1/getinfo', (req, res, next) => {
-				res.json(app.responses['get /v1/getinfo']);
-			});
-			app.post('/v1/channels', (req, res, next) => {
-				res.json(app.responses['post /v1/channels']);
-			});
-			app.post('/v1/channels/transactions', (req, res, next) => {
-				res.json(app.responses['post /v1/channels/transactions']);
-			});
-			fs.writeFile(macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {
-				if (error) return done(error);
-				pem.createCertificate({
-					selfSigned: true,
-					days: 1
-				}, (error, result) => {
-					if (error) return done(error);
-					const { certificate, serviceKey } = result;
-					async.parallel({
-						cert: fs.writeFile.bind(fs, certPath, certificate),
-						key: fs.writeFile.bind(fs, keyPath, serviceKey),
-					}, error => {
-						if (error) return done(error);
-						app.server = https.createServer({
-							key: serviceKey,
-							cert: certificate,
-						}, app).listen(port, host, done);
-					});
-				});
-			});
-			const nodePubKey = '02c990e21bee14bf4b73a34bd69d7eff4fda2a6877bb09074046528f41e586ebe3';
-			const nodeUri = `${nodePubKey}@127.0.0.1:9735`;
-			app.hostname = `${host}:${port}`;
-			app.cert = certPath;
-			app.macaroon = macaroonPath;
-			app.nodePubKey = nodePubKey;
-			app.nodeUri = nodeUri;
-			app.responses = {
-				'get /v1/getinfo': {
-					identity_pubkey: nodePubKey,
-					alias: 'lnd-testnet',
-					testnet: true,
-					uris: [ nodeUri ],
-				},
-				'post /v1/channels': {
-					output_index: 0,
-					funding_txid_bytes: null,
-					funding_txid_str: '968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e',
-				},
-				'post /v1/channels/transactions': (function() {
-					const preimage = lnurl.Server.prototype.generateRandomKey();
-					return {
-						payment_preimage: preimage,
-						payment_hash: lnurl.Server.prototype.hash(preimage),
-						payment_error: '',
-						payment_route: {},
-					};
-				})(),
-			};
-			app.expectRequests = function(method, uri, total) {
-				const numRequests = _.filter(app.requests, function(req) {
-					return req.url === uri && req.method.toLowerCase() === method;
-				}).length;
-				expect(numRequests).to.equal(total);
-			};
-			backends.lnd.push(app);
-			return app;
-		},
+	prepareMockLightningNode: function(backend, options, done) {
+		if (_.isFunction(options)) {
+			done = options;
+			options = {};
+		}
+		const MockLightningNode = mocks.lightning[backend];
+		if (!MockLightningNode) {
+			throw new Error(`Mock lightning node does not exist: "${backend}"`);
+		}
+		const mockNode = new MockLightningNode(options, done);
+		mockNode.backend = backend;
+		mockNode.expectRequests = function(method, uri, total) {
+			const numRequests = _.filter(mockNode.requests, function(req) {
+				return req.url === uri && req.method.toLowerCase() === method;
+			}).length;
+			expect(numRequests).to.equal(total);
+		};
+		mockNode.close = function(cb) {
+			if (!mockNode.server) return cb();
+			mockNode.server.close(cb);
+		};
+		mockLightningNodes.push(mockNode);
+		return mockNode;
 	},
 	prepareSignedRequest: function(apiKey, tag, params, overrides) {
 		overrides = overrides || {};
@@ -179,5 +116,36 @@ module.exports = {
 		});
 		req.once('error', done);
 		req.end();
+	},
+	generatePreImage: function() {
+		return lnurl.Server.prototype.generateRandomKey(20);
+	},
+	generatePaymentRequest: function(amount) {
+		const preimage = this.generatePreImage();
+		const paymentHash = lnurl.Server.prototype.hash(preimage);
+		const encoded = bolt11.encode({
+			coinType: 'regtest',
+			millisatoshis: amount,
+			tags: [
+				{
+					tagName: 'payment_hash',
+					data: paymentHash,
+				},
+			],
+		});
+		const nodePrivateKey = lnurl.Server.prototype.generateRandomKey();
+		const signed = bolt11.sign(encoded, nodePrivateKey);
+		return signed.paymentRequest;
+	},
+	generateLinkingKey: function() {
+		let privKey;
+		do {
+			privKey = crypto.randomBytes(32);
+		} while (!secp256k1.privateKeyVerify(privKey))
+		const pubKey = secp256k1.publicKeyCreate(privKey);
+		return {
+			pubKey: pubKey,
+			privKey: privKey,
+		};
 	},
 };
