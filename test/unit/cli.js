@@ -160,7 +160,7 @@ describe('Command-line interface', function() {
 		});
 
 		beforeEach(function() {
-			this.ln.requests = [];
+			this.ln.resetRequestCounters();
 		});
 
 		after(function(done) {

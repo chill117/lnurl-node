@@ -24,9 +24,12 @@ module.exports = function(options, done) {
 	};
 	app.nodePubKey = nodePubKey;
 	app.nodeUri = nodeUri;
-	app.requests = [];
+	app.requestCounters = {
+		getinfo: 0,
+		openchannel: 0,
+		payinvoice: 0,
+	};
 	app.use('*', (req, res, next) => {
-		app.requests.push(req);
 		const expectedAuthorization = 'Basic ' + Buffer.from('"":' + app.config.password, 'utf8').toString('base64');
 		if (!req.headers['authorization'] || req.headers['authorization'] !== expectedAuthorization) {
 			return res.status(400).end();
@@ -34,6 +37,7 @@ module.exports = function(options, done) {
 		next();
 	});
 	app.post('/getinfo', (req, res, next) => {
+		app.requestCounters.getinfo++;
 		res.json({
 			nodeId: nodePubKey,
 			alias: 'eclair-testnet',
@@ -43,9 +47,11 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/open', (req, res, next) => {
+		app.requestCounters.openchannel++;
 		res.json('e872f515dc5d8a3d61ccbd2127f33141eaa115807271dcc5c5c727f3eca914d3');
 	});
 	app.post('/payinvoice', (req, res, next) => {
+		app.requestCounters.payinvoice++;
 		res.json('e4227601-38b3-404e-9aa0-75a829e9bec0');
 	});
 	setTimeout(() => {

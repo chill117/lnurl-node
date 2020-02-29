@@ -1,7 +1,6 @@
 const _ = require('underscore');
 const bolt11 = require('bolt11');
 const crypto = require('crypto');
-const { expect } = require('chai');
 const fs = require('fs');
 const https = require('https');
 const lnurl = require('../');
@@ -56,11 +55,18 @@ module.exports = {
 		}
 		const mockNode = new MockLightningNode(options, done);
 		mockNode.backend = backend;
-		mockNode.expectRequests = function(method, uri, total) {
-			const numRequests = _.filter(mockNode.requests, function(req) {
-				return req.url === uri && req.method.toLowerCase() === method;
-			}).length;
-			expect(numRequests).to.equal(total);
+		mockNode.resetRequestCounters = function() {
+			this.requestCounters = _.mapObject(this.requestCounters, () => {
+				return 0;
+			});
+		};
+		mockNode.expectNumRequestsToEqual = function(type, total) {
+			if (_.isUndefined(mockNode.requestCounters[type])) {
+				throw new Error(`Unknown request type: "${type}"`);
+			}
+			if (mockNode.requestCounters[type] !== total) {
+				throw new Error(`Expected ${total} requests of type: "${type}"`);
+			}
 		};
 		mockNode.close = function(cb) {
 			if (!mockNode.server) return cb();

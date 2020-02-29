@@ -12,7 +12,7 @@ describe('Server: HTTP API', function() {
 	});
 
 	beforeEach(function() {
-		this.ln.requests = [];
+		this.ln.resetRequestCounters();
 	});
 
 	after(function(done) {
@@ -646,7 +646,7 @@ describe('Server: HTTP API', function() {
 							expect(body).to.deep.equal({
 							status: 'OK',
 						});
-						this.ln.expectRequests('post', '/v1/channels/transactions', 1);
+						this.ln.expectNumRequestsToEqual('payinvoice', 1);
 					},
 				},
 				{
@@ -662,7 +662,7 @@ describe('Server: HTTP API', function() {
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({ status: 'OK' });
-						this.ln.expectRequests('post', '/v1/channels/transactions', 3);
+						this.ln.expectNumRequestsToEqual('payinvoice', 3);
 					},
 				},
 				{
@@ -702,7 +702,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
-						this.ln.expectRequests('post', '/v1/channels/transactions', 0);
+						this.ln.expectNumRequestsToEqual('payinvoice', 0);
 					},
 				},
 				{
@@ -721,7 +721,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
-						this.ln.expectRequests('post', '/v1/channels/transactions', 0);
+						this.ln.expectNumRequestsToEqual('payinvoice', 0);
 					},
 				},
 			];
@@ -880,7 +880,7 @@ describe('Server: HTTP API', function() {
 							if (error) return done(error);
 							try {
 								expect(body).to.deep.equal({ status: 'OK' });
-								this.ln.expectRequests('post', '/v1/channels/transactions', 1);
+								this.ln.expectNumRequestsToEqual('payinvoice', 1);
 							} catch (error) {
 								return done(error);
 							}
@@ -894,7 +894,7 @@ describe('Server: HTTP API', function() {
 						if (error) return done(error);
 						try {
 							expect(body).to.deep.equal({ status: 'OK' });
-							this.ln.expectRequests('post', '/v1/channels/transactions', 1);
+							this.ln.expectNumRequestsToEqual('payinvoice', 1);
 						} catch (error) {
 							return done(error);
 						}
@@ -905,7 +905,7 @@ describe('Server: HTTP API', function() {
 									status: 'ERROR',
 									reason: 'Already used',
 								});
-								this.ln.expectRequests('post', '/v1/channels/transactions', 1);
+								this.ln.expectNumRequestsToEqual('payinvoice', 1);
 							} catch (error) {
 								return done(error);
 							}

@@ -32,15 +32,19 @@ module.exports = function(options, done) {
 	};
 	app.nodePubKey = nodePubKey;
 	app.nodeUri = nodeUri;
-	app.requests = [];
+	app.requestCounters = {
+		getinfo: 0,
+		openchannel: 0,
+		payinvoice: 0,
+	};
 	app.use('*', (req, res, next) => {
-		app.requests.push(req);
 		if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {
 			return res.status(400).end();
 		}
 		next();
 	});
 	app.get('/v1/getinfo', (req, res, next) => {
+		app.requestCounters.getinfo++;
 		res.json({
 			identity_pubkey: nodePubKey,
 			alias: 'lnd-testnet',
@@ -49,6 +53,7 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/v1/channels', (req, res, next) => {
+		app.requestCounters.openchannel++;
 		res.json({
 			output_index: 0,
 			funding_txid_bytes: null,
@@ -56,6 +61,7 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/v1/channels/transactions', (req, res, next) => {
+		app.requestCounters.payinvoice++;
 		const preimage = lnurl.Server.prototype.generateRandomKey();
 		res.json({
 			payment_preimage: preimage,
