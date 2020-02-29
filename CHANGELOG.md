@@ -1,7 +1,7 @@
 # Changelog
 
 * TBD:
-  * Added support for Eclair as LN backend
+  * Added support for c-lightning and Eclair as LN backends
 * v0.3.1:
   * Use Number type for min/maxWithdrawable (lnurl-withdraw)
 * v0.3.0:
