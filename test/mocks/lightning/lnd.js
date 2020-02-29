@@ -90,5 +90,9 @@ module.exports = function(options, done) {
 			});
 		});
 	});
+	app.close = function(done) {
+		if (!app.server) return done();
+		app.server.close(done);
+	};
 	return app;
 };

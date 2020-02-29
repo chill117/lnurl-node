@@ -7,16 +7,8 @@ const secp256k1 = require('secp256k1');
 
 describe('Server: HTTP API', function() {
 
-	before(function(done) {
-		this.ln = helpers.prepareMockLightningNode('lnd', done);
-	});
-
 	beforeEach(function() {
 		this.ln.resetRequestCounters();
-	});
-
-	after(function(done) {
-		this.ln.close(done);
 	});
 
 	before(function(done) {

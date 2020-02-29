@@ -54,6 +54,10 @@ module.exports = function(options, done) {
 		app.requestCounters.payinvoice++;
 		res.json('e4227601-38b3-404e-9aa0-75a829e9bec0');
 	});
+	app.close = function(done) {
+		if (!app.server) return done();
+		app.server.close(done);
+	};
 	setTimeout(() => {
 		app.server = http.createServer(app).listen(port, host, done);
 	});

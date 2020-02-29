@@ -5,13 +5,12 @@ const fs = require('fs');
 const https = require('https');
 const lnurl = require('../');
 const path = require('path');
-const mocks = require('./mocks');
 const querystring = require('querystring');
 const secp256k1 = require('secp256k1');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
-let mockLightningNodes = [];
+let ln;
 
 module.exports = {
 	lnurl: lnurl,
@@ -30,12 +29,11 @@ module.exports = {
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
 			},
 		});
-		const defaultLightningNode = _.first(mockLightningNodes);
-		if (defaultLightningNode) {
+		if (ln) {
 			if (!options.lightning.backend) {
-				options.lightning.backend = defaultLightningNode.backend;
+				options.lightning.backend = ln.backend;
 			}
-			options.lightning.config = _.defaults(options.lightning.config || {}, defaultLightningNode.config);
+			options.lightning.config = _.defaults(options.lightning.config || {}, ln.config);
 		}
 		const server = lnurl.createServer(options);
 		server.once('listening', () => {
@@ -49,10 +47,8 @@ module.exports = {
 			done = options;
 			options = {};
 		}
-		const MockLightningNode = mocks.lightning[backend];
-		if (!MockLightningNode) {
-			throw new Error(`Mock lightning node does not exist: "${backend}"`);
-		}
+		const mockPath = path.join(__dirname, 'mocks', 'lightning', backend);
+		const MockLightningNode = require(mockPath);
 		const mockNode = new MockLightningNode(options, done);
 		mockNode.backend = backend;
 		mockNode.resetRequestCounters = function() {
@@ -68,11 +64,7 @@ module.exports = {
 				throw new Error(`Expected ${total} requests of type: "${type}"`);
 			}
 		};
-		mockNode.close = function(cb) {
-			if (!mockNode.server) return cb();
-			mockNode.server.close(cb);
-		};
-		mockLightningNodes.push(mockNode);
+		ln = mockNode;
 		return mockNode;
 	},
 	prepareSignedRequest: function(apiKey, tag, params, overrides) {

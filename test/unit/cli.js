@@ -155,16 +155,8 @@ describe('Command-line interface', function() {
 
 	describe('server [options]', function() {
 
-		before(function(done) {
-			this.ln = this.helpers.prepareMockLightningNode('lnd', done);
-		});
-
 		beforeEach(function() {
 			this.ln.resetRequestCounters();
-		});
-
-		after(function(done) {
-			this.ln.close(done);
 		});
 
 		it('runs', function(done) {
