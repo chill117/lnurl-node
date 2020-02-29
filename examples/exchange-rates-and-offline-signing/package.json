@@ -1,0 +1,31 @@
+{
+  "name": "exchange-rates",
+  "version": "1.0.0",
+  "description": "Example lnurl-server with exchanges-rates middleware and signed lnurls",
+  "main": "server.js",
+  "scripts": {
+    "generate-api-key": "./node_modules/.bin/lnurl generateApiKey --encoding 'base64'",
+    "generate-signed-lnurl": "node ./scripts/generate-signed-lnurl.js",
+    "lnurl-encode": "./node_modules/.bin/lnurl encode",
+    "server:debug": "DEBUG=lnurl* node server.js",
+    "start": "npm run server:debug",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chill117/lnurl-node.git"
+  },
+  "author": {
+    "name": "Charles Hill",
+    "email": "chill@degreesofzero.com"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/chill117/lnurl-node/issues"
+  },
+  "homepage": "https://github.com/chill117/lnurl-node",
+  "dependencies": {
+    "bignumber.js": "9.0.0",
+    "lnurl": "0.3.1"
+  }
+}
