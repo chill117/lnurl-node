@@ -1,8 +1,9 @@
 {
-  "name": "exchange-rates",
+  "name": "lnurl-server-with-exchange-rates-and-offline-signing",
   "version": "1.0.0",
-  "description": "Example lnurl-server with exchanges-rates middleware and signed lnurls",
+  "description": "Example lnurl-server with exchanges-rates and offline signing",
   "main": "server.js",
+  "private": true,
   "scripts": {
     "generate-api-key": "./node_modules/.bin/lnurl generateApiKey --encoding 'base64'",
     "generate-signed-lnurl": "node ./scripts/generate-signed-lnurl.js",
