@@ -27,6 +27,6 @@
   "homepage": "https://github.com/chill117/lnurl-node",
   "dependencies": {
     "bignumber.js": "9.0.0",
-    "lnurl": "0.3.1"
+    "lnurl": "0.4.0"
   }
 }

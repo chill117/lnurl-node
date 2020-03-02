@@ -58,7 +58,7 @@ npm run --silent generate-signed-lnurl "EUR" "0.05"
 ```
 Example output:
 ```
-https://127.0.0.1:3000/lnurl?id=Ggx0Pz0%3D&n=e86d91cf28b6012a&tag=withdrawRequest&fiatSymbol=EUR&minWithdrawable=0.05&maxWithdrawable=0.05&defaultDescription=&s=08bf0cb7004204942963ec0572a9e17e43559f0216285e5b7cf8ca0cf9e0cf41
+http://127.0.0.1:3000/lnurl?id=Ggx0Pz0%3D&n=e86d91cf28b6012a&tag=withdrawRequest&fiatSymbol=EUR&minWithdrawable=0.05&maxWithdrawable=0.05&defaultDescription=&s=08bf0cb7004204942963ec0572a9e17e43559f0216285e5b7cf8ca0cf9e0cf41
 ```
 * `id` - the ID of the offline app's API key
 * `n` - randomly generated nonce
@@ -71,11 +71,9 @@ https://127.0.0.1:3000/lnurl?id=Ggx0Pz0%3D&n=e86d91cf28b6012a&tag=withdrawReques
 
 Open your browser and navigate to the URL that was created (yours, not the one here).
 
-Accept the self-signed TLS certificate and reload the page.
-
 You should see something like this:
 ```json
-{"minWithdrawable":635000,"maxWithdrawable":635000,"defaultDescription":"","callback":"https://127.0.0.1:3000/lnurl","k1":"69bdcc40d516e1080092e1419a7c9dbad345fe6f341e9312a9540e7fd78c5823","tag":"withdrawRequest"}
+{"minWithdrawable":635000,"maxWithdrawable":635000,"defaultDescription":"","callback":"http://127.0.0.1:3000/lnurl","k1":"69bdcc40d516e1080092e1419a7c9dbad345fe6f341e9312a9540e7fd78c5823","tag":"withdrawRequest"}
 ```
 * Note that the min/maxWithdrawable amounts have been converted to millisatoshis
 * `k1` - a short-lived secret that the user's lnurl-supporting wallet will send back to the server in order to complete the withdrawal process

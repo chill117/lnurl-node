@@ -48,10 +48,8 @@ let baseUrl;
 if (config.url) {
 	baseUrl = config.url;
 } else {
-	const protocol = 'https';
-	const { host, port } = config;
-	const hostname = `${host}:${port}`;
-	baseUrl = `${protocol}://${hostname}`;
+	const { host, port, protocol } = config;
+	baseUrl = `${protocol}://${host}:${port}`;
 }
 const { endpoint } = config;
 const signedUrl = `${baseUrl}${endpoint}?` + querystring.stringify(query);
