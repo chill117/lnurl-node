@@ -2,6 +2,7 @@
 
 * TBD:
   * Added support for c-lightning and Eclair as LN backends
+  * New `protocol` server option that allows the use of unencrypted http - the default remains https
 * v0.3.1:
   * Use Number type for min/maxWithdrawable (lnurl-withdraw)
 * v0.3.0:

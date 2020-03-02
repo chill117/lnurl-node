@@ -10,6 +10,7 @@ module.exports = function(lnurl) {
 	};
 	const express = require('express');
 	const fs = require('fs');
+	const http = require('http');
 	const https = require('https');
 	const HttpError = require('./HttpError');
 	const path = require('path');
@@ -27,7 +28,7 @@ module.exports = function(lnurl) {
 		this.prepareHooks();
 		this.prepareLightning();
 		this.prepareStore();
-		this.createHttpsServer();
+		this.app = this.createWebServer();
 		this._locks = {};
 	};
 
@@ -36,15 +37,17 @@ module.exports = function(lnurl) {
 	Server.HttpError = HttpError;
 
 	Server.prototype.defaultOptions = {
-		// The host for the HTTPS server:
+		// The host for the web server:
 		host: 'localhost',
-		// The port for the HTTPS server:
+		// The port for the web server:
 		port: 3000,
+		// The protocol to use for the web server:
+		protocol: 'https',
 		// Whether or not to start listening when the server is created:
 		listen: true,
 		// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
 		url: null,
-		// The URI path of the HTTPS end-point:
+		// The URI path of the web API end-point:
 		endpoint: '/lnurl',
 		auth: {
 			// List of API keys that can be used to authorize privileged behaviors:
@@ -101,8 +104,8 @@ module.exports = function(lnurl) {
 		options.lightning.config = _.defaults(options.lightning.config || {}, this.defaultOptions.lightning.config);
 		options.tls = _.defaults(options.tls || {}, this.defaultOptions.tls);
 		if (!options.url) {
-			const { host, port } = options;
-			options.url = `https://${host}:${port}`;
+			const { host, port, protocol } = options;
+			options.url = `${protocol}://${host}:${port}`;
 		}
 		return options;
 	};
@@ -199,9 +202,9 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.createHttpsServer = function() {
-		debug.info('Creating HTTPS server...');
-		const app = this.app = express();
+	Server.prototype.createWebServer = function() {
+		debug.info('Creating web server...');
+		const app = express();
 		const { host, port } = this.options;
 		const middleware = _.result(this, 'middleware');
 		app.use(middleware.stripHeaders);
@@ -254,20 +257,38 @@ module.exports = function(lnurl) {
 		);
 		app.use('*', middleware.notFound);
 		app.use(middleware.catchError);
-		this.getTlsCertificate().then(tls => {
-			if (this.state === 'initializing') {
-				app.httpsServer = https.createServer({
-					key: tls.key,
-					cert: tls.cert,
-				}, app);
-				if (this.options.listen) {
-					return this.listen();
-				}
-			}
+		this.createHttpOrHttpsServer(app).then(server => {
+			app.webServer = server;
+			if (this.options.listen) return this.listen();
 		}).catch(error => {
 			this.state = 'initialization:failed';
 			this.emit('error', error);
 			debug.error(error);
+		});
+		return app;
+	};
+
+	Server.prototype.createHttpOrHttpsServer = function(app) {
+		return new Promise((resolve, reject) => {
+			let server;
+			const { protocol } = this.options;
+			switch (protocol) {
+				case 'http':
+					server = http.createServer(app);
+					return resolve(server);
+				case 'https':
+					return this.getTlsCertificate().then(tls => {
+						if (this.state === 'initializing') {
+							server = https.createServer({
+								key: tls.key,
+								cert: tls.cert,
+							}, app);
+						}
+						resolve(server);
+					});
+				default:
+					return reject(new Error(`Unknown or unsupported protocol: "${protocol}"`));
+			}
 		});
 	};
 
@@ -282,12 +303,12 @@ module.exports = function(lnurl) {
 			throw new Error('Server is already listening');
 		}
 		return new Promise((resolve, reject) => {
-			const { port, host } = this.options;
-			this.app.httpsServer.listen(port, host, error => {
+			const { port, host, protocol } = this.options;
+			this.app.webServer.listen(port, host, error => {
 				if (error) return reject(error);
 				this.state = 'listening';
 				this.emit('listening');
-				debug.info(`HTTPS server listening at https://${host}:${port}/`);
+				debug.info(`Web server listening at ${protocol}://${host}:${port}/`);
 			});
 		});
 	};
@@ -538,8 +559,8 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.getDefaultUrl = function() {
-		const { host, port } = this.defaultOptions;
-		const defaultUrl = `https://${host}:${port}`;
+		const { host, port, protocol } = this.defaultOptions;
+		const defaultUrl = `${protocol}://${host}:${port}`;
 		return defaultUrl;
 	};
 
@@ -718,9 +739,9 @@ module.exports = function(lnurl) {
 					this.store.close().then(next).catch(next);
 				},
 				next => {
-					if (!this.app || !this.app.httpsServer) return next();
-					this.app.httpsServer.close(() => {
-						this.app.httpsServer = null;
+					if (!this.app || !this.app.webServer) return next();
+					this.app.webServer.close(() => {
+						this.app.webServer = null;
 						next();
 					});
 				},

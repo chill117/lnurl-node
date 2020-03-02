@@ -2,6 +2,7 @@ const _ = require('underscore');
 const bolt11 = require('bolt11');
 const crypto = require('crypto');
 const fs = require('fs');
+const http = require('http');
 const https = require('https');
 const lnurl = require('../');
 const path = require('path');
@@ -37,8 +38,10 @@ module.exports = {
 		}
 		const server = lnurl.createServer(options);
 		server.once('listening', () => {
-			const { certPath } = server.options.tls;
-			server.ca = fs.readFileSync(certPath).toString();
+			if (server.options.protocol === 'https') {
+				const { certPath } = server.options.tls;
+				server.ca = fs.readFileSync(certPath).toString();
+			}
 		});
 		return server;
 	},
@@ -96,7 +99,8 @@ module.exports = {
 		if (requestOptions.qs) {
 			options.path += '?' + querystring.stringify(requestOptions.qs);
 		}
-		const req = https.request(options, function(res) {
+		const request = parsedUrl.protocol === 'https:' ? https.request : http.request;
+		const req = request(options, function(res) {
 			let body = '';
 			res.on('data', function(buffer) {
 				body += buffer.toString();

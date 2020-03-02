@@ -80,15 +80,21 @@ program
 	)
 	.option(
 		'--host [value]',
-		'The host for the HTTPS server',
+		'The host for the web server',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.host,
 	)
 	.option(
 		'--port [value]',
-		'The port for the HTTPS server',
+		'The port for the web server',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.port
+	)
+	.option(
+		'--protocol [value]',
+		'The protocol to use for the web server',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.protocol
 	)
 	.option(
 		'--url [value]',
@@ -98,7 +104,7 @@ program
 	)
 	.option(
 		'--endpoint [value]',
-		'The URI path of the HTTPS end-point',
+		'The URI path of the web API end-point',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.endpoint
 	)
@@ -167,7 +173,7 @@ program
 		if (this.configFile) {
 			options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
 		} else {
-			options = _.pick(this, 'host', 'port', 'url', 'exposeWriteEndpoint');
+			options = _.pick(this, 'host', 'port', 'protocol', 'url', 'exposeWriteEndpoint');
 		}
 		_.each(['auth', 'lightning', 'tls', 'store'], group => {
 			options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
