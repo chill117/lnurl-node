@@ -173,7 +173,7 @@ program
 		if (this.configFile) {
 			options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
 		} else {
-			options = _.pick(this, 'host', 'port', 'protocol', 'url', 'exposeWriteEndpoint');
+			options = _.pick(this, 'host', 'port', 'protocol', 'url');
 		}
 		_.each(['auth', 'lightning', 'tls', 'store'], group => {
 			options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
