@@ -30,6 +30,9 @@ module.exports = function(lnurl) {
 		this.prepareStore();
 		this.app = this.createWebServer();
 		this._locks = {};
+		process.on('SIGINT', () => {
+			this.close();
+		});
 	};
 
 	util.inherits(Server, SafeEventEmitter);
