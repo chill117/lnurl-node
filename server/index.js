@@ -92,7 +92,6 @@ module.exports = function(lnurl) {
 				afterCheckSignature: null,
 			},
 		},
-
 	};
 
 	Server.prototype.prepareOptions = function(options) {

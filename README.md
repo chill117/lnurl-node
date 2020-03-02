@@ -30,7 +30,7 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [Shorter Signed LNURLs](#shorter-signed-lnurls)
     * [Subprotocol Short Names](#subprotocol-short-names)
     * [Query Parameter Short Names](#query-parameter-short-names)
-    * [E-notation for integer values](#e-notation-for-integer-values)
+    * [E-notation for number values](#e-notation-for-number-values)
     * [Set a shorter endpoint path](#set-a-shorter-endpoint-path)
 * [Configuring Data Store](#configuring-data-store)
   * [Redis](#redis)
@@ -64,10 +64,10 @@ The [lnurl specification](https://github.com/btcontract/lnurl-rfc/blob/master/sp
 
 Server parameters:
 
-| name       | type      | notes         |
-| ---------- | --------- | ------------- |
-| `localAmt` | `integer` | > 0           |
-| `pushAmt`  | `integer` | <= `localAmt` |
+| name       | type             | notes         |
+| ---------- | ---------------- | ------------- |
+| `localAmt` | `integer` (sats) | > 0           |
+| `pushAmt`  | `integer` (sats) | <= `localAmt` |
 
 Client parameters:
 
@@ -100,11 +100,11 @@ Client parameters:
 
 Server parameters:
 
-| name                 | type      | notes                |
-| -------------------- | --------- | -------------------- |
-| `minWithdrawable`    | `integer` | > 0                  |
-| `maxWithdrawable`    | `integer` | >= `minWithdrawable` |
-| `defaultDescription` | `string`  |                      |
+| name                 | type              | notes                |
+| -------------------- | ----------------- | -------------------- |
+| `minWithdrawable`    | `integer` (msats) | > 0                  |
+| `maxWithdrawable`    | `integer` (msats) | >= `minWithdrawable` |
+| `defaultDescription` | `string`          |                      |
 
 Client parameters:
 
@@ -143,6 +143,12 @@ Expected output:
 ```
 lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns
 ```
+This command also accepts piped input. For example:
+```bash
+echo "https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df" \
+	| tr -d '\n' \
+	| lnurl encode
+```
 
 
 ### Decoding an lnurl-encoded string
@@ -155,7 +161,12 @@ Expected output:
 ```
 https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df
 ```
-
+This command also accepts piped input. For example:
+```bash
+echo "lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns" \
+	| tr -d '\n' \
+	| lnurl decode
+```
 
 ### Generating a new API key
 
@@ -163,19 +174,16 @@ To generate a new API key for your lnurl server:
 ```bash
 lnurl generateApiKey
 ```
-Expected output:
+Example output:
 ```json
 {
 	"id": "46f8cab814de07a8a65f",
 	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
 }
 ```
-Available options for this command:
-```
-Options:
-  --encoding [value]      Encoding to use for ID and key (hex or base64) (default: "hex")
-  --numBytes.id [value]   Number of random bytes to generate for API key ID (default: 5)
-  --numBytes.key [value]  Number of random bytes to generate for API key (default: 32)
+For a list of available options:
+```bash
+lnurl generateApiKey --help
 ```
 
 
@@ -198,28 +206,6 @@ lnurl server \
 To print all available options for the server command:
 ```bash
 lnurl server --help
-```
-Output:
-```
-Start an lnurl application server.
-
-Options:
-  --configFile [value]          Optionally load CLI options from a file (supported formats: ".json") (e.g "/path/to/lnurl-server.json") (default: null)
-  --host [value]                The host for the HTTPS server (default: "localhost")
-  --port [value]                The port for the HTTPS server (default: 3000)
-  --url [value]                 The URL where the server is externally reachable (default: "https://localhost:3000")
-  --endpoint [value]            The URI path of the HTTPS end-point (default: "/lnurl")
-  --auth.apiKeys [values]       List of API keys that can be used to authorize privileged behaviors (default: [])
-  --lightning.backend [value]   Which LN backend to use (only lnd supported currently) (default: "lnd")
-  --lightning.config [value]    The configuration object to connect to the LN backend (default: {"hostname":"127.0.0.1:8080","cert":null,"macaroon":null})
-  --tls.certPath [value]        The full file path to the TLS certificate (default: "./tls.cert")
-  --tls.keyPath [value]         The full file path to the TLS certificate key (default: "./tls.key")
-  --no-tls.generate             Do NOT create TLS cert/key pair when does not already exist
-  --no-tls.selfSigned           Do NOT self-sign the certificate
-  --tls.days [value]            The length of validity of the self-signed certificate (default: 3650)
-  --store.backend [value]       Which data store backend to use (default: "memory")
-  --store.config [value]        The options object to use to configure the data store (default: {})
-  -h, --help                    output usage information
 ```
 
 
@@ -319,33 +305,42 @@ It is also possible to generate lnurls in a separate (or even offline) applicati
 
 ```js
 {
-	// The host for the HTTPS server:
+	// The host for the web server:
 	host: 'localhost',
-	// The port for the HTTPS server:
+	// The port for the web server:
 	port: 3000,
+	// The protocol to use for the web server:
+	protocol: 'https',
+	// Whether or not to start listening when the server is created:
+	listen: true,
 	// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
 	url: null,
-	// The URI path of the HTTPS end-point:
+	// The URI path of the web API end-point:
 	endpoint: '/lnurl',
 	auth: {
 		// List of API keys that can be used to authorize privileged behaviors:
 		apiKeys: [],
+	},
+	apiKey: {
+		encoding: 'hex',
+		numBytes: {
+			id: 5,
+			key: 32,
+		},
 	},
 	lightning: {
 		// Which LN backend to use (only lnd supported currently):
 		backend: 'lnd',
 		// The configuration object to connect to the LN backend:
 		config: {
-			hostname: '127.0.0.1:8080',
-			cert: null,
-			macaroon: null,
+			// Defaults here depend on the LN backend used.
 		},
 	},
 	tls: {
-		// The full file path to the TLS certificate (default CWD/tls.cert):
-		certPath: '/path/to/tls.cert',
-		// The full file path to the TLS certificate key (default CWD/tls.key):
-		keyPath: '/path/to/tls.key',
+		// The full file path to the TLS certificate:
+		certPath: path.join(process.cwd(), 'tls.cert'),
+		// The full file path to the TLS certificate key:
+		keyPath: path.join(process.cwd(), 'tls.key'),
 		// Whether to create TLS cert/key pair if does not already exist:
 		generate: true,
 		// Whether to self-sign the certificate:
@@ -517,9 +512,9 @@ Parameters for "login":
 
 _None_
 
-#### E-notation for integer values
+#### E-notation for number values
 
-It is possible to pass integers in e-notation. For example:
+It is possible to pass numbers in e-notation. For example:
 ```
 pn=1000000&px=5000000
 ```
