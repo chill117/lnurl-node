@@ -1,6 +1,6 @@
 # Changelog
 
-* TBD:
+* v0.4.0:
   * Added support for c-lightning and Eclair as LN backends
   * New `protocol` server option that allows the use of unencrypted http - the default remains https
 * v0.3.1:
