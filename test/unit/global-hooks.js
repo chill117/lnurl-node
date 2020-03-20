@@ -1,6 +1,5 @@
 const async = require('async');
 const fs = require('fs-extra');
-const mkdirp = require('mkdirp');
 
 before(function() {
 	this.helpers = require('../helpers');
@@ -12,7 +11,7 @@ before(function(done) {
 });
 
 before(function(done) {
-	mkdirp(this.tmpDir, done);
+	fs.mkdir(this.tmpDir, { recursive: true }, done);
 });
 
 before(function(done) {
