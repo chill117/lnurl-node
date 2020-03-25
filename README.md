@@ -39,7 +39,9 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [PostgreSQL](#postgresql)
 * [Debugging](#debugging)
 * [Tests](#tests)
+* [Changelog](#changelog)
 * [License](#license)
+* [Funding](#funding)
 
 
 ## Installation
@@ -705,3 +707,8 @@ See [CHANGELOG.md](https://github.com/chill117/lnurl-node/blob/master/CHANGELOG.
 
 This software is [MIT licensed](https://tldrlegal.com/license/mit-license):
 > A short, permissive software license. Basically, you can do whatever you want as long as you include the original copyright and license notice in any copy of the software/source.  There are many variations of this license in use.
+
+
+## Funding
+
+This project is free and open-source. If you would like to show your appreciation by helping to fund the project's continued development and maintenance, you can find available options [here](https://degreesofzero.com/donate.html?project=lnurl-node).
