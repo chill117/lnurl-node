@@ -53,6 +53,8 @@ module.exports = {
 			throw new HttpError('Missing required parameter: "private"', 400);
 		}
 		private = parseInt(private) === 1;
-		return this.ln.openChannel(remoteid, localAmt, pushAmt, private);
+		return this.ln.openChannel(remoteid, localAmt, pushAmt, private).then(() => {
+			return null;
+		});
 	},
 };

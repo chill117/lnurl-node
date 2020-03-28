@@ -94,6 +94,20 @@ Lightning.prototype.payInvoice = function(invoice) {
 	});
 };
 
+Lightning.prototype.addInvoice = function(amount, extra) {
+	const { descriptionHash } = extra;
+	const descriptionHashBase64 = Buffer.from(descriptionHash, 'hex').toString('base64');
+	return this.request('post', '/v1/invoices', {
+		value_msat: amount,
+		description_hash: descriptionHashBase64,
+	}).then(result => {
+		if (!result.payment_request) {
+			throw new Error(`Unexpected response from LN Backend [POST /v1/invoices]: Missing "payment_request"`);
+		}
+		return result.payment_request;
+	});
+};
+
 Lightning.prototype.getCertAndMacaroon = function() {
 	return new Promise((resolve, reject) => {
 		const { cert, macaroon } = this.options;

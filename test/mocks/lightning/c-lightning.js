@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const helpers = require('../../helpers');
 const net = require('net');
 const path = require('path');
 const tmpDir = path.join(__dirname, '..', '..', 'tmp');
@@ -23,10 +24,6 @@ module.exports = function(options, done) {
 		sockets: [],
 	};
 	app.nodeUri = app.config.nodeUri;
-	app.requestCounters = {
-		openchannel: 0,
-		payinvoice: 0,
-	};
 	app.server = net.createServer(socket => {
 		app.sockets.push(socket);
 		socket.on('data', data => {
@@ -57,6 +54,20 @@ module.exports = function(options, done) {
 								},
 								id: json.id,
 							};
+						case 'invoice':
+							app.requestCounters.addinvoice++;
+							const { msatoshi, description } = json.params;
+							const pr = helpers.generatePaymentRequest(msatoshi, { description });
+							const paymentHash = helpers.getTagDataFromPaymentRequest(pr, 'payment_hash');
+							return {
+								jsonrpc: '2.0', 
+								result: {
+									bolt11: pr,
+									payment_hash: paymentHash,
+									expiry_time: Date.now() + 86400,
+								},
+								id: json.id,
+							};
 						default:
 							return {
 								jsonrpc: '2.0', 
@@ -68,6 +79,7 @@ module.exports = function(options, done) {
 							};
 					}
 				} catch (error) {
+					console.error(error);
 					return {
 						jsonrpc: '2.0', 
 						error: {

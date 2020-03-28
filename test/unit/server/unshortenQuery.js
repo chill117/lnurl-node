@@ -43,22 +43,6 @@ describe('unshortenQuery(query)', function() {
 		{
 			args: {
 				query: {
-					t: 'w',
-					pn: 1,
-					px: 5000,
-					pd: 'default memo',
-				},
-			},
-			expected: {
-				tag: 'withdrawRequest',
-				minWithdrawable: 1,
-				maxWithdrawable: 5000,
-				defaultDescription: 'default memo',
-			},
-		},
-		{
-			args: {
-				query: {
 					t: 'l',
 				},
 			},
@@ -76,6 +60,38 @@ describe('unshortenQuery(query)', function() {
 			expected: {
 				id: 'some-id',
 				tag: 'login',
+			},
+		},
+		{
+			args: {
+				query: {
+					t: 'w',
+					pn: 1,
+					px: 5000,
+					pd: 'default memo',
+				},
+			},
+			expected: {
+				tag: 'withdrawRequest',
+				minWithdrawable: 1,
+				maxWithdrawable: 5000,
+				defaultDescription: 'default memo',
+			},
+		},
+		{
+			args: {
+				query: {
+					t: 'p',
+					pn: 1000,
+					px: 5000,
+					pm: '[["text/plain","example metadata"]]',
+				},
+			},
+			expected: {
+				tag: 'payRequest',
+				minSendable: 1000,
+				maxSendable: 5000,
+				metadata: '[["text/plain","example metadata"]]',
 			},
 		},
 	];

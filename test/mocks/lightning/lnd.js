@@ -1,7 +1,9 @@
 const _ = require('underscore');
 const async = require('async');
+const bodyParser = require('body-parser');
 const express = require('express');
 const fs = require('fs');
+const helpers = require('../../helpers');
 const https = require('https');
 const lnurl = require('../../../');
 const path = require('path');
@@ -32,17 +34,13 @@ module.exports = function(options, done) {
 	};
 	app.nodePubKey = nodePubKey;
 	app.nodeUri = nodeUri;
-	app.requestCounters = {
-		getinfo: 0,
-		openchannel: 0,
-		payinvoice: 0,
-	};
 	app.use('*', (req, res, next) => {
 		if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {
 			return res.status(400).end();
 		}
 		next();
 	});
+	app.use(bodyParser.json());
 	app.get('/v1/getinfo', (req, res, next) => {
 		app.requestCounters.getinfo++;
 		res.json({
@@ -68,6 +66,18 @@ module.exports = function(options, done) {
 			payment_hash: lnurl.Server.prototype.hash(preimage),
 			payment_error: '',
 			payment_route: {},
+		});
+	});
+	app.post('/v1/invoices', (req, res, next) => {
+		app.requestCounters.addinvoice++;
+		const { value } = req.body;
+		const descriptionHash = Buffer.from(req.body.description_hash, 'base64').toString('hex');
+		const pr = helpers.generatePaymentRequest(value, { descriptionHash });
+		const paymentHash = helpers.getTagDataFromPaymentRequest(pr, 'payment_hash');
+		res.json({
+			add_index: '0',
+			r_hash: paymentHash,
+			payment_request: pr,
 		});
 	});
 	fs.writeFile(macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {

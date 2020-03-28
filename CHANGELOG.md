@@ -2,6 +2,7 @@
 
 * TBD:
   * Fixes for login subprotocol
+  * Added support for "payRequest" subprotocol
   * Added new events for server instance:
     * "request:received"
     * "request:processing"

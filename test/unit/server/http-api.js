@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const bolt11 = require('bolt11');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
@@ -6,6 +7,13 @@ const querystring = require('querystring');
 const secp256k1 = require('secp256k1');
 
 describe('Server: HTTP API', function() {
+
+	const lightningBackendRequestTypes = {
+		channelRequest: 'openchannel',
+		login: null,
+		payRequest: 'addinvoice',
+		withdrawRequest: 'payinvoice',
+	};
 
 	beforeEach(function() {
 		this.ln.resetRequestCounters();
@@ -53,6 +61,11 @@ describe('Server: HTTP API', function() {
 					maxWithdrawable: 2000000,
 					defaultDescription: 'service.com: withdrawRequest',
 				},
+				'payRequest': {
+					minSendable: 100000,
+					maxSendable: 200000,
+					metadata: '[["text/plain", "service.com: payRequest"]]',
+				},
 				'login': {},
 			},
 			action: {
@@ -63,14 +76,27 @@ describe('Server: HTTP API', function() {
 				'withdrawRequest': {
 					pr: helpers.generatePaymentRequest(1000000),
 				},
-				'login': {},
+				'payRequest': {
+					amount: 150000,
+				},
+				'login': function(secret) {
+					const { pubKey, privKey } = helpers.generateLinkingKey();
+					const k1 = Buffer.from(secret, 'hex');
+					const { signature } = secp256k1.sign(k1, privKey);
+					const derEncodedSignature = secp256k1.signatureExport(signature);
+					const params = {
+						sig: derEncodedSignature.toString('hex'),
+						key: pubKey.toString('hex'),
+					};
+					return params;
+				},
 			},
 		};
 
-		const prepareValidParams = function(step, tag) {
+		const prepareValidParams = function(step, tag, secret) {
 			const params = validParams[step] && validParams[step][tag];
 			if (_.isFunction(params)) {
-				return params();
+				return params(secret);
 			} else if (_.isObject(params)) {
 				return _.clone(params);
 			}
@@ -244,37 +270,54 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			it('one-time-use', function(done) {
-				const tag = 'withdrawRequest';
-				const params = prepareValidParams('create', tag);
-				const apiKey = this.apiKeys[0];
-				const query = helpers.prepareSignedRequest(apiKey, tag, params);
-				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
-					qs: query,
-					json: true,
-				}, (error, response1, body1) => {
-					if (error) return done(error);
-					try {
-						expect(body1).to.be.an('object');
-						expect(body1.status).to.not.equal('ERROR');
-					} catch (error) {
-						return done(error);
-					}
-					helpers.request('get', {
-						url: 'https://localhost:3000/lnurl',
-						ca: this.server.ca,
-						qs: query,
-						json: true,
-					}, (error, response2, body2) => {
-						if (error) return done(error);
-						try {
-							expect(body2).to.deep.equal(body1);
-						} catch (error) {
-							return done(error);
-						}
-						done();
+			describe('link reuse', function() {
+				_.each([
+					'channelRequest',
+					'payRequest',
+					'withdrawRequest'
+				], function(tag) {
+					const reusable = (function() {
+						const subprotocol = lnurl.Server.prototype.getSubProtocol(tag);
+						return subprotocol.reusable === true;
+					})();
+					describe(tag, function() {
+						before(function(done) {
+							const params = prepareValidParams('create', tag);
+							const apiKey = this.apiKeys[0];
+							const query = this.query = helpers.prepareSignedRequest(apiKey, tag, params);
+							helpers.request('get', {
+								url: 'https://localhost:3000/lnurl',
+								ca: this.server.ca,
+								qs: query,
+								json: true,
+							}, (error, response, body) => {
+								if (error) return done(error);
+								try {
+									this.body1 = body;
+									expect(body).to.be.an('object');
+									expect(body.status).to.not.equal('ERROR');
+								} catch (error) {
+									return done(error);
+								}
+								done();
+							});
+						});
+						it(`reusable = ${reusable}`, function(done) {
+							helpers.request('get', {
+								url: 'https://localhost:3000/lnurl',
+								ca: this.server.ca,
+								qs: this.query,
+								json: true,
+							}, (error, response, body) => {
+								if (error) return done(error);
+								try {
+									expect(body).to.deep.equal(this.body1);
+								} catch (error) {
+									return done(error);
+								}
+								done();
+							});
+						});
 					});
 				});
 			});
@@ -333,32 +376,6 @@ describe('Server: HTTP API', function() {
 						},
 					},
 				];
-				_.each(['localAmt', 'pushAmt'], function(key) {
-					const tag = 'channelRequest';
-					let params = prepareValidParams('create', tag);
-					delete params[key];
-					testsByTag[tag].push({
-						params: params,
-						expected: {
-							status: 'ERROR',
-							reason: `Missing required parameter: "${key}"`,
-						},
-					});
-				});
-				_.each(['string', 0.1, true], function(nonIntegerValue) {
-					_.each(['localAmt', 'pushAmt'], function(key) {
-						const tag = 'channelRequest';
-						let params = prepareValidParams('create', tag);
-						params[key] = nonIntegerValue;
-						testsByTag[tag].push({
-							params: params,
-							expected: {
-								status: 'ERROR',
-								reason: `Invalid parameter ("${key}"): Integer expected`,
-							},
-						});
-					});
-				});
 				testsByTag['withdrawRequest'] = [
 					{
 						params: {
@@ -390,38 +407,122 @@ describe('Server: HTTP API', function() {
 							expect(body.tag).to.equal('withdrawRequest');
 							expect(body.callback).to.equal('https://localhost:3000/lnurl');
 							const params = prepareValidParams('create', 'withdrawRequest');
-							expect(body.minWithdrawable).to.equal(params.minWithdrawable);
-							expect(body.maxWithdrawable).to.equal(params.maxWithdrawable);
-							expect(body.defaultDescription).to.equal(params.defaultDescription);
+							_.each(params, function(value, key) {
+								expect(body[key]).to.equal(params[key]);
+							});
 						},
 					},
 				];
-				_.each(['minWithdrawable', 'maxWithdrawable', 'defaultDescription'], function(key) {
-					const tag = 'withdrawRequest';
-					let params = prepareValidParams('create', tag);
-					delete params[key];
-					testsByTag[tag].push({
-						params: params,
+				testsByTag['payRequest'] = [
+					{
+						description: 'invalid metadata (broken JSON)',
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '["invalid json',
+						},
 						expected: {
 							status: 'ERROR',
-							reason: `Missing required parameter: "${key}"`,
+							reason: '"metadata" must be valid stringified JSON',
 						},
-					});
-				});
-				_.each(['string', 0.1, true], function(nonIntegerValue) {
-					_.each(['minWithdrawable', 'maxWithdrawable'], function(key) {
-						const tag = 'withdrawRequest';
-						let params = prepareValidParams('create', tag);
-						params[key] = nonIntegerValue;
-						testsByTag[tag].push({
-							params: params,
-							expected: {
-								status: 'ERROR',
-								reason: `Invalid parameter ("${key}"): Integer expected`,
-							},
-						});
-					});
-				});
+					},
+					{
+						description: 'invalid metadata (object)',
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '{"not":"an array"}',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"metadata" must be a stringified JSON array',
+						},
+					},
+					{
+						description: 'invalid metadata (empty array)',
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '[]',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"metadata" must contain exactly one "text/plain" entry',
+						},
+					},
+					{
+						description: 'invalid metadata (non-array entry)',
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '[[], ""]',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"metadata" must be a stringified JSON array of arrays (e.g "[[..],[..]]")',
+						},
+					},
+					{
+						description: 'invalid metadata (image, missing "text/plain" entry)',
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '[["image/png;base64", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAABhWlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AYht+milIqDnYQfyBDdbIgKuKoVShChVArtOpgcukfNGlIUlwcBdeCgz+LVQcXZ10dXAVB8AfEydFJ0UVK/C4ptIjxjuMe3vvel7vvAKFeZprVMQ5oum2mEnExk10Vu14RxDBCNAdlZhlzkpSE7/i6R4DvdzGe5V/35+hRcxYDAiLxLDNMm3iDeHrTNjjvE0dYUVaJz4nHTLog8SPXFY/fOBdcFnhmxEyn5okjxGKhjZU2ZkVTI54ijqqaTvlCxmOV8xZnrVxlzXvyF4Zz+soy12kNIYFFLEGCCAVVlFCGjRjtOikWUnQe9/EPuH6JXAq5SmDkWEAFGmTXD/4Hv3tr5ScnvKRwHOh8cZyPEaBrF2jUHOf72HEaJ0DwGbjSW/5KHZj5JL3W0qJHQO82cHHd0pQ94HIH6H8yZFN2pSAtIZ8H3s/om7JA3y0QWvP61jzH6QOQpl4lb4CDQ2C0QNnrPu/ubu/bvzXN/v0AL7RyjAwTcWUAAAAJcEhZcwAALiMAAC4jAXilP3YAAAAHdElNRQfkAx0KCjB1c1tWAAAAGXRFWHRDb21tZW50AENyZWF0ZWQgd2l0aCBHSU1QV4EOFwAAAAxJREFUCNdj+P//PwAF/gL+3MxZ5wAAAABJRU5ErkJggg=="]]',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"metadata" must contain exactly one "text/plain" entry',
+						},
+					},
+					{
+						description: 'invalid metadata (multiple "text/plain" entries)',
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '[["text/plain", "service.com: payRequest"],["text/plain", "a second text/plain entry!"]]',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"metadata" must contain exactly one "text/plain" entry',
+						},
+					},
+					{
+						params: {
+							minSendable: 0,
+							maxSendable: 200000,
+							metadata: '[["text/plain", "service.com: payRequest"]]',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"minSendable" must be greater than zero',
+						},
+					},
+					{
+						params: {
+							minSendable: 200000,
+							maxSendable: 190000,
+							metadata: '[["text/plain", "service.com: payRequest"]]',
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"maxSendable" must be greater than or equal to "minSendable"',
+						},
+					},
+					{
+						params: prepareValidParams('create', 'payRequest'),
+						expected: function(body, query) {
+							expect(body).to.be.an('object');
+							expect(body.tag).to.equal('payRequest');
+							const { id, s } = query;
+							const secret = lnurl.Server.prototype.hash(`${id}-${s}`);
+							expect(body.callback).to.equal(`https://localhost:3000/lnurl/${secret}`);
+							const params = prepareValidParams('create', 'payRequest');
+							_.each(params, function(value, key) {
+								expect(body[key]).to.equal(params[key]);
+							});
+						},
+					},
+				];
 				testsByTag['login'] = [
 					{
 						description: 'invalid signature: signed with different private key',
@@ -463,6 +564,44 @@ describe('Server: HTTP API', function() {
 						},
 					},
 				];
+				var requiredParameters = {
+					channelRequest: ['localAmt', 'pushAmt'],
+					withdrawRequest: ['minWithdrawable', 'maxWithdrawable', 'defaultDescription'],
+					payRequest: ['minSendable', 'maxSendable', 'metadata'],
+				};
+				_.each(requiredParameters, function(paramNames, tag) {
+					_.each(paramNames, function(name) {
+						let params = prepareValidParams('create', tag);
+						delete params[name];
+						testsByTag[tag].push({
+							params: params,
+							expected: {
+								status: 'ERROR',
+								reason: `Missing required parameter: "${name}"`,
+							},
+						});
+					});
+				});
+				var integerParameters = {
+					channelRequest: ['localAmt', 'pushAmt'],
+					withdrawRequest: ['minWithdrawable', 'maxWithdrawable'],
+					payRequest: ['minSendable', 'maxSendable'],
+				};
+				_.each(['string', 0.1, true], function(nonIntegerValue) {
+					_.each(integerParameters, function(paramNames, tag) {
+						_.each(paramNames, function(name) {
+							let params = prepareValidParams('create', tag);
+							params[name] = nonIntegerValue;
+							testsByTag[tag].push({
+								params: params,
+								expected: {
+									status: 'ERROR',
+									reason: `Invalid parameter ("${name}"): Integer expected`,
+								},
+							});
+						});
+					});
+				});
 				_.each(testsByTag, function(tests, tag) {
 					describe(`tag: "${tag}"`, function() {
 						_.each(tests, function(test) {
@@ -485,7 +624,7 @@ describe('Server: HTTP API', function() {
 									if (error) return done(error);
 									try {
 										if (_.isFunction(test.expected)) {
-											test.expected.call(this, body);
+											test.expected.call(this, body, query);
 										} else {
 											expect(body).to.deep.equal(test.expected);
 										}
@@ -543,14 +682,23 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'valid secret',
 					expected: function(body) {
-						expect(body).to.deep.equal({
+						expect(body).to.deep.equal(_.extend({
 							k1: this.secret,
 							tag: 'withdrawRequest',
 							callback: 'https://localhost:3000/lnurl',
-							minWithdrawable: 1000000,
-							maxWithdrawable: 2000000,
-							defaultDescription: 'service.com: withdrawRequest',
-						});
+						}, prepareValidParams('create', 'withdrawRequest')));
+					},
+				},
+			];
+			testsByTag['payRequest'] = [
+				{
+					description: 'valid secret',
+					expected: function(body) {
+						const { secret } = this;
+						expect(body).to.deep.equal(_.extend({
+							tag: 'payRequest',
+							callback: `https://localhost:3000/lnurl/${secret}`,
+						}, prepareValidParams('create', 'payRequest')));
 					},
 				},
 			];
@@ -635,9 +783,10 @@ describe('Server: HTTP API', function() {
 			];
 			testsByTag['withdrawRequest'] = [
 				{
+					description: 'single payment request (total OK)',
 					params: validParams.action.withdrawRequest,
 					expected: function(body) {
-							expect(body).to.deep.equal({
+						expect(body).to.deep.equal({
 							status: 'OK',
 						});
 						this.ln.expectNumRequestsToEqual('payinvoice', 1);
@@ -645,14 +794,12 @@ describe('Server: HTTP API', function() {
 				},
 				{
 					description: 'multiple payment requests (total OK)',
-					params: function() {
-						return {
-							pr: [
-								helpers.generatePaymentRequest(700000),
-								helpers.generatePaymentRequest(800000),
-								helpers.generatePaymentRequest(400000),
-							].join(','),
-						};
+					params: {
+						pr: [
+							helpers.generatePaymentRequest(700000),
+							helpers.generatePaymentRequest(800000),
+							helpers.generatePaymentRequest(400000),
+						].join(','),
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({ status: 'OK' });
@@ -660,10 +807,9 @@ describe('Server: HTTP API', function() {
 					},
 				},
 				{
-					params: function() {
-						return {
-							pr: helpers.generatePaymentRequest(500000),
-						};
+					description: 'single payment request (total < minWithdrawable)',
+					params: {
+						pr: helpers.generatePaymentRequest(500000),
 					},
 					expected: {
 						status: 'ERROR',
@@ -672,13 +818,11 @@ describe('Server: HTTP API', function() {
 				},
 				{
 					description: 'multiple payment requests (total < minWithdrawable)',
-					params: function() {
-						return {
-							pr: [
-								helpers.generatePaymentRequest(300000),
-								helpers.generatePaymentRequest(500000),
-							].join(','),
-						};
+					params: {
+						pr: [
+							helpers.generatePaymentRequest(300000),
+							helpers.generatePaymentRequest(500000),
+						].join(','),
 					},
 					expected: {
 						status: 'ERROR',
@@ -686,13 +830,12 @@ describe('Server: HTTP API', function() {
 					},
 				},
 				{
-					params: function() {
-						return {
-							pr: helpers.generatePaymentRequest(5000000),
-						};
+					description: 'single payment request (total > maxWithdrawable)',
+					params: {
+						pr: helpers.generatePaymentRequest(5000000),
 					},
 					expected: function(body) {
-							expect(body).to.deep.equal({
+						expect(body).to.deep.equal({
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
@@ -701,14 +844,12 @@ describe('Server: HTTP API', function() {
 				},
 				{
 					description: 'multiple payment requests (total > maxWithdrawable)',
-					params: function() {
-						return {
-							pr: [
-								helpers.generatePaymentRequest(700000),
-								helpers.generatePaymentRequest(800000),
-								helpers.generatePaymentRequest(800000),
-							].join(','),
-						};
+					params: {
+						pr: [
+							helpers.generatePaymentRequest(700000),
+							helpers.generatePaymentRequest(800000),
+							helpers.generatePaymentRequest(800000),
+						].join(','),
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({
@@ -716,6 +857,47 @@ describe('Server: HTTP API', function() {
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
 						this.ln.expectNumRequestsToEqual('payinvoice', 0);
+					},
+				},
+			];
+			testsByTag['payRequest'] = [
+				{
+					description: 'amount OK',
+					params: validParams.action.payRequest,
+					expected: function(body) {
+						expect(body).to.be.an('object');
+						expect(body.pr).to.be.a('string');
+						expect(body.routes).to.be.an('array');
+						const purposeCommitHashTagData = helpers.getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
+						const { metadata } = validParams.create.payRequest;
+						expect(purposeCommitHashTagData).to.equal(lnurl.Server.prototype.hash(Buffer.from(metadata, 'utf8')));
+						this.ln.expectNumRequestsToEqual('addinvoice', 1);
+					},
+				},
+				{
+					description: 'amount < minSendable',
+					params: {
+						amount: 99999,
+					},
+					expected: function(body) {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Amount must be greater than or equal to "minSendable"',
+						});
+						this.ln.expectNumRequestsToEqual('addinvoice', 0);
+					},
+				},
+				{
+					description: 'amount > maxSendable',
+					params: {
+						amount: 200001,
+					},
+					expected: function(body) {
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: 'Amount must be less than or equal to "maxSendable"',
+						});
+						this.ln.expectNumRequestsToEqual('addinvoice', 0);
 					},
 				},
 			];
@@ -760,15 +942,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'valid signature',
 					params: function() {
-						const { pubKey, privKey } = helpers.generateLinkingKey();
-						const k1 = Buffer.from(this.secret, 'hex');
-						const { signature } = secp256k1.sign(k1, privKey);
-						const derEncodedSignature = secp256k1.signatureExport(signature);
-						const params = {
-							sig: derEncodedSignature.toString('hex'),
-							key: pubKey.toString('hex'),
-						};
-						return params;
+						return prepareValidParams('action', 'login', this.secret);
 					},
 					expected: {
 						status: 'OK',
@@ -831,83 +1005,84 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			describe('other', function() {
-
-				const doRequest = function(step, cb) {
-					const params = prepareValidParams(step, tag) || {};
-					if (step === 'info') {
-						params.q = this.secret;
-					} else {
-						params.k1 = this.secret;
-					}
-					helpers.request('get', {
-						url: 'https://localhost:3000/lnurl',
-						ca: this.server.ca,
-						qs: params,
-						json: true,
-					}, cb);
-				};
-
-				const tag = 'withdrawRequest';
-				beforeEach(function() {
-					this.doRequest = doRequest.bind(this);
-					this.secret = null;
-					const params = prepareValidParams('create', tag);
-					return this.server.generateNewUrl(tag, params).then(result => {
-						this.secret = result.secret;
-					});
-				});
-
-				it('full client-server UX flow', function(done) {
-					this.doRequest('info', (error, response, body) => {
-						if (error) return done(error);
-						try {
-							expect(body).to.be.an('object');
-							expect(body.k1).to.be.a('string');
-							expect(body.tag).to.equal(tag);
-							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+			describe('link reuse', function() {
+				_.each([
+					'channelRequest',
+					'login',
+					'payRequest',
+					'withdrawRequest'
+				], function(tag) {
+					const reusable = (function() {
+						const subprotocol = lnurl.Server.prototype.getSubProtocol(tag);
+						return subprotocol.reusable === true;
+					})();
+					const requestType = lightningBackendRequestTypes[tag];
+					describe(tag, function() {
+						beforeEach(function() {
+							this.secret = null;
 							const params = prepareValidParams('create', tag);
-							expect(body.minWithdrawable).to.equal(params.minWithdrawable);
-							expect(body.maxWithdrawable).to.equal(params.maxWithdrawable);
-							expect(body.defaultDescription).to.equal(params.defaultDescription);
-						} catch (error) {
-							return done(error);
-						}
-						this.doRequest('action', (error, response, body) => {
-							if (error) return done(error);
-							try {
-								expect(body).to.deep.equal({ status: 'OK' });
-								this.ln.expectNumRequestsToEqual('payinvoice', 1);
-							} catch (error) {
-								return done(error);
-							}
-							done();
+							return this.server.generateNewUrl(tag, params).then(result => {
+								this.secret = result.secret;
+							});
 						});
-					});
-				});
-
-				it('one-time-use', function(done) {
-					this.doRequest('action', (error, response, body) => {
-						if (error) return done(error);
-						try {
-							expect(body).to.deep.equal({ status: 'OK' });
-							this.ln.expectNumRequestsToEqual('payinvoice', 1);
-						} catch (error) {
-							return done(error);
-						}
-						this.doRequest('action', (error, response, body) => {
-							if (error) return done(error);
-							try {
-								expect(body).to.deep.equal({
-									status: 'ERROR',
-									reason: 'Already used',
-								});
-								this.ln.expectNumRequestsToEqual('payinvoice', 1);
-							} catch (error) {
-								return done(error);
+						beforeEach(function() {
+							if (requestType) {
+								this.ln.expectNumRequestsToEqual(requestType, 0);
 							}
-							done();
-						})
+						});
+						beforeEach(function(done) {
+							this.query = _.extend({}, prepareValidParams('action', tag, this.secret) || {}, {
+								k1: this.secret,
+							});
+							helpers.request('get', {
+								url: 'https://localhost:3000/lnurl',
+								ca: this.server.ca,
+								qs: this.query,
+								json: true,
+							}, (error, response, body) => {
+								if (error) return done(error);
+								try {
+									expect(body).to.be.an('object');
+									expect(body.status).to.not.equal('ERROR');
+									if (requestType) {
+										this.ln.expectNumRequestsToEqual(requestType, 1);
+									}
+								} catch (error) {
+									return done(error);
+								}
+								done();
+							});
+						});
+						it(`reusable = ${reusable}`, function(done) {
+							helpers.request('get', {
+								url: 'https://localhost:3000/lnurl',
+								ca: this.server.ca,
+								qs: this.query,
+								json: true,
+							}, (error, response, body) => {
+								if (error) return done(error);
+								try {
+									if (reusable) {
+										expect(body).to.be.an('object');
+										expect(body.status).to.not.equal('ERROR');
+										if (requestType) {
+											this.ln.expectNumRequestsToEqual(requestType, 2);
+										}
+									} else {
+										expect(body).to.deep.equal({
+											status: 'ERROR',
+											reason: 'Already used',
+										});
+										if (requestType) {
+											this.ln.expectNumRequestsToEqual(requestType, 1);
+										}
+									}
+								} catch (error) {
+									return done(error);
+								}
+								done();
+							});
+						});
 					});
 				});
 			});

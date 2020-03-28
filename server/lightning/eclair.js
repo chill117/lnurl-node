@@ -85,6 +85,22 @@ Lightning.prototype.payInvoice = function(invoice) {
 	});
 };
 
+Lightning.prototype.addInvoice = function(amount, extra) {
+	const method = 'POST';
+	const uri = '/createinvoice';
+	const { description } = extra;
+	const data = {
+		amountMsat: amount,
+		description,
+	};
+	return this.request(method, uri, data).then(result => {
+		if (!result.serialized) {
+			throw new Error(`Unexpected response from LN Backend [POST /createinvoice]: Missing "serialized"`);
+		}
+		return result.serialized;
+	});
+};
+
 Lightning.prototype.request = function(method, uri, data) {
 	if (!_.isString(method)) {
 		throw new Error('Invalid argument ("method"): String expected');

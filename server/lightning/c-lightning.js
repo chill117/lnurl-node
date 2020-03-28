@@ -82,6 +82,22 @@ Lightning.prototype.payInvoice = function(invoice) {
 	});
 };
 
+Lightning.prototype.addInvoice = function(amount, extra) {
+	// https://github.com/ElementsProject/lightning/blob/master/doc/lightning-invoice.7.md
+	const method = 'invoice';
+	const { description } = extra;
+	const params = {
+		msatoshi: amount,
+		description,
+	};
+	return this.cmd(method, params).then(result => {
+		if (!result.bolt11) {
+			throw new Error(`Unexpected response from LN Backend [invoice]: Missing "bolt11"`);
+		}
+		return result.bolt11;
+	});
+};
+
 Lightning.prototype.generateUniqueId = function() {
 	const { prefix } = this;
 	return _.uniqueId(`${prefix}-req`);

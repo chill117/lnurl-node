@@ -7,10 +7,9 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
 * [Installation](#installation)
 * [Subprotocols](#subprotocols)
   * [channelRequest](#channelRequest)
-  * [hostedChannelRequest](#hostedChannelRequest)
   * [login](#login)
-  * [withdrawRequest](#withdrawRequest)
   * [payRequest](#payRequest)
+  * [withdrawRequest](#withdrawRequest)
 * [Command-line interface](#command-line-interface)
   * [Help menu](#help-menu)
   * [Encoding a URL](#encoding-a-url)
@@ -60,7 +59,7 @@ This will install `lnurl` and add it to your application's `package.json` file.
 
 ## Subprotocols
 
-The [lnurl specification](https://github.com/btcontract/lnurl-rfc/blob/master/spec.md) has defined a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported (or soon-to-be) are defined here in this section.
+The [lnurl specification](https://github.com/btcontract/lnurl-rfc/blob/master/spec.md) has defined a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported are defined here in this section.
 
 ### channelRequest
 
@@ -79,11 +78,6 @@ Client parameters:
 | `private`  | `boolean` | `0` or `1`      |
 
 
-### hostedChannelRequest
-
-_not yet implemented_
-
-
 ### login
 
 Server parameters:
@@ -96,6 +90,23 @@ Client parameters:
 | ------| ----- | --------------------------------- |
 | `sig` | `hex` | `sign(k1, <private linking key>)` |
 | `key` | `hex` | public linking key                |
+
+
+### payRequest
+
+Server parameters:
+
+| name           | type              | notes            |
+| -------------- | ----------------- | ---------------- |
+| `minSendable`  | `integer` (msats) | > 0              |
+| `maxSendable`  | `integer` (msats) | >= `minSendable` |
+| `metadata`     | `string`          | stringified JSON |
+
+Client parameters:
+
+| name       | type              | notes                              |
+| ---------- | ----------------- | ---------------------------------- |
+| `amount`   | `integer` (msats) | >= `minSendable`, <= `maxSendable` |
 
 
 ### withdrawRequest
@@ -115,11 +126,6 @@ Client parameters:
 | `pr`       | `string`  | lightning payment request |
 
 * Note that `pr` can contain multiple payment requests (separated by commas)
-
-
-### payRequest
-
-_not yet implemented_
 
 
 
@@ -447,8 +453,9 @@ It is possible to shorten the subprotocol name:
 | name              | shortened |
 | ----------------- | --------- |
 | `channelRequest`  | `c`       |
-| `withdrawRequest` | `w`       |
 | `login`           | `l`       |
+| `payRequest`      | `p`       |
+| `withdrawRequest` | `w`       |
 
 The following example:
 ```
@@ -491,6 +498,27 @@ Can be shortened to:
 t=c&pl=1000&pp=1000
 ```
 
+Parameters for "login":
+
+_None_
+
+Parameters for "payRequest":
+
+| name          | shortened |
+| ------------- | --------- |
+| `minSendable` | `pn`      |
+| `maxSendable` | `px`      |
+| `metadata`    | `pm`      |
+
+The following example:
+```
+tag=payRequest&minSendable=100000&maxSendable=100000&metadata=%5B%5B%22text%2Fplain%22%2C%22example%20metadata%22%5D%5D
+```
+Can be shortened to:
+```
+t=p&pn=100000&px=100000&pm=%5B%5B%22text%2Fplain%22%2C%22example%20metadata%22%5D%5D
+```
+
 Parameters for "withdrawRequest":
 
 | name                 | shortened |
@@ -507,10 +535,6 @@ Can be shortened to:
 ```
 t=w&pn=1000&px=500000
 ```
-
-Parameters for "login":
-
-_None_
 
 #### E-notation for number values
 

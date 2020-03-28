@@ -1,5 +1,8 @@
 const _ = require('underscore');
+const bodyParser = require('body-parser');
+const bolt11 = require('bolt11');
 const express = require('express');
+const helpers = require('../../helpers');
 const http = require('http');
 
 module.exports = function(options, done) {
@@ -24,11 +27,6 @@ module.exports = function(options, done) {
 	};
 	app.nodePubKey = nodePubKey;
 	app.nodeUri = nodeUri;
-	app.requestCounters = {
-		getinfo: 0,
-		openchannel: 0,
-		payinvoice: 0,
-	};
 	app.use('*', (req, res, next) => {
 		const expectedAuthorization = 'Basic ' + Buffer.from('"":' + app.config.password, 'utf8').toString('base64');
 		if (!req.headers['authorization'] || req.headers['authorization'] !== expectedAuthorization) {
@@ -36,6 +34,8 @@ module.exports = function(options, done) {
 		}
 		next();
 	});
+	// Parse application/x-www-form-urlencoded:
+	app.use(bodyParser.urlencoded({ extended: false }));
 	app.post('/getinfo', (req, res, next) => {
 		app.requestCounters.getinfo++;
 		res.json({
@@ -53,6 +53,23 @@ module.exports = function(options, done) {
 	app.post('/payinvoice', (req, res, next) => {
 		app.requestCounters.payinvoice++;
 		res.json('e4227601-38b3-404e-9aa0-75a829e9bec0');
+	});
+	app.post('/createinvoice', (req, res, next) => {
+		app.requestCounters.addinvoice++;
+		const { amountMsat, description } = req.body;
+		const pr = helpers.generatePaymentRequest(amountMsat, { description });
+		const decoded = bolt11.decode(pr);
+		const paymentHash = helpers.getTagDataFromPaymentRequest(pr, 'payment_hash');
+		res.json({
+			prefix: decoded.prefix,
+			timestamp: decoded.timestamp,
+			nodeId: nodePubKey,
+			serialized: pr,
+			description: description,
+			paymentHash: paymentHash,
+			expiry: 21600,
+			amount: decoded.millisatoshis,
+		});
 	});
 	app.close = function(done) {
 		if (!app.server) return done();

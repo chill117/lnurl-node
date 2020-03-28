@@ -54,6 +54,14 @@ module.exports = {
 		const MockLightningNode = require(mockPath);
 		const mockNode = new MockLightningNode(options, done);
 		mockNode.backend = backend;
+		mockNode.requestCounters = _.chain([
+			'getinfo',
+			'openchannel',
+			'payinvoice',
+			'addinvoice',
+		]).map(function(key) {
+			return [key, 0];
+		}).object().value();
 		mockNode.resetRequestCounters = function() {
 			this.requestCounters = _.mapObject(this.requestCounters, () => {
 				return 0;
@@ -122,29 +130,53 @@ module.exports = {
 	generatePreImage: function() {
 		return lnurl.Server.prototype.generateRandomKey(20);
 	},
-	generatePaymentRequest: function(amount) {
+	generatePaymentRequest: function(amount, extra) {
+		extra = extra || {};
+		const description = extra.description || null;
+		let descriptionHash = extra.descriptionHash || null;
+		if (description && !descriptionHash) {
+			descriptionHash = lnurl.Server.prototype.hash(Buffer.from(description, 'utf8'));
+		}
 		const preimage = this.generatePreImage();
 		const paymentHash = lnurl.Server.prototype.hash(preimage);
+		let tags = [
+			{
+				tagName: 'payment_hash',
+				data: paymentHash,
+			},
+		];
+		if (description) {
+			tags.push({
+				tagName: 'description',
+				data: description,
+			});
+		}
+		if (descriptionHash) {
+			tags.push({
+				tagName: 'purpose_commit_hash',
+				data: descriptionHash,
+			});
+		}
 		const encoded = bolt11.encode({
 			coinType: 'regtest',
 			millisatoshis: amount,
-			tags: [
-				{
-					tagName: 'payment_hash',
-					data: paymentHash,
-				},
-			],
+			tags: tags,
 		});
 		const nodePrivateKey = lnurl.Server.prototype.generateRandomKey();
 		const signed = bolt11.sign(encoded, nodePrivateKey);
 		return signed.paymentRequest;
+	},
+	getTagDataFromPaymentRequest: function(pr, tagName) {
+		const decoded = bolt11.decode(pr);
+		const tag = _.findWhere(decoded.tags, { tagName });
+		return tag && tag.data || null;
 	},
 	generateLinkingKey: function() {
 		let privKey;
 		do {
 			privKey = crypto.randomBytes(32);
 		} while (!secp256k1.privateKeyVerify(privKey))
-		const pubKey = secp256k1.publicKeyCreate(privKey);
+		const pubKey = Buffer.from(secp256k1.publicKeyCreate(privKey));
 		return {
 			pubKey: pubKey,
 			privKey: privKey,

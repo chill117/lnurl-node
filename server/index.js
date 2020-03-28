@@ -204,57 +204,16 @@ module.exports = function(lnurl) {
 	Server.prototype.createWebServer = function() {
 		debug.info('Creating web server...');
 		const app = express();
-		const { host, port } = this.options;
+		const { host, port, endpoint } = this.options;
 		const middleware = _.result(this, 'middleware');
 		app.use(middleware.stripHeaders);
 		app.use(middleware.logRequests);
-		app.get(this.options.endpoint,
+		app.get([endpoint, `${endpoint}/:k1`],
 			middleware.signedLnurl.unshortenQuery,
 			middleware.signedLnurl.checkSignature,
 			middleware.signedLnurl.afterCheckSignature,
 			middleware.signedLnurl.createUrl,
-			(req, res, next) => {
-				let error;
-				const secret = req.query.q || req.query.k1;
-				if (!secret) {
-					return next(new HttpError('Missing secret', 400));
-				}
-				if (this.isLocked(secret)) {
-					throw new HttpError('Invalid secret', 400);
-				}
-				this.lock(secret);
-				const hash = this.hash(secret);
-				const method = req.query.q ? 'info' : 'action';
-				this.emit('request:received', { hash, method });
-				this.fetchUrl(hash).then(url => {
-					if (!url) {
-						throw new HttpError('Invalid secret', 400);
-					}
-					if (url.used === true) {
-						throw new HttpError('Already used', 400);
-					}
-					const tag = url.tag;
-					const params = _.extend({}, req.query, url.params);
-					this.emit('request:processing', { hash, method });
-					return this.runSubProtocol(tag, method, secret, params);
-				}).then(result => {
-					this.emit('request:processed', { hash, method });
-					if (method === 'info') {
-						res.status(200).json(result);
-					} else {
-						return this.markUsedUrl(hash).then(() => {
-							res.status(200).json({ status: 'OK' });
-						});
-					}
-				}).then(() => {
-					this.unlock(secret);
-				}).catch(error => {
-					const reason = error instanceof HttpError ? error.message : 'Internal server error';
-					this.emit('request:failed', { hash, method, reason });
-					this.unlock(secret);
-					next(error);
-				});
-			}
+			middleware.processUrl,
 		);
 		app.use('*', middleware.notFound);
 		app.use(middleware.catchError);
@@ -400,6 +359,49 @@ module.exports = function(lnurl) {
 					});
 				},
 			},
+			processUrl: (req, res, next) => {
+				let error;
+				const secret = req.query.q || req.query.k1 || req.params.k1;
+				if (!secret) {
+					return next(new HttpError('Missing secret', 400));
+				}
+				if (this.isLocked(secret)) {
+					throw new HttpError('Invalid secret', 400);
+				}
+				this.lock(secret);
+				const hash = this.hash(secret);
+				const method = req.query.q ? 'info' : 'action';
+				this.emit('request:received', { hash, method });
+				this.fetchUrl(hash).then(url => {
+					if (!url) {
+						throw new HttpError('Invalid secret', 400);
+					}
+					const { tag } = url;
+					if (!this.isReusable(tag) && url.used === true) {
+						throw new HttpError('Already used', 400);
+					}
+					const params = _.extend({}, req.query, url.params);
+					this.emit('request:processing', { hash, method });
+					return this.runSubProtocol(tag, method, secret, params);
+				}).then(result => {
+					this.emit('request:processed', { hash, method });
+					if (method === 'info') {
+						res.status(200).json(result);
+					} else {
+						result = result || { status: 'OK' };
+						return this.markUsedUrl(hash).then(() => {
+							res.status(200).json(result);
+						});
+					}
+				}).then(() => {
+					this.unlock(secret);
+				}).catch(error => {
+					const reason = error instanceof HttpError ? error.message : 'Internal server error';
+					this.emit('request:failed', { hash, method, reason });
+					this.unlock(secret);
+					next(error);
+				});
+			},
 		};
 	};
 
@@ -460,20 +462,26 @@ module.exports = function(lnurl) {
 			},
 			tags: {
 				'c': 'channelRequest',
-				'w': 'withdrawRequest',
 				'l': 'login',
+				'p': 'payRequest',
+				'w': 'withdrawRequest',
 			},
 			params: {
 				'channelRequest': {
 					'pl': 'localAmt',
 					'pp': 'pushAmt',
 				},
+				'login': {
+				},
+				'payRequest': {
+					'pn': 'minSendable',
+					'px': 'maxSendable',
+					'pm': 'metadata',
+				},
 				'withdrawRequest': {
 					'pn': 'minWithdrawable',
 					'px': 'maxWithdrawable',
 					'pd': 'defaultDescription',
-				},
-				'login': {
 				},
 			}
 		};
@@ -499,6 +507,17 @@ module.exports = function(lnurl) {
 			}
 		}
 		return unshortened;
+	};
+
+	Server.prototype.isReusable = function(tag) {
+		if (!_.isString(tag)) {
+			throw new Error('Invalid argument ("tag"): String expected.');
+		}
+		const subprotocol = this.getSubProtocol(tag);
+		if (!subprotocol) {
+			throw new Error(`Unknown subprotocol: "${tag}"`);
+		}
+		return subprotocol.reusable === true;
 	};
 
 	Server.prototype.runSubProtocol = function(tag, method, secret, params) {
@@ -566,14 +585,23 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.getCallbackUrl = function(params) {
+		const { endpoint } = this.options;
+		return this.getUrl(endpoint, params);
+	};
+
+	Server.prototype.getUrl = function(uri, params) {
+		uri = uri || '';
+		if (!_.isString(uri)) {
+			throw new Error('Invalid argument ("uri"): String expected.');
+		}
 		if (_.isUndefined(params)) {
 			params = {};
 		}
 		if (!_.isObject(params)) {
 			throw new Error('Invalid argument ("params"): Object expected.');
 		}
-		const { endpoint, url } = this.options;
-		let callbackUrl = `${url}${endpoint}`;
+		const { url } = this.options;
+		let callbackUrl = `${url}${uri}`;
 		if (!_.isEmpty(params)) {
 			callbackUrl += '?' + querystring.stringify(params);
 		}
