@@ -224,6 +224,8 @@ module.exports = function(lnurl) {
 				}
 				this.lock(secret);
 				const hash = this.hash(secret);
+				const method = req.query.q ? 'info' : 'action';
+				this.emit('request:received', { hash, method });
 				this.fetchUrl(hash).then(url => {
 					if (!url) {
 						throw new HttpError('Invalid secret', 400);
@@ -233,22 +235,22 @@ module.exports = function(lnurl) {
 					}
 					const tag = url.tag;
 					const params = _.extend({}, req.query, url.params);
-					if (req.query.q) {
-						return this.runSubProtocol(tag, 'info', secret, params).then(info => {
-							res.status(200).json(info);
-						});
+					this.emit('request:processing', { hash, method });
+					return this.runSubProtocol(tag, method, secret, params);
+				}).then(result => {
+					this.emit('request:processed', { hash, method });
+					if (method === 'info') {
+						res.status(200).json(result);
 					} else {
-						return this.runSubProtocol(tag, 'action', secret, params).then(() => {
-							return this.markUsedUrl(hash).then(() => {
-								res.status(200).json({ status: 'OK' });
-							});
+						return this.markUsedUrl(hash).then(() => {
+							res.status(200).json({ status: 'OK' });
 						});
 					}
-				// NOTE:
-				// promise.finally() not supported by nodejs <= 8.
 				}).then(() => {
 					this.unlock(secret);
 				}).catch(error => {
+					const reason = error instanceof HttpError ? error.message : 'Internal server error';
+					this.emit('request:failed', { hash, method, reason });
 					this.unlock(secret);
 					next(error);
 				});
