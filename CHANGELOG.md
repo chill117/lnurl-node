@@ -1,6 +1,11 @@
 # Changelog
 
 * TBD:
+  * Added new events for server instance:
+    * "request:received"
+    * "request:processing"
+    * "request:processed"
+    * "request:failed"
   * Updated dependencies
 * v0.4.0:
   * Added support for c-lightning and Eclair as LN backends
