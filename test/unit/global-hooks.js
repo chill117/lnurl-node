@@ -15,7 +15,7 @@ before(function(done) {
 });
 
 before(function(done) {
-	this.ln = this.helpers.prepareMockLightningNode('lnd', done);
+	this.ln = this.helpers.prepareMockLightningNode(process.env.LNURL_LIGHTNING_BACKEND || 'lnd', done);
 });
 
 after(function(done) {

@@ -9,6 +9,8 @@ script: npm test
 
 jobs:
   include:
+    - env: LNURL_LIGHTNING_BACKEND='c-lightning'
+    - env: LNURL_LIGHTNING_BACKEND='eclair'
     - env: LNURL_STORE_BACKEND=redis LNURL_STORE_CONFIG='{"prefix":"lnurl:"}'
       services: redis-server
       before_script: npm install ioredis
