@@ -1,6 +1,7 @@
 # Changelog
 
 * TBD:
+  * Fixes for login subprotocol
   * Added new events for server instance:
     * "request:received"
     * "request:processing"
