@@ -613,7 +613,16 @@ module.exports = function(lnurl) {
 	Server.prototype.generateNewUrl = function(tag, params) {
 		return this.validateSubProtocolParameters(tag, params).then(() => {
 			return this.generateSecret(tag, params).then(secret => {
-				const url = this.getCallbackUrl({ q: secret });
+				let params;
+				switch (tag) {
+					case 'login':
+						params = { tag, k1: secret };
+						break;
+					default:
+						params = { q: secret };
+						break;
+				}
+				const url = this.getCallbackUrl(params);
 				const encoded = lnurl.encode(url);
 				return { encoded, secret, url };
 			});

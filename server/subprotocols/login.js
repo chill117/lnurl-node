@@ -5,10 +5,10 @@ module.exports = {
 	params: {
 		required: [],
 	},
-	validate: function(params) {
+	validate: function() {
 	},
 	info: function() {
-		throw new HttpError('Invalid request. Expected querystring as follows: k1=SECRET&sig=SIGNATURE&key=LINKING_PUBKEY', 400)
+		throw new HttpError('Invalid request. Expected querystring as follows: k1=SECRET&sig=SIGNATURE&key=LINKING_PUBKEY', 400);
 	},
 	action: function(secret, params) {
 		if (!params.sig) {
@@ -19,8 +19,8 @@ module.exports = {
 		}
 		return new Promise((resolve, reject) => {
 			const k1 = Buffer.from(secret, 'hex');
-			const signature = Buffer.from(params.sig, 'hex');
-			const key = Buffer.from(params.key, 'hex')
+			const signature = secp256k1.signatureImport(Buffer.from(params.sig, 'hex'));
+			const key = Buffer.from(params.key, 'hex');
 			const signatureOk = secp256k1.verify(k1, signature, key);
 			if (!signatureOk) {
 				throw new HttpError('Invalid signature', 400);

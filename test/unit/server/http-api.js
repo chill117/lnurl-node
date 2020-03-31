@@ -430,10 +430,11 @@ describe('Server: HTTP API', function() {
 							const linkingKey2 = helpers.generateLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
 							const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
+							const derEncodedSignature = secp256k1.signatureExport(signature);
 							return {
 								tag: 'login',
 								k1: k1.toString('hex'),
-								sig: signature.toString('hex'),
+								sig: derEncodedSignature.toString('hex'),
 								key: linkingKey2.pubKey.toString('hex'),
 							};
 						},
@@ -448,10 +449,11 @@ describe('Server: HTTP API', function() {
 							const { pubKey, privKey } = helpers.generateLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
 							const { signature } = secp256k1.sign(k1, privKey);
+							const derEncodedSignature = secp256k1.signatureExport(signature);
 							const params = {
 								tag: 'login',
 								k1: k1.toString('hex'),
-								sig: signature.toString('hex'),
+								sig: derEncodedSignature.toString('hex'),
 								key: pubKey.toString('hex'),
 							};
 							return params;
@@ -725,8 +727,9 @@ describe('Server: HTTP API', function() {
 						const linkingKey2 = helpers.generateLinkingKey();
 						const k1 = Buffer.from(this.secret, 'hex');
 						const { signature } = secp256k1.sign(k1, linkingKey1.privKey);
+						const derEncodedSignature = secp256k1.signatureExport(signature);
 						const params = {
-							sig: signature.toString('hex'),
+							sig: derEncodedSignature.toString('hex'),
 							key: linkingKey2.pubKey.toString('hex'),
 						};
 						return params;
@@ -742,8 +745,9 @@ describe('Server: HTTP API', function() {
 						const { pubKey, privKey } = helpers.generateLinkingKey();
 						const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
 						const { signature } = secp256k1.sign(k1, privKey);
+						const derEncodedSignature = secp256k1.signatureExport(signature);
 						const params = {
-							sig: signature.toString('hex'),
+							sig: derEncodedSignature.toString('hex'),
 							key: pubKey.toString('hex'),
 						};
 						return params;
@@ -759,8 +763,9 @@ describe('Server: HTTP API', function() {
 						const { pubKey, privKey } = helpers.generateLinkingKey();
 						const k1 = Buffer.from(this.secret, 'hex');
 						const { signature } = secp256k1.sign(k1, privKey);
+						const derEncodedSignature = secp256k1.signatureExport(signature);
 						const params = {
-							sig: signature.toString('hex'),
+							sig: derEncodedSignature.toString('hex'),
 							key: pubKey.toString('hex'),
 						};
 						return params;
