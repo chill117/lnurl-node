@@ -23,6 +23,7 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
     * [options](#options-for-createserver-method)
   * [generateApiKey](#generateapikey)
 * [Hooks](#hooks)
+  * [Login Hook](#login-hook)
   * [Middleware Hooks](#middleware-hooks)
     * [middleware:signedLnurl:afterCheckSignature](#middlewaresignedLnurlafterCheckSignature)
 * [Signed LNURLs](#signed-lnurls)
@@ -397,6 +398,22 @@ Available options:
 ## Hooks
 
 It is possible to further customize your lnurl server by using hooks to run custom application code at key points in the server application flow.
+
+### Login Hook
+
+The lnurl-auth subprotocol allows users to login/authenticate with your service. You can use the login hook as shown here to execute your own custom code whenever there is a successful login/authentication attempt for your server.
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer();
+server.bindToHook('login', function(key, next) {
+	// This code is executed when the lnurl-auth checks have passed (e.g valid signature provided).
+	// `key` is the public linking key which has just authenticated.
+	// Fail the request by calling next with an error:
+	next(new Error('Your custom error message'));
+	// Or call next without any arguments to continue processing the request:
+	next();
+});
+```
 
 ### Middleware Hooks
 

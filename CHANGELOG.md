@@ -1,6 +1,7 @@
 # Changelog
 
-* TBD:
+* v0.5.0:
+  * Added new "login" hook
   * Fixes for login subprotocol
   * Added support for "payRequest" subprotocol
   * Added new events for server instance:

@@ -329,7 +329,7 @@ module.exports = function(lnurl) {
 					// Valid signature.
 					next();
 				},
-				afterCheckSignature: this.prepareMiddlewareHook('signedLnurl:afterCheckSignature'),
+				afterCheckSignature: this.getHook('middleware:signedLnurl:afterCheckSignature'),
 				createUrl: (req, res, next) => {
 					if (!req.query.s) return next();
 					const { tag } = req.query;
@@ -408,8 +408,11 @@ module.exports = function(lnurl) {
 	Server.prototype.prepareHooks = function() {
 		this.hooks = _.chain([
 			'middleware:signedLnurl:afterCheckSignature',
+			'login',
 		]).map(name => {
-			return [name, []];
+			const hook = this.prepareHook(name);
+			let callbacks = [];
+			return [name, { hook, callbacks }];
 		}).object().value();
 	};
 
@@ -417,26 +420,51 @@ module.exports = function(lnurl) {
 		return !_.isUndefined(this.hooks[name]);
 	};
 
+	Server.prototype.executeHook = function(name) {
+		if (!this.isValidHook(name)) {
+			throw new Error(`Unknown hook: "${name}"`);
+		}
+		const hook = this.getHook(name);
+		const args = Array.from(arguments).slice(1);
+		hook.apply(this, args);
+	};
+
+	Server.prototype.getHook = function(name) {
+		if (!this.isValidHook(name)) {
+			throw new Error(`Unknown hook: "${name}"`);
+		}
+		const { hook } = this.hooks[name];
+		return hook;
+	};
+
 	Server.prototype.bindToHook = function(name, fn) {
 		if (!this.isValidHook(name)) {
 			throw new Error(`Cannot bind to unknown hook: "${name}"`);
 		}
-		this.hooks[name].push(fn);
+		this.hooks[name].callbacks.push(fn);
 	};
 
 	Server.prototype.getCallbacksBoundToHook = function(name) {
-		return this.hooks[name] || [];
+		if (!this.isValidHook(name)) {
+			throw new Error(`Unknown hook: "${name}"`);
+		}
+		const { callbacks } = this.hooks[name];
+		return callbacks || [];
 	};
 
-	Server.prototype.prepareMiddlewareHook = function(middlewareName) {
-		const name = `middleware:${middlewareName}`;
-		return (req, res, next) => {
-			const callbacks = this.getCallbacksBoundToHook(name);
-			const customMiddlewares = _.map(callbacks, fn => {
-				return fn.bind(this, req, res);
+	Server.prototype.prepareHook = function(name) {
+		if (!_.isString(name)) {
+			throw new Error('Invalid argument ("name"): String expected.');
+		}
+		return function() {
+			const args = Array.from(arguments);
+			const done = _.last(args);
+			const callbackArgs = [this].concat(_.initial(args, 1));
+			const callbacks = _.map(this.getCallbacksBoundToHook(name), callback => {
+				return callback.bind.apply(callback, callbackArgs);
 			});
-			async.series(customMiddlewares, next);
-		};
+			async.series(callbacks, done);
+		}.bind(this);
 	};
 
 	Server.prototype.isValidSignature = function(payload, signature, id) {

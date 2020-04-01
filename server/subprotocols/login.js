@@ -25,7 +25,10 @@ module.exports = {
 			if (!signatureOk) {
 				throw new HttpError('Invalid signature', 400);
 			}
-			resolve();
+			this.executeHook('login', key.toString('hex'), error => {
+				if (error) return reject(error);
+				resolve();
+			});
 		});
 	},
 };

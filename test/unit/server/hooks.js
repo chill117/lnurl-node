@@ -1,9 +1,65 @@
 const _ = require('underscore');
 const { expect } = require('chai');
+const helpers = require('../../helpers');
 const lnurl = require('../../../');
 const { HttpError } = lnurl.Server;
+const secp256k1 = require('secp256k1');
 
 describe('Server: hooks', function() {
+
+	describe('login', function() {
+
+		beforeEach(function() {
+			this.server = this.helpers.createServer({
+				protocol: 'http',
+				listen: false,
+			});
+		});
+
+		afterEach(function() {
+			if (this.server) return this.server.close();
+		});
+
+		beforeEach(function() {
+			this.secret = null;
+			return this.server.generateNewUrl('login', {}).then(result => {
+				this.secret = result.secret;
+			});
+		});
+
+		it('successful login', function(done) {
+			const { pubKey, privKey } = helpers.generateLinkingKey();
+			const k1 = Buffer.from(this.secret, 'hex');
+			const { signature } = secp256k1.sign(k1, privKey);
+			const derEncodedSignature = secp256k1.signatureExport(signature);
+			const params = {
+				sig: derEncodedSignature.toString('hex'),
+				key: pubKey.toString('hex'),
+			};
+			let calls = 0;
+			this.server.bindToHook('login', function(key, next) {
+				calls++;
+				try {
+					expect(key).to.be.a('string');
+					expect(next).to.be.a('function');
+					next();
+				} catch (error) {
+					return done(error);
+				}
+			});
+			this.server.bindToHook('login', function(key, next) {
+				calls++;
+				try {
+					expect(calls).to.equal(2);
+					next();
+				} catch (error) {
+					return done(error);
+				}
+				done();
+			});
+			this.server.runSubProtocol('login', 'action', this.secret, params).catch(done);
+		});
+	});
 
 	describe('middleware:signedLnurl:afterCheckSignature', function() {
 
