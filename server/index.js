@@ -371,7 +371,7 @@ module.exports = function(lnurl) {
 				this.lock(secret);
 				const hash = this.hash(secret);
 				const method = req.query.q ? 'info' : 'action';
-				this.emit('request:received', { hash, method });
+				this.emit('request:received', { hash, method, req });
 				this.fetchUrl(hash).then(url => {
 					if (!url) {
 						throw new HttpError('Invalid secret', 400);
@@ -381,10 +381,10 @@ module.exports = function(lnurl) {
 						throw new HttpError('Already used', 400);
 					}
 					const params = _.extend({}, req.query, url.params);
-					this.emit('request:processing', { hash, method });
+					this.emit('request:processing', { hash, method, req });
 					return this.runSubProtocol(tag, method, secret, params);
 				}).then(result => {
-					this.emit('request:processed', { hash, method });
+					this.emit('request:processed', { hash, method, req });
 					if (method === 'info') {
 						res.status(200).json(result);
 					} else {
@@ -397,7 +397,7 @@ module.exports = function(lnurl) {
 					this.unlock(secret);
 				}).catch(error => {
 					const reason = error instanceof HttpError ? error.message : 'Internal server error';
-					this.emit('request:failed', { hash, method, reason });
+					this.emit('request:failed', { hash, method, reason, req });
 					this.unlock(secret);
 					next(error);
 				});
