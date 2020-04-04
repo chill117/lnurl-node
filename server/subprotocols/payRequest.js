@@ -1,7 +1,5 @@
 const _ = require('underscore');
-const async = require('async');
 const BigNumber = require('bignumber.js');
-const bolt11 = require('bolt11');
 const HttpError = require('../HttpError');
 
 module.exports = {
