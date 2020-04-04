@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.5.1:
+  * Added "login" event
+  * Now providing req object with "request:" events
 * v0.5.0:
   * Added new "login" hook
   * Fixes for login subprotocol
