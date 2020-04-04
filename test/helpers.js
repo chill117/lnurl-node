@@ -145,16 +145,15 @@ module.exports = {
 				data: paymentHash,
 			},
 		];
-		if (description) {
-			tags.push({
-				tagName: 'description',
-				data: description,
-			});
-		}
 		if (descriptionHash) {
 			tags.push({
 				tagName: 'purpose_commit_hash',
 				data: descriptionHash,
+			});
+		} else if (description) {
+			tags.push({
+				tagName: 'description',
+				data: description,
 			});
 		}
 		const encoded = bolt11.encode({
