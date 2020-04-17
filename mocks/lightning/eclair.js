@@ -2,8 +2,13 @@ const _ = require('underscore');
 const bodyParser = require('body-parser');
 const bolt11 = require('bolt11');
 const express = require('express');
-const helpers = require('../../helpers');
+const {
+	generateNodeKey,
+	generatePaymentRequest,
+	getTagDataFromPaymentRequest
+} = require('../../lib');
 const http = require('http');
+const lnurl = require('../../');
 
 module.exports = function(options, done) {
 	if (_.isFunction(options)) {
@@ -13,20 +18,26 @@ module.exports = function(options, done) {
 	options = _.defaults(options || {}, {
 		host: 'localhost',
 		port: 8080,
+		hostname: null,
+		network: 'bitcoin',// can be "regtest", "testnet", or "bitcoin"
+		password: null,
 	});
+	if (!options.hostname) {
+		options.hostname = [options.host, options.port].join(':');
+	}
+	if (!options.password) {
+		options.password = lnurl.Server.prototype.generateRandomKey(16, 'base64');
+	}
+	const { hostname } = options;
+	const { nodePrivateKey, nodePublicKey } = generateNodeKey();
+	options.nodePrivateKey = nodePrivateKey;
 	const app = new express();
-	const { host, port } = options;
-	const hostname = `${host}:${port}`;
-	const nodePubKey = '02c990e21bee14bf4b73a34bd69d7eff4fda2a6877bb09074046528f41e586ebe3';
-	const nodeUri = `${nodePubKey}@${hostname}`;
-	const password = 'o5akC9Z4CDkX';
 	app.config = {
-		hostname: `${host}:${port}`,
-		password: password,
+		hostname: options.hostname,
+		nodeUri: `${nodePublicKey}@${hostname}`,
+		password: options.password,
 		protocol: 'http',
 	};
-	app.nodePubKey = nodePubKey;
-	app.nodeUri = nodeUri;
 	app.use('*', (req, res, next) => {
 		const expectedAuthorization = 'Basic ' + Buffer.from('"":' + app.config.password, 'utf8').toString('base64');
 		if (!req.headers['authorization'] || req.headers['authorization'] !== expectedAuthorization) {
@@ -37,9 +48,9 @@ module.exports = function(options, done) {
 	// Parse application/x-www-form-urlencoded:
 	app.use(bodyParser.urlencoded({ extended: false }));
 	app.post('/getinfo', (req, res, next) => {
-		app.requestCounters.getinfo++;
+		app.requestCounters && app.requestCounters.getinfo++;
 		res.json({
-			nodeId: nodePubKey,
+			nodeId: nodePublicKey,
 			alias: 'eclair-testnet',
 			chainHash: '06226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f',
 			blockHeight: 123456,
@@ -47,23 +58,23 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/open', (req, res, next) => {
-		app.requestCounters.openchannel++;
+		app.requestCounters && app.requestCounters.openchannel++;
 		res.json('e872f515dc5d8a3d61ccbd2127f33141eaa115807271dcc5c5c727f3eca914d3');
 	});
 	app.post('/payinvoice', (req, res, next) => {
-		app.requestCounters.payinvoice++;
+		app.requestCounters && app.requestCounters.payinvoice++;
 		res.json('e4227601-38b3-404e-9aa0-75a829e9bec0');
 	});
 	app.post('/createinvoice', (req, res, next) => {
-		app.requestCounters.addinvoice++;
+		app.requestCounters && app.requestCounters.addinvoice++;
 		const { amountMsat, description } = req.body;
-		const pr = helpers.generatePaymentRequest(amountMsat, { description });
+		const pr = generatePaymentRequest(amountMsat, { description }, options);
 		const decoded = bolt11.decode(pr);
-		const paymentHash = helpers.getTagDataFromPaymentRequest(pr, 'payment_hash');
+		const paymentHash = getTagDataFromPaymentRequest(pr, 'payment_hash');
 		res.json({
 			prefix: decoded.prefix,
 			timestamp: decoded.timestamp,
-			nodeId: nodePubKey,
+			nodeId: nodePublicKey,
 			serialized: pr,
 			description: description,
 			paymentHash: paymentHash,
@@ -76,6 +87,7 @@ module.exports = function(options, done) {
 		app.server.close(done);
 	};
 	setTimeout(() => {
+		const { host, port } = options;
 		app.server = http.createServer(app).listen(port, host, done);
 	});
 	return app;

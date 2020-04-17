@@ -229,7 +229,7 @@ describe('Command-line interface', function() {
 										expect(body.k1).to.be.a('string');
 										expect(body.tag).to.equal(tag);
 										expect(body.callback).to.equal('https://localhost:3000/lnurl');
-										expect(body.uri).to.equal(this.ln.nodeUri);
+										expect(body.uri).to.equal(this.ln.config.nodeUri);
 									} catch (error) {
 										return next(error);
 									}

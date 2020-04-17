@@ -3,12 +3,15 @@ const async = require('async');
 const bodyParser = require('body-parser');
 const express = require('express');
 const fs = require('fs');
-const helpers = require('../../helpers');
+const {
+	generateNodeKey,
+	generatePaymentRequest,
+	getTagDataFromPaymentRequest
+} = require('../../lib');
 const https = require('https');
-const lnurl = require('../../../');
+const lnurl = require('../../');
 const path = require('path');
 const pem = require('pem');
-const tmpDir = path.join(__dirname, '..', '..', 'tmp');
 
 module.exports = function(options, done) {
 	if (_.isFunction(options)) {
@@ -18,22 +21,30 @@ module.exports = function(options, done) {
 	options = _.defaults(options || {}, {
 		host: 'localhost',
 		port: 8080,
+		hostname: null,
+		network: 'bitcoin',// can be "regtest", "testnet", or "bitcoin"
+		certPath: path.join(process.cwd(), 'lnd-tls.cert'),
+		keyPath: path.join(process.cwd(), 'lnd-tls.key'),
+		macaroonPath: path.join(process.cwd(), 'lnd-admin.macaroon'),
+		tcp: {},
 	});
+	options.tcp = _.defaults(options.tcp || {}, {
+		hostname: '127.0.0.1:9735',
+	});
+	if (!options.hostname) {
+		options.hostname = [options.host, options.port].join(':');
+	}
+	const { hostname } = options;
+	const { nodePrivateKey, nodePublicKey } = generateNodeKey();
+	options.nodePrivateKey = nodePrivateKey;
 	const app = new express();
-	const { host, port } = options;
-	const certPath = path.join(tmpDir, 'lnd-tls.cert');
-	const keyPath = path.join(tmpDir, 'lnd-tls.key');
-	const macaroonPath = path.join(tmpDir, 'lnd-admin.macaroon');
 	const macaroon = lnurl.Server.prototype.generateRandomKey();
-	const nodePubKey = '02c990e21bee14bf4b73a34bd69d7eff4fda2a6877bb09074046528f41e586ebe3';
-	const nodeUri = `${nodePubKey}@127.0.0.1:9735`;
 	app.config = {
-		hostname: `${host}:${port}`,
-		cert: certPath,
-		macaroon: macaroonPath,
+		hostname: options.hostname,
+		cert: options.certPath,
+		macaroon: options.macaroonPath,
+		nodeUri: [nodePublicKey, options.tcp.hostname].join('@'),
 	};
-	app.nodePubKey = nodePubKey;
-	app.nodeUri = nodeUri;
 	app.use('*', (req, res, next) => {
 		if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {
 			return res.status(400).end();
@@ -44,10 +55,10 @@ module.exports = function(options, done) {
 	app.get('/v1/getinfo', (req, res, next) => {
 		app.requestCounters.getinfo++;
 		res.json({
-			identity_pubkey: nodePubKey,
+			identity_pubkey: nodePublicKey,
 			alias: 'lnd-testnet',
 			testnet: true,
-			uris: [ nodeUri ],
+			uris: [ app.config.nodeUri ],
 		});
 	});
 	app.post('/v1/channels', (req, res, next) => {
@@ -72,15 +83,15 @@ module.exports = function(options, done) {
 		app.requestCounters.addinvoice++;
 		const { value } = req.body;
 		const descriptionHash = Buffer.from(req.body.description_hash, 'base64').toString('hex');
-		const pr = helpers.generatePaymentRequest(value, { descriptionHash });
-		const paymentHash = helpers.getTagDataFromPaymentRequest(pr, 'payment_hash');
+		const pr = generatePaymentRequest(value, { descriptionHash }, options);
+		const paymentHash = getTagDataFromPaymentRequest(pr, 'payment_hash');
 		res.json({
 			add_index: '0',
 			r_hash: paymentHash,
 			payment_request: pr,
 		});
 	});
-	fs.writeFile(macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {
+	fs.writeFile(options.macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {
 		if (error) return done(error);
 		pem.createCertificate({
 			selfSigned: true,
@@ -89,10 +100,11 @@ module.exports = function(options, done) {
 			if (error) return done(error);
 			const { certificate, serviceKey } = result;
 			async.parallel({
-				cert: fs.writeFile.bind(fs, certPath, certificate),
-				key: fs.writeFile.bind(fs, keyPath, serviceKey),
+				cert: fs.writeFile.bind(fs, options.certPath, certificate),
+				key: fs.writeFile.bind(fs, options.keyPath, serviceKey),
 			}, error => {
 				if (error) return done(error);
+				const { host, port } = options;
 				app.server = https.createServer({
 					key: serviceKey,
 					cert: certificate,

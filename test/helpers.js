@@ -1,9 +1,12 @@
 const _ = require('underscore');
-const bolt11 = require('bolt11');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const {
+	generatePaymentRequest,
+	getTagDataFromPaymentRequest
+} = require('../lib');
 const lnurl = require('../');
 const path = require('path');
 const querystring = require('querystring');
@@ -50,8 +53,17 @@ module.exports = {
 			done = options;
 			options = {};
 		}
-		const mockPath = path.join(__dirname, 'mocks', 'lightning', backend);
+		const mockPath = path.join(__dirname, '..', 'mocks', 'lightning', backend);
 		const MockLightningNode = require(mockPath);
+		switch (backend) {
+			case 'lnd':
+				options = _.defaults(options || {}, {
+					certPath: path.join(tmpDir, 'lnd-tls.cert'),
+					keyPath: path.join(tmpDir, 'lnd-tls.key'),
+					macaroonPath: path.join(tmpDir, 'lnd-admin.macaroon'),
+				});
+				break;
+		}
 		const mockNode = new MockLightningNode(options, done);
 		mockNode.backend = backend;
 		mockNode.requestCounters = _.chain([
@@ -127,48 +139,11 @@ module.exports = {
 		req.once('error', done);
 		req.end();
 	},
-	generatePreImage: function() {
-		return lnurl.Server.prototype.generateRandomKey(20);
+	generatePaymentRequest: function() {
+		return generatePaymentRequest.apply(this, arguments);
 	},
-	generatePaymentRequest: function(amount, extra) {
-		extra = extra || {};
-		const description = extra.description || null;
-		let descriptionHash = extra.descriptionHash || null;
-		if (description && !descriptionHash) {
-			descriptionHash = lnurl.Server.prototype.hash(Buffer.from(description, 'utf8'));
-		}
-		const preimage = this.generatePreImage();
-		const paymentHash = lnurl.Server.prototype.hash(preimage);
-		let tags = [
-			{
-				tagName: 'payment_hash',
-				data: paymentHash,
-			},
-		];
-		if (descriptionHash) {
-			tags.push({
-				tagName: 'purpose_commit_hash',
-				data: descriptionHash,
-			});
-		} else if (description) {
-			tags.push({
-				tagName: 'description',
-				data: description,
-			});
-		}
-		const encoded = bolt11.encode({
-			coinType: 'regtest',
-			millisatoshis: amount,
-			tags: tags,
-		});
-		const nodePrivateKey = lnurl.Server.prototype.generateRandomKey();
-		const signed = bolt11.sign(encoded, nodePrivateKey);
-		return signed.paymentRequest;
-	},
-	getTagDataFromPaymentRequest: function(pr, tagName) {
-		const decoded = bolt11.decode(pr);
-		const tag = _.findWhere(decoded.tags, { tagName });
-		return tag && tag.data || null;
+	getTagDataFromPaymentRequest: function() {
+		return getTagDataFromPaymentRequest.apply(this, arguments);
 	},
 	generateLinkingKey: function() {
 		let privKey;

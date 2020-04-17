@@ -372,7 +372,7 @@ describe('Server: HTTP API', function() {
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('channelRequest');
 							expect(body.callback).to.equal('https://localhost:3000/lnurl');
-							expect(body.uri).to.equal(this.ln.nodeUri);
+							expect(body.uri).to.equal(this.ln.config.nodeUri);
 						},
 					},
 				];
@@ -673,7 +673,7 @@ describe('Server: HTTP API', function() {
 							k1: this.secret,
 							tag: 'channelRequest',
 							callback: 'https://localhost:3000/lnurl',
-							uri: this.ln.nodeUri,
+							uri: this.ln.config.nodeUri,
 						});
 					},
 				},
