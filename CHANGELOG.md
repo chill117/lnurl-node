@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.5.2:
+  * Mocks and a few utility functions now available in package; see `./mocks/` and `./lib/` respectively
+  * Fix for HTTPError constructor prototype
 * v0.5.1:
   * Added "login" event
   * Now providing req object with "request:" events
