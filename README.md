@@ -342,6 +342,8 @@ It is also possible to generate lnurls in a separate (or even offline) applicati
 		config: {
 			// Defaults here depend on the LN backend used.
 		},
+		// Whether or not to create a mock instance of the LN backend:
+		mock: false,
 	},
 	tls: {
 		// The full file path to the TLS certificate:
