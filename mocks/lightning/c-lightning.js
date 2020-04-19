@@ -2,6 +2,10 @@ const _ = require('underscore');
 const async = require('async');
 const bolt11 = require('bolt11');
 const crypto = require('crypto');
+const debug = {
+	info: require('debug')('lnurl:mock:c-lightning:info'),
+	error: require('debug')('lnurl:mock:c-lightning:error'),
+};
 const fs = require('fs');
 const {
 	generateNodeKey,
@@ -24,6 +28,7 @@ module.exports = function(options, done) {
 		hostname: null,// set this to externally reachable hostname for TCP server
 		network: 'bitcoin',// can be "regtest", "testnet", or "bitcoin"
 		delimiter: '\n',
+		socket: path.join(process.cwd(), 'c-lightning.sock'),
 	});
 	if (!options.hostname) {
 		options.hostname = [options.host, options.port].join(':');
@@ -34,18 +39,26 @@ module.exports = function(options, done) {
 	let app = {
 		config: {
 			nodeUri: [nodePublicKey, hostname].join('@'),
-			socket: path.join(__dirname, '..', 'c-lightning.sock'),
+			socket: options.socket,
 		},
 		interfaces: {
 			jsonRpc: { sockets: [] },
 			tcp: { sockets: [] },
 		},
 		close: function(done) {
+			done = done || _.noop;
 			async.each(_.values(app.interfaces), function(interface, next) {
 				_.invoke(interface.sockets, 'end');
 				interface.server.close(next);
-			}, done || _.noop);
-			destroySocketFile();
+			}, function(error) {
+				if (error) return done(error);
+				try {
+					destroySocketFile();
+				} catch (error) {
+					return done(error);
+				}
+				done();
+			});
 		},
 	};
 	app.interfaces.jsonRpc.server = net.createServer(socket => {
@@ -103,7 +116,7 @@ module.exports = function(options, done) {
 							};
 					}
 				} catch (error) {
-					console.error(error);
+					debug.error(error);
 					return {
 						jsonrpc: '2.0', 
 						error: {
@@ -122,33 +135,35 @@ module.exports = function(options, done) {
 		try {
 			fs.statSync(app.config.socket);
 		} catch (error) {
-			return;
+			if (error.message.substr(0, 'ENOENT: no such file or directory'.length) !== 'ENOENT: no such file or directory') {
+				throw error;
+			}
 		}
 		try {
 			fs.unlinkSync(app.config.socket);
 		} catch (error) {
-			console.error(error);
+			debug.error(error);
 		}
 	};
 	destroySocketFile();
 	app.interfaces.tcp.server = net.createServer(function(socket) {
 		app.interfaces.tcp.sockets.push(socket);
 		socket.on('data', data => {
-			console.log('TCP DATA:', data.toString('hex'));
+			debug.info('TCP data received:', data.toString('hex'));
 		});
 	});
 	async.parallel([
 		function(next) {
 			app.interfaces.jsonRpc.server.listen(app.config.socket, () => {
 				const { socket } = app.config;
-				console.log(`Mock c-lightning JSON-RPC API listening at ${socket}`);
+				debug.info(`JSON-RPC API listening at ${socket}`);
 				next();
 			});
 		},
 		function(next) {
 			const { host, port } = options;
 			app.interfaces.tcp.server.listen(port, host, () => {
-				console.log(`Mock c-lightning listening for TCP connections at ${host}:${port}`);
+				debug.info(`Listening for TCP connections at ${host}:${port}`);
 				next();
 			});
 		},

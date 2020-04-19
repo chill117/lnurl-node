@@ -67,6 +67,8 @@ module.exports = function(lnurl) {
 			config: {
 				// Defaults here depend on the LN backend used.
 			},
+			// Whether or not to create a mock instance of the LN backend.
+			mock: false,
 		},
 		tls: {
 			// The full file path to the TLS certificate:
@@ -774,10 +776,19 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.prepareLightning = function() {
-		const { backend, config } = this.options.lightning;
-		const lightningPath = path.join(__dirname, 'lightning', backend);
-		const Lightning = require(lightningPath);
-		this.ln = new Lightning(config);
+		const { backend } = this.options.lightning;
+		let { config } = this.options.lightning;
+		const Backend = require(path.join(__dirname, 'lightning', backend));
+		if (this.options.lightning.mock) {
+			const Mock = require(path.join(__dirname, '..', 'mocks', 'lightning', backend));
+			const mock = new Mock(config, () => {
+				this.ln = new Backend(config);
+				this.ln.mock = mock || null;
+			});
+			config = mock.config;
+		} else {
+			this.ln = new Backend(config);
+		}
 	};
 
 	Server.prototype.deepClone = function(data) {
@@ -810,6 +821,10 @@ module.exports = function(lnurl) {
 						this.app.webServer = null;
 						next();
 					});
+				},
+				next => {
+					if (!this.ln || !this.ln.mock) return next();
+					this.ln.mock.close(next);
 				},
 			], error => {
 				if (error) {

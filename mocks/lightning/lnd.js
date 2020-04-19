@@ -1,6 +1,10 @@
 const _ = require('underscore');
 const async = require('async');
 const bodyParser = require('body-parser');
+const debug = {
+	info: require('debug')('lnurl:mock:eclair:info'),
+	error: require('debug')('lnurl:mock:eclair:error'),
+};
 const express = require('express');
 const fs = require('fs');
 const {
@@ -108,7 +112,10 @@ module.exports = function(options, done) {
 				app.server = https.createServer({
 					key: serviceKey,
 					cert: certificate,
-				}, app).listen(port, host, done);
+				}, app).listen(port, host, function() {
+					debug.info(`HTTPS server listening at https://${host}:${port}/`);
+					done();
+				});
 			});
 		});
 	});

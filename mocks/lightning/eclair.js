@@ -1,6 +1,10 @@
 const _ = require('underscore');
 const bodyParser = require('body-parser');
 const bolt11 = require('bolt11');
+const debug = {
+	info: require('debug')('lnurl:mock:eclair:info'),
+	error: require('debug')('lnurl:mock:eclair:error'),
+};
 const express = require('express');
 const {
 	generateNodeKey,
@@ -88,7 +92,10 @@ module.exports = function(options, done) {
 	};
 	setTimeout(() => {
 		const { host, port } = options;
-		app.server = http.createServer(app).listen(port, host, done);
+		app.server = http.createServer(app).listen(port, host, function() {
+			debug.info(`HTTP server listening at http://${host}:${port}/`);
+			done();
+		});
 	});
 	return app;
 };
