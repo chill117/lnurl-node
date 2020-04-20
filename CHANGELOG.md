@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Can now use custom lightning backends; see [Custom Lightning Backend](https://github.com/chill117/lnurl-node/blob/master/README.md#custom-lightning-backend)
 * v0.6.0:
   * Added new option "mock". When set to TRUE, the server will create its own mock instance of the specified Lightning Node. Useful for quick prototyping and testing.
 * v0.5.2:

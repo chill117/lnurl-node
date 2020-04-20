@@ -777,8 +777,19 @@ module.exports = function(lnurl) {
 
 	Server.prototype.prepareLightning = function() {
 		const { backend } = this.options.lightning;
+		let backendPath;
+		if (_.isString(backend)) {
+			backendPath = path.join(__dirname, 'lightning', backend);
+		} else if (_.isObject(backend)) {
+			if (!backend.path) {
+				throw new Error('Invalid option ("lightning.backend"): Missing required property "path"');
+			}
+			backendPath = backend.path;
+		} else {
+			throw new Error('Invalid option ("lightning.backend"): String or object expected');
+		}
 		let { config } = this.options.lightning;
-		const Backend = require(path.join(__dirname, 'lightning', backend));
+		const Backend = require(backendPath);
 		if (this.options.lightning.mock) {
 			const mock = this.prepareMockLightningNode(backend, config, () => {
 				this.ln = new Backend(config);

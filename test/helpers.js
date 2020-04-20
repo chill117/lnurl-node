@@ -33,10 +33,8 @@ module.exports = {
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
 			},
 		});
-		if (ln) {
-			if (!options.lightning.backend) {
-				options.lightning.backend = ln.backend;
-			}
+		if (ln && !options.lightning.backend) {
+			options.lightning.backend = ln.backend;
 			options.lightning.config = _.defaults(options.lightning.config || {}, ln.config);
 		}
 		const server = lnurl.createServer(options);

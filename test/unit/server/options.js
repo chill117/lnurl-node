@@ -1,6 +1,7 @@
 const _ = require('underscore');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
+const path = require('path');
 
 describe('Server: options', function() {
 
@@ -34,6 +35,46 @@ describe('Server: options', function() {
 				},
 			],
 		},
+		{
+			description: '{ "lightning": { "backend": { "path": "/path/to/custom/backend.js" } } }',
+			options: {
+				protocol: 'http',
+				lightning: {
+					backend: {
+						path: path.join(__dirname, '..', '..', 'backends', 'custom.js'),
+					},
+					config: {
+						nodeUri: '000000000010101@127.0.0.1:9735',
+					},
+				},
+			},
+			tests: [
+				{
+					description: 'can use a custom lightning backend',
+					expected: function(done) {
+						this.server.generateNewUrl('channelRequest', {
+							localAmt: 2000,
+							pushAmt: 0,
+						}).then(result => {
+							const { url } = result;
+							helpers.request('get', {
+								url,
+								json: true,
+							}, (error, response, body) => {
+								if (error) return done(error);
+								try {
+									expect(body).to.be.an('object');
+									expect(body.uri).to.equal('000000000010101@127.0.0.1:9735');
+								} catch (error) {
+									return done(error);
+								}
+								done();
+							});
+						}).catch(done);
+					},
+				},
+			],
+		},
 	];
 
 	_.each(testGroups, function(testGroup) {
@@ -46,7 +87,9 @@ describe('Server: options', function() {
 				server.once('listening', done);
 			});
 			after(function() {
-				return this.server.close();
+				if (this.server) {
+					return this.server.close();
+				}
 			});
 			_.each(testGroup.tests, function(test) {
 				it(test.description, function(done) {

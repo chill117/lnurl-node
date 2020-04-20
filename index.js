@@ -28,4 +28,5 @@ let lnurl = {
 };
 
 lnurl.Server = require('./server')(lnurl);
+lnurl.LightningBackend = require('./server/LightningBackend');
 module.exports = lnurl;

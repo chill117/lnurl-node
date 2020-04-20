@@ -208,7 +208,7 @@ lnurl server \
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
 * To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
-
+* To use a custom lightning backend with your server see [Custom Lightning Backend](#custom-lightning-backend).
 
 To print all available options for the server command:
 ```bash
@@ -288,6 +288,7 @@ const server = lnurl.createServer({
 ```
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
+* To use a custom lightning backend with your server see [Custom Lightning Backend](#custom-lightning-backend).
 
 To generate a new lnurl that a client application can then consume:
 ```js
@@ -366,6 +367,72 @@ It is also possible to generate lnurls in a separate (or even offline) applicati
 		config: {},
 	},
 }
+```
+
+#### Custom Lightning Backend
+
+It is possible to define your own custom lightning backend as follows:
+```js
+// ./backends/custom.js
+
+const { LightningBackend } = require('lnurl');
+
+class Backend extends LightningBackend {
+
+	constructor(options) {
+		super('custom', options, {
+			defaultOptions: {
+				nodeUri: null,
+			},
+			requiredOptions: ['nodeUri'],
+		});
+	}
+
+	checkOptions(options) {
+		// This is called by the constructor.
+		// Throw an error if any problems are found with the given options.
+	}
+
+	getNodeUri() {
+		return new Promise((resolve, reject) => {
+			resolve(this.options.nodeUri);
+		});
+	}
+
+	openChannel(remoteId, localAmt, pushAmt, makePrivate) {
+		return new Promise((resolve, reject) => {
+			resolve();
+		});
+	}
+
+	payInvoice(invoice) {
+		return new Promise((resolve, reject) => {
+			resolve();
+		});
+	}
+
+	addInvoice(amount, extra) {
+		return new Promise((resolve, reject) => {
+			resolve();
+		});
+	}
+}
+
+module.exports = Backend;
+```
+And to use your new custom backend:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	lightning: {
+		backend: {
+			path: '/full/path/to/backends/custom.js',
+		},
+		config: {
+			// Options to pass to your custom backend.
+		},
+	},
+});
 ```
 
 
