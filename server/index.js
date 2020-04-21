@@ -780,8 +780,7 @@ module.exports = function(lnurl) {
 		let { config } = this.options.lightning;
 		const Backend = require(path.join(__dirname, 'lightning', backend));
 		if (this.options.lightning.mock) {
-			const Mock = require(path.join(__dirname, '..', 'mocks', 'lightning', backend));
-			const mock = new Mock(config, () => {
+			const mock = this.prepareMockLightningNode(backend, config, () => {
 				this.ln = new Backend(config);
 				this.ln.mock = mock || null;
 			});
@@ -789,6 +788,20 @@ module.exports = function(lnurl) {
 		} else {
 			this.ln = new Backend(config);
 		}
+	};
+
+	Server.prototype.prepareMockLightningNode = function(backend, options, done) {
+		if (!_.isString(backend)) {
+			throw new Error('Invalid argument ("backend"): String expected.');
+		}
+		if (_.isFunction(options)) {
+			done = options;
+			options = null;
+		}
+		options = options || {};
+		const Mock = require(path.join(__dirname, '..', 'mocks', 'lightning', backend));
+		const mock = new Mock(options, done);
+		return mock;
 	};
 
 	Server.prototype.deepClone = function(data) {

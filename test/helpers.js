@@ -51,10 +51,9 @@ module.exports = {
 	prepareMockLightningNode: function(backend, options, done) {
 		if (_.isFunction(options)) {
 			done = options;
-			options = {};
+			options = null;
 		}
-		const mockPath = path.join(__dirname, '..', 'mocks', 'lightning', backend);
-		const MockLightningNode = require(mockPath);
+		options = options || {};
 		switch (backend) {
 			case 'lnd':
 				options = _.defaults(options || {}, {
@@ -64,9 +63,9 @@ module.exports = {
 				});
 				break;
 		}
-		const mockNode = new MockLightningNode(options, done);
-		mockNode.backend = backend;
-		mockNode.requestCounters = _.chain([
+		const mock = lnurl.Server.prototype.prepareMockLightningNode(backend, options, done);
+		mock.backend = backend;
+		mock.requestCounters = _.chain([
 			'getinfo',
 			'openchannel',
 			'payinvoice',
@@ -74,21 +73,21 @@ module.exports = {
 		]).map(function(key) {
 			return [key, 0];
 		}).object().value();
-		mockNode.resetRequestCounters = function() {
+		mock.resetRequestCounters = function() {
 			this.requestCounters = _.mapObject(this.requestCounters, () => {
 				return 0;
 			});
 		};
-		mockNode.expectNumRequestsToEqual = function(type, total) {
-			if (_.isUndefined(mockNode.requestCounters[type])) {
+		mock.expectNumRequestsToEqual = function(type, total) {
+			if (_.isUndefined(mock.requestCounters[type])) {
 				throw new Error(`Unknown request type: "${type}"`);
 			}
-			if (mockNode.requestCounters[type] !== total) {
+			if (mock.requestCounters[type] !== total) {
 				throw new Error(`Expected ${total} requests of type: "${type}"`);
 			}
 		};
-		ln = mockNode;
-		return mockNode;
+		ln = mock;
+		return mock;
 	},
 	prepareSignedRequest: function(apiKey, tag, params, overrides) {
 		overrides = overrides || {};
@@ -151,9 +150,6 @@ module.exports = {
 			privKey = crypto.randomBytes(32);
 		} while (!secp256k1.privateKeyVerify(privKey))
 		const pubKey = Buffer.from(secp256k1.publicKeyCreate(privKey));
-		return {
-			pubKey: pubKey,
-			privKey: privKey,
-		};
+		return { pubKey, privKey };
 	},
 };

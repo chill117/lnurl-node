@@ -161,11 +161,12 @@ describe('Command-line interface', function() {
 
 	describe('server [options]', function() {
 
+		let apiKeys;
 		let certPath, keyPath;
 		before(function() {
-			this.apiKeys = [ lnurl.generateApiKey() ];
-			certPath = this.certPath = path.join(this.tmpDir, 'tls.cert');
-			keyPath = this.keyPath = path.join(this.tmpDir, 'tls.key');
+			apiKeys = [ lnurl.generateApiKey() ];
+			certPath = path.join(this.tmpDir, 'tls.cert');
+			keyPath = path.join(this.tmpDir, 'tls.key');
 		});
 
 		beforeEach(function() {
@@ -174,7 +175,7 @@ describe('Command-line interface', function() {
 
 		beforeEach(function(done) {
 			// Clean-up any existing TLS cert/key files.
-			const files = [ this.certPath, this.keyPath ];
+			const files = [ certPath, keyPath ];
 			async.each(files, (file, next) => {
 				fs.stat(file, error => {
 					if (error) return next();
@@ -191,11 +192,11 @@ describe('Command-line interface', function() {
 						'server',
 						'--host', 'localhost',
 						'--port', '3000',
-						'--auth.apiKeys', JSON.stringify(this.apiKeys),
+						'--auth.apiKeys', JSON.stringify(apiKeys),
 						'--lightning.backend', this.ln.backend,
 						'--lightning.config', JSON.stringify(this.ln.config),
-						'--tls.certPath', this.certPath,
-						'--tls.keyPath', this.keyPath,
+						'--tls.certPath', certPath,
+						'--tls.keyPath', keyPath,
 						'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
 						'--store.config', JSON.stringify((process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {}),
 					];
@@ -203,7 +204,7 @@ describe('Command-line interface', function() {
 				expected: function(done) {
 					waitForTlsFiles(error => {
 						if (error) return done(error);
-						fs.readFile(this.certPath, (error, buffer) => {
+						fs.readFile(certPath, (error, buffer) => {
 							if (error) return done(error);
 							const ca = buffer.toString();
 							const tag = 'channelRequest';
@@ -211,7 +212,7 @@ describe('Command-line interface', function() {
 								localAmt: 1000,
 								pushAmt: 1000,
 							};
-							const apiKey = this.apiKeys[0];
+							const apiKey = apiKeys[0];
 							const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
 							async.retry({
 								times: 75,
@@ -249,7 +250,7 @@ describe('Command-line interface', function() {
 						port: 3000,
 						protocol: 'http',
 						auth: {
-							apiKeys: this.apiKeys,
+							apiKeys: apiKeys,
 						},
 						lightning: {
 							backend: this.ln.backend,
@@ -292,7 +293,7 @@ describe('Command-line interface', function() {
 
 		const waitForTlsFiles = function(done) {
 			const startTime = Date.now();
-			const maxWaitTime = 1000;
+			const maxWaitTime = 1500;
 			async.until(next => {
 				const files = [ certPath, keyPath ];
 				async.map(files, (file, nextFile) => {
