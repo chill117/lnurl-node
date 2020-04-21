@@ -291,11 +291,15 @@ const server = lnurl.createServer({
 
 To generate a new lnurl that a client application can then consume:
 ```js
-const { encoded, secret, url } = server.generateNewUrl('channelRequest', {
+server.generateNewUrl('channelRequest', {
 	localAmt: 2000,
 	pushAmt: 0
+}).then(result => {
+	const { encoded, secret, url } = result;
+	console.log({ encoded, secret, url });
+}).catch(error => {
+	console.error(error);
 });
-console.log({ encoded, secret, url });
 ```
 Expected output:
 ```json
