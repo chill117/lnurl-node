@@ -336,6 +336,7 @@ module.exports = function(lnurl) {
 					if (!req.query.s) return next();
 					const { tag } = req.query;
 					const params = _.omit(req.query, 's', 'id', 'n', 'tag');
+					const apiKeyId = req.query.id || null;
 					let secret;
 					switch (tag) {
 						case 'login':
@@ -351,7 +352,7 @@ module.exports = function(lnurl) {
 							req.query = { q: secret };
 							break;
 					}
-					return this.createUrl(secret, tag, params).then(() => {
+					return this.createUrl(secret, tag, params, apiKeyId).then(() => {
 						next();
 					}).catch(error => {
 						if (!/duplicate/i.test(error.message)) {
@@ -382,7 +383,8 @@ module.exports = function(lnurl) {
 					if (!this.isReusable(tag) && url.used === true) {
 						throw new HttpError('Already used', 400);
 					}
-					const params = _.extend({}, req.query, url.params);
+					const apiKeyId = url.apiKeyId || null;
+					const params = _.extend({}, req.query, url.params, { apiKeyId });
 					this.emit('request:processing', { hash, method, req });
 					return this.runSubProtocol(tag, method, secret, params);
 				}).then(result => {
@@ -668,9 +670,9 @@ module.exports = function(lnurl) {
 		return { id, key };
 	};
 
-	Server.prototype.generateNewUrl = function(tag, params) {
+	Server.prototype.generateNewUrl = function(tag, params, apiKeyId) {
 		return this.validateSubProtocolParameters(tag, params).then(() => {
-			return this.generateSecret(tag, params).then(secret => {
+			return this.generateSecret(tag, params, apiKeyId).then(secret => {
 				let params;
 				switch (tag) {
 					case 'login':
@@ -687,19 +689,21 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.createUrl = function(key, tag, params) {
+	Server.prototype.createUrl = function(key, tag, params, apiKeyId) {
+		apiKeyId = apiKeyId || null;
 		return this.validateSubProtocolParameters(tag, params).then(() => {
-			return this.saveUrl(key, tag, params);
+			return this.saveUrl(key, tag, params, apiKeyId);
 		});
 	};
 
-	Server.prototype.saveUrl = function(key, tag, params) {
+	Server.prototype.saveUrl = function(key, tag, params, apiKeyId) {
+		apiKeyId = apiKeyId || null;
 		const hash = this.hash(key);
 		return this.store.exists(hash).then(exists => {
 			if (exists) {
 				throw new Error(`Cannot save duplicate URL (hash: "${hash}")`);
 			} else {
-				const data = { tag, params, used: false };
+				const data = { tag, params, apiKeyId, used: false };
 				return this.store.save(hash, data);
 			}
 		});
@@ -716,7 +720,7 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.generateSecret = function(tag, params) {
+	Server.prototype.generateSecret = function(tag, params, apiKeyId) {
 		if (_.isUndefined(params)) {
 			params = {};
 		}
@@ -734,7 +738,7 @@ module.exports = function(lnurl) {
 				try {
 					numAttempts++;
 					key = this.generateRandomKey();
-					return this.saveUrl(key, tag, params).then(() => {
+					return this.saveUrl(key, tag, params, apiKeyId).then(() => {
 						next();
 					}).catch(error => {
 						if (/duplicate/i.test(error.message)) {

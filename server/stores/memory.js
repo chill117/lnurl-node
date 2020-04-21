@@ -4,13 +4,13 @@ module.exports = function(lnurl) {
 
 	let Store = function(options) {
 		this.options = options || {};
-		this._store = {};
+		this.store = new Map();
 	};
 
 	Store.prototype.save = function(hash, data) {
 		return new Promise((resolve, reject) => {
 			data = this.deepClone(data);
-			this._store[hash] = data;
+			this.store.set(hash, data);
 			resolve();
 		});
 	};
@@ -25,7 +25,7 @@ module.exports = function(lnurl) {
 		return new Promise((resolve, reject) => {
 			let data;
 			try {
-				data = this._store[hash] || null;
+				data = this.store.get(hash) || null;
 				if (data) {
 					data = this.deepClone(data);
 				}
@@ -38,7 +38,7 @@ module.exports = function(lnurl) {
 
 	Store.prototype.delete = function(hash) {
 		return new Promise((resolve, reject) => {
-			this._store[hash] = null;
+			this.store.delete(hash);
 			resolve();
 		});
 	};

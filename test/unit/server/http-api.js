@@ -631,7 +631,26 @@ describe('Server: HTTP API', function() {
 									} catch (error) {
 										return done(error);
 									}
-									done();
+									let secret;
+									switch (tag) {
+										case 'login':
+											secret = query.k1;
+											break;
+										default:
+											const { id, s } = query;
+											secret = this.server.hash(`${id}-${s}`);
+											break;
+									}
+									const hash = this.server.hash(secret);
+									this.server.fetchUrl(hash).then(result => {
+										if (body.status === 'ERROR' && tag !== 'login') {
+											expect(result).to.equal(null);
+										} else {
+											expect(result).to.be.an('object');
+											expect(result.apiKeyId).to.equal(apiKey.id);
+										}
+										done();
+									}).catch(done);
 								});
 							});
 						});
