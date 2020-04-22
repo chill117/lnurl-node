@@ -60,9 +60,16 @@ This will install `lnurl` and add it to your application's `package.json` file.
 
 ## Subprotocols
 
-The [lnurl specification](https://github.com/btcontract/lnurl-rfc/blob/master/spec.md) has defined a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported are defined here in this section.
+The lnurl specification defines a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported are described here in this section.
+
+Each subprotocol has two tables of parameters - server and client. The server parameters table details the parameters that you are required to provide when generating a new LNURL via [generateNewUrl()](#generateNewUrl). The client parameters are to be provided by the user's wallet application during the process of executing the respective LNURL subprotocol.
+
 
 ### channelRequest
+
+[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-channel.md)
+
+Allows a user to request that your service open a channel with their node.
 
 Server parameters:
 
@@ -81,6 +88,10 @@ Client parameters:
 
 ### login
 
+[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-auth.md)
+
+Allows a user to login/authorize with your service. This subprotocol does not require the Lightning Network, but instead uses what it calls "linking keys" to uniquely identify and authorize a user. Linking keys are derived from a combination of a hierarchical, deterministically generated private key (BIP 44) and your service's host (or domain name).
+
 Server parameters:
 
 _None_
@@ -94,6 +105,10 @@ Client parameters:
 
 
 ### payRequest
+
+[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-pay.md)
+
+Users can pay your service via a static payment QR code.
 
 Server parameters:
 
@@ -111,6 +126,10 @@ Client parameters:
 
 
 ### withdrawRequest
+
+[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-withdraw.md)
+
+Users can request a payment from your service.
 
 Server parameters:
 
@@ -290,28 +309,6 @@ const server = lnurl.createServer({
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
 * To use a custom lightning backend with your server see [Custom Lightning Backend](#custom-lightning-backend).
 
-To generate a new lnurl that a client application can then consume:
-```js
-server.generateNewUrl('channelRequest', {
-	localAmt: 2000,
-	pushAmt: 0
-}).then(result => {
-	const { encoded, secret, url } = result;
-	console.log({ encoded, secret, url });
-}).catch(error => {
-	console.error(error);
-});
-```
-Expected output:
-```json
-{
-	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
-	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
-	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
-}
-```
-It is also possible to generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
-
 
 #### Options for createServer method
 
@@ -434,6 +431,33 @@ const server = lnurl.createServer({
 	},
 });
 ```
+
+
+### generateNewUrl
+
+`generateNewUrl(tag, params)`
+
+To generate a new lnurl that a client application can then consume:
+```js
+server.generateNewUrl('channelRequest', {
+	localAmt: 2000,
+	pushAmt: 0
+}).then(result => {
+	const { encoded, secret, url } = result;
+	console.log({ encoded, secret, url });
+}).catch(error => {
+	console.error(error);
+});
+```
+Expected output:
+```json
+{
+	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
+	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
+	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
+}
+```
+It is also possible to generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
 
 
 ### generateApiKey
