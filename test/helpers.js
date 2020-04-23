@@ -23,7 +23,7 @@ module.exports = {
 		options = _.defaults(options || {}, {
 			host: 'localhost',
 			port: 3000,
-			lightning: {},
+			lightning: _.pick(ln, 'backend', 'config'),
 			tls: {
 				certPath: path.join(tmpDir, 'tls.cert'),
 				keyPath: path.join(tmpDir, 'tls.key'),
@@ -33,10 +33,6 @@ module.exports = {
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
 			},
 		});
-		if (ln && !options.lightning.backend) {
-			options.lightning.backend = ln.backend;
-			options.lightning.config = _.defaults(options.lightning.config || {}, ln.config);
-		}
 		const server = lnurl.createServer(options);
 		server.once('listening', () => {
 			if (server.options.protocol === 'https') {

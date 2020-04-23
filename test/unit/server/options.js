@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const async = require('async');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
 const path = require('path');
@@ -75,6 +76,71 @@ describe('Server: options', function() {
 				},
 			],
 		},
+		{
+			description: '{"auth": {"apiKeys": [{ "lightning": { .. } }]}}',
+			options: {
+				protocol: 'http',
+				lightning: null,
+				auth: {
+					apiKeys: [
+						{
+							id: 'tzLWF0c=',
+							key: 'nOtf6XbGnMVZJ51GKDIrmd9B4ltvO0C1xSUBivlN4cQ=',
+							lightning: {
+								backend: 'c-lightning',
+								config: {
+									port: 9736,
+									socket: path.join(helpers.tmpDir, 'clightning1.sock'),
+								},
+								mock: true,
+							},
+						},
+						{
+							id: 'ooGwzJM=',
+							key: 'FSgM6S1xIs8hfof1zlW8m2YYugRHdn80rJqNXTdp3OE=',
+							lightning: {
+								backend: 'c-lightning',
+								config: {
+									port: 9737,
+									socket: path.join(helpers.tmpDir, 'clightning2.sock'),
+								},
+								mock: true,
+							},
+						},
+					],
+				},
+			},
+			tests: [
+				{
+					description: 'each API key uses the correct lightning backend',
+					expected: function(done) {
+						async.each(this.server.options.auth.apiKeys, (apiKey, next) => {
+							const tag = 'channelRequest';
+							const params = {
+								localAmt: 2000,
+								pushAmt: 0,
+							};
+							const query = helpers.prepareSignedRequest(apiKey, tag, params);
+							helpers.request('get', {
+								url: this.server.getCallbackUrl(),
+								qs: query,
+								json: true,
+							}, (error, response, body) => {
+								if (error) return next(error);
+								try {
+									const { port } = apiKey.lightning.config;
+									expect(body.status).to.not.equal('ERROR');
+									expect(body.uri.substr(-5)).to.equal(':' + port);
+								} catch (error) {
+									return next(error);
+								}
+								next();
+							});
+						}, done);
+					},
+				},
+			],
+		},
 	];
 
 	_.each(testGroups, function(testGroup) {
@@ -88,7 +154,9 @@ describe('Server: options', function() {
 			});
 			after(function() {
 				if (this.server) {
-					return this.server.close();
+					return this.server.close().then(() => {
+						this.server = null;
+					});
 				}
 			});
 			_.each(testGroup.tests, function(test) {

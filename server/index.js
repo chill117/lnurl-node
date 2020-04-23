@@ -29,7 +29,7 @@ module.exports = function(lnurl) {
 		this.prepareLightning();
 		this.prepareStore();
 		this.app = this.createWebServer();
-		this._locks = {};
+		this.locks = new Map();
 	};
 
 	util.inherits(Server, SafeEventEmitter);
@@ -54,12 +54,18 @@ module.exports = function(lnurl) {
 			apiKeys: [],
 		},
 		apiKey: {
+			// Encoding for generated API keys ('hex', 'base64', etc):
 			encoding: 'hex',
 			numBytes: {
+				// Number of random bytes for API key ID:
 				id: 5,
+				// Number of random bytes for API key secret:
 				key: 32,
 			},
 		},
+		/*
+			Set equal to NULL not configure LN backend at the server-wide level.
+		*/
 		lightning: {
 			// Which LN backend to use (only lnd supported currently):
 			backend: 'lnd',
@@ -83,13 +89,10 @@ module.exports = function(lnurl) {
 			days: 3650,
 		},
 		store: {
+			// Name of store backend ('knex', 'memory', 'redis'):
 			backend: 'memory',
+			// Configuration options to pass to store:
 			config: {},
-		},
-		middleware: {
-			signedLnurl: {
-				afterCheckSignature: null,
-			},
 		},
 	};
 
@@ -101,8 +104,10 @@ module.exports = function(lnurl) {
 		options = _.defaults(options || {}, this.defaultOptions);
 		options.auth = _.defaults(options.auth || {}, this.defaultOptions.auth);
 		options.apiKey = _.defaults(options.apiKey || {}, this.defaultOptions.apiKey);
-		options.lightning = _.defaults(options.lightning || {}, this.defaultOptions.lightning);
-		options.lightning.config = _.defaults(options.lightning.config || {}, this.defaultOptions.lightning.config);
+		if (!_.isNull(options.lightning)) {
+			options.lightning = _.defaults(options.lightning || {}, this.defaultOptions.lightning);
+			options.lightning.config = _.defaults(options.lightning.config || {}, this.defaultOptions.lightning.config);
+		}
 		options.tls = _.defaults(options.tls || {}, this.defaultOptions.tls);
 		if (!options.url) {
 			const { host, port, protocol } = options;
@@ -130,7 +135,7 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.rejectUnknownOptions = function() {
-		_.chain(this.defaultOptions).keys().each(key => {
+		_.each(this.options, (value, key) => {
 			if (_.isUndefined(this.defaultOptions[key])) {
 				throw new Error(`Unknown option: "${key}"`);
 			}
@@ -138,8 +143,7 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.checkRequiredOptions = function() {
-		let requiredOptions = ['host', 'port'];
-		_.each(requiredOptions, name => {
+		_.each(['host', 'port'], name => {
 			if (!this.options[name]) {
 				throw new Error(`Missing required option: "${name}"`);
 			}
@@ -147,18 +151,18 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.prepareApiKeys = function() {
-		this.apiKeys = {};
+		this.apiKeys = new Map();
 		_.each(this.options.auth.apiKeys, apiKey => {
-			let { id, key } = apiKey;
-			if (this.apiKeys[id]) {
+			const { id } = apiKey;
+			if (this.apiKeys.has(id)) {
 				throw new Error(`Duplicate API key identifier ("${id}")`);
 			}
-			this.apiKeys[id] = key;
+			this.apiKeys.set(id, _.omit(apiKey, 'id'));
 		});
 	};
 
 	Server.prototype.getApiKey = function(id) {
-		return this.apiKeys[id] || null;
+		return this.apiKeys.get(id) || null;
 	};
 
 	Server.prototype.getTlsCertificate = function() {
@@ -384,9 +388,9 @@ module.exports = function(lnurl) {
 						throw new HttpError('Already used', 400);
 					}
 					const apiKeyId = url.apiKeyId || null;
-					const params = _.extend({}, req.query, url.params, { apiKeyId });
+					const params = _.extend({}, req.query, url.params);
 					this.emit('request:processing', { hash, method, req });
-					return this.runSubProtocol(tag, method, secret, params);
+					return this.runSubProtocol(tag, method, secret, params, apiKeyId);
 				}).then(result => {
 					this.emit('request:processed', { hash, method, req });
 					if (method === 'info') {
@@ -472,8 +476,9 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.isValidSignature = function(payload, signature, id) {
-		const key = this.getApiKey(id);
-		if (!key) return false;
+		const apiKey = this.getApiKey(id);
+		if (!apiKey) return false;
+		const { key } = apiKey;
 		const expected = this.createSignature(payload, key);
 		return signature === expected;
 	};
@@ -542,9 +547,6 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.isReusable = function(tag) {
-		if (!_.isString(tag)) {
-			throw new Error('Invalid argument ("tag"): String expected.');
-		}
 		const subprotocol = this.getSubProtocol(tag);
 		if (!subprotocol) {
 			throw new Error(`Unknown subprotocol: "${tag}"`);
@@ -552,10 +554,7 @@ module.exports = function(lnurl) {
 		return subprotocol.reusable === true;
 	};
 
-	Server.prototype.runSubProtocol = function(tag, method, secret, params) {
-		if (!_.isString(tag)) {
-			throw new Error('Invalid argument ("tag"): String expected.');
-		}
+	Server.prototype.runSubProtocol = function(tag, method, secret, params, apiKeyId) {
 		const subprotocol = this.getSubProtocol(tag);
 		if (!subprotocol) {
 			throw new Error(`Unknown subprotocol: "${tag}"`);
@@ -573,7 +572,28 @@ module.exports = function(lnurl) {
 		if (!_.isObject(params)) {
 			throw new Error('Invalid argument ("params"): Object expected.');
 		}
-		return subprotocol[method].call(this, secret, params);
+		return this.prepareSubProtocolContext(apiKeyId).then(context => {
+			return subprotocol[method].call(context, secret, params);
+		});
+	};
+
+	Server.prototype.prepareSubProtocolContext = function(apiKeyId) {
+		apiKeyId = apiKeyId || null;
+		if (!_.isNull(apiKeyId)) {
+			if (!_.isString(apiKeyId)) {
+				throw new Error('Invalid argument ("apiKeyId"): String expected.');
+			}
+			const apiKey = this.getApiKey(apiKeyId);
+			if (!apiKey) {
+				throw new HttpError('Unknown API key', 400);
+			}
+			if (apiKey.lightning) {
+				return this.prepareLightningBackend(apiKey.lightning).then(ln => {
+					return _.extend({}, this, { ln });
+				});
+			}
+		}
+		return Promise.resolve(this);
 	};
 
 	Server.prototype.hasSubProtocol = function(tag) {
@@ -648,15 +668,15 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.isLocked = function(secret) {
-		return this._locks[secret] === true;
+		return this.locks.has(secret);
 	};
 
 	Server.prototype.lock = function(secret) {
-		this._locks[secret] = true;
+		this.locks.set(secret, true);
 	};
 
 	Server.prototype.unlock = function(secret) {
-		this._locks[secret] = null;
+		this.locks.delete(secret);
 	};
 
 	Server.prototype.generateApiKey = function(options) {
@@ -780,34 +800,54 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.prepareLightning = function() {
-		const { backend } = this.options.lightning;
-		let backendPath;
-		if (_.isString(backend)) {
-			backendPath = path.join(__dirname, 'lightning', backend);
-		} else if (_.isObject(backend)) {
-			if (!backend.path) {
-				throw new Error('Invalid option ("lightning.backend"): Missing required property "path"');
-			}
-			backendPath = backend.path;
-		} else {
-			throw new Error('Invalid option ("lightning.backend"): String or object expected');
-		}
-		let { config } = this.options.lightning;
-		const Backend = require(backendPath);
-		if (this.options.lightning.mock) {
-			const mock = this.prepareMockLightningNode(backend, config, () => {
-				this.ln = new Backend(config);
-				this.ln.mock = mock || null;
-			});
-			config = mock.config;
-		} else {
-			this.ln = new Backend(config);
+		if (this.options.lightning) {
+			this.prepareLightningBackend(this.options.lightning).then(ln => {
+				this.ln = ln;
+			}).catch(debug.error);
 		}
 	};
 
+	Server.prototype.prepareLightningBackend = function(options) {
+		return new Promise((resolve, reject) => {
+			try {
+				const { backend } = options;
+				let backendPath;
+				if (_.isString(backend)) {
+					backendPath = path.join(__dirname, 'lightning', backend);
+				} else if (_.isObject(backend)) {
+					if (!backend.path) {
+						throw new Error('Invalid option ("lightning.backend"): Missing required property "path"');
+					}
+					if (options.mock) {
+						throw new Error('Invalid option ("lightning.backend"): Cannot use mock flag with custom backend');
+					}
+					backendPath = backend.path;
+				} else {
+					throw new Error('Invalid option ("lightning.backend"): String or object expected');
+				}
+				let { config } = options;
+				const Backend = require(backendPath);
+				if (options.mock) {
+					const mock = this.prepareMockLightningNode(backend, config, () => {
+						let ln = new Backend(mock.config);
+						ln.mock = mock || null;
+						resolve(ln);
+					});
+					this.mocks = this.mocks || [];
+					this.mocks.push(mock);
+				} else {
+					const ln = new Backend(config);
+					return resolve(ln);
+				}
+			} catch (error) {
+				return reject(error);
+			}
+		});
+	};
+
 	Server.prototype.prepareMockLightningNode = function(backend, options, done) {
-		if (!_.isString(backend)) {
-			throw new Error('Invalid argument ("backend"): String expected.');
+		if (!_.isString(backend) && !_.isObject(backend)) {
+			throw new Error('Invalid argument ("backend"): String or object expected.');
 		}
 		if (_.isFunction(options)) {
 			done = options;
@@ -817,6 +857,14 @@ module.exports = function(lnurl) {
 		const Mock = require(path.join(__dirname, '..', 'mocks', 'lightning', backend));
 		const mock = new Mock(options, done);
 		return mock;
+	};
+
+	Server.prototype.destroyMockLightningNodes = function(done) {
+		if (!this.mocks) return done();
+		async.each(this.mocks, function(mock, next) {
+			mock.close(next);
+		}, done);
+		this.mocks = [];
 	};
 
 	Server.prototype.deepClone = function(data) {
@@ -851,8 +899,7 @@ module.exports = function(lnurl) {
 					});
 				},
 				next => {
-					if (!this.ln || !this.ln.mock) return next();
-					this.ln.mock.close(next);
+					this.destroyMockLightningNodes(next);
 				},
 			], error => {
 				if (error) {
