@@ -2,8 +2,8 @@ const _ = require('underscore');
 const async = require('async');
 const bodyParser = require('body-parser');
 const debug = {
-	info: require('debug')('lnurl:mock:eclair:info'),
-	error: require('debug')('lnurl:mock:eclair:error'),
+	info: require('debug')('lnurl:mock:lnd:info'),
+	error: require('debug')('lnurl:mock:lnd:error'),
 };
 const express = require('express');
 const fs = require('fs');
