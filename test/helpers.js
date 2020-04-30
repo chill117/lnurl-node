@@ -14,16 +14,16 @@ const secp256k1 = require('secp256k1');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
-let ln;
-
 module.exports = {
-	lnurl: lnurl,
 	tmpDir: tmpDir,
 	createServer: function(options) {
 		options = _.defaults(options || {}, {
 			host: 'localhost',
 			port: 3000,
-			lightning: _.pick(ln, 'backend', 'config'),
+			lightning: {
+				backend: process.env.LNURL_LIGHTNING_BACKEND || 'lnd',
+				config: {},
+			},
 			tls: {
 				certPath: path.join(tmpDir, 'tls.cert'),
 				keyPath: path.join(tmpDir, 'tls.key'),
@@ -43,7 +43,11 @@ module.exports = {
 		return server;
 	},
 	prepareMockLightningNode: function(backend, options, done) {
-		if (_.isFunction(options)) {
+		if (_.isFunction(backend)) {
+			done = backend;
+			options = null;
+			backend = process.env.LNURL_LIGHTNING_BACKEND || 'lnd';
+		} else if (_.isFunction(options)) {
 			done = options;
 			options = null;
 		}
@@ -80,7 +84,6 @@ module.exports = {
 				throw new Error(`Expected ${total} requests of type: "${type}"`);
 			}
 		};
-		ln = mock;
 		return mock;
 	},
 	prepareSignedRequest: function(apiKey, tag, params, overrides) {

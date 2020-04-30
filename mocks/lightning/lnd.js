@@ -43,6 +43,7 @@ module.exports = function(options, done) {
 	options.nodePrivateKey = nodePrivateKey;
 	const app = new express();
 	const macaroon = lnurl.Server.prototype.generateRandomKey();
+	app.options = options;
 	app.config = {
 		hostname: options.hostname,
 		cert: options.certPath,

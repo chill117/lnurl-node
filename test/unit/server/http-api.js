@@ -15,37 +15,47 @@ describe('Server: HTTP API', function() {
 		withdrawRequest: 'payinvoice',
 	};
 
-	beforeEach(function() {
-		this.ln.resetRequestCounters();
+	let mock;
+	before(function(done) {
+		mock = this.helpers.prepareMockLightningNode(done);
 	});
 
+	after(function(done) {
+		if (!mock) return done();
+		mock.close(done);
+	});
+
+	beforeEach(function() {
+		mock.resetRequestCounters();
+	});
+
+	let server, apiKeys;
 	before(function(done) {
 		try {
-			const apiKeys = [
+			apiKeys = [
 				lnurl.generateApiKey(),
 				lnurl.generateApiKey({
 					encoding: 'base64',
 				}),
 			];
-			this.apiKeys = apiKeys;
-			this.server = helpers.createServer({
+			server = helpers.createServer({
 				auth: {
 					apiKeys: apiKeys,
 				},
 				lightning: {
-					backend: this.ln.backend,
-					config: this.ln.config,
+					backend: mock.backend,
+					config: mock.config,
 				},
 			});
-			this.server.once('error', done);
-			this.server.once('listening', done);
+			server.once('error', done);
+			server.once('listening', done);
 		} catch (error) {
 			return done(error);
 		}
 	});
 
 	after(function() {
-		if (this.server) return this.server.close();
+		if (server) return server.close();
 	});
 
 	describe('GET /lnurl', function() {
@@ -105,7 +115,7 @@ describe('Server: HTTP API', function() {
 		it('missing secret', function(done) {
 			helpers.request('get', {
 				url: 'https://localhost:3000/lnurl',
-				ca: this.server.ca,
+				ca: server.ca,
 				qs: {},
 				json: true,
 			}, function(error, response, body) {
@@ -131,7 +141,7 @@ describe('Server: HTTP API', function() {
 				const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
 				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
+					ca: server.ca,
 					qs: query,
 					json: true,
 				}, (error, response, body) => {
@@ -151,13 +161,13 @@ describe('Server: HTTP API', function() {
 			it('query tampering', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const apiKey = this.apiKeys[0];
+				const apiKey = apiKeys[0];
 				const query = helpers.prepareSignedRequest(apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
 				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
+					ca: server.ca,
 					qs: query,
 					json: true,
 				}, (error, response, body) => {
@@ -178,13 +188,13 @@ describe('Server: HTTP API', function() {
 				it(`missing "${field}"`, function(done) {
 					const tag = 'channelRequest';
 					const params = prepareValidParams('create', tag);
-					const apiKey = this.apiKeys[0];
+					const apiKey = apiKeys[0];
 					let overrides = {};
 					overrides[field] = '';
 					const query = helpers.prepareSignedRequest(apiKey, tag, params, overrides);
 					helpers.request('get', {
 						url: 'https://localhost:3000/lnurl',
-						ca: this.server.ca,
+						ca: server.ca,
 						qs: query,
 						json: true,
 					}, (error, response, body) => {
@@ -205,7 +215,7 @@ describe('Server: HTTP API', function() {
 			it('out-of-order query string', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const apiKey = this.apiKeys[0];
+				const apiKey = apiKeys[0];
 				let query = _.extend({
 					n: helpers.generateNonce(10),
 					tag: tag,
@@ -222,7 +232,7 @@ describe('Server: HTTP API', function() {
 				}, params);
 				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
+					ca: server.ca,
 					qs: outOfOrderQuery,
 					json: true,
 				}, (error, response, body) => {
@@ -242,7 +252,7 @@ describe('Server: HTTP API', function() {
 			it('shortened query', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const apiKey = this.apiKeys[0];
+				const apiKey = apiKeys[0];
 				let query = {
 					id: apiKey.id,
 					n: helpers.generateNonce(10),
@@ -254,8 +264,8 @@ describe('Server: HTTP API', function() {
 				const signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
 				query.s = signature;
 				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
+					url: server.getCallbackUrl(),
+					ca: server.ca,
 					qs: query,
 					json: true,
 				}, (error, response, body) => {
@@ -283,11 +293,11 @@ describe('Server: HTTP API', function() {
 					describe(tag, function() {
 						before(function(done) {
 							const params = prepareValidParams('create', tag);
-							const apiKey = this.apiKeys[0];
+							const apiKey = apiKeys[0];
 							const query = this.query = helpers.prepareSignedRequest(apiKey, tag, params);
 							helpers.request('get', {
-								url: 'https://localhost:3000/lnurl',
-								ca: this.server.ca,
+								url: server.getCallbackUrl(),
+								ca: server.ca,
 								qs: query,
 								json: true,
 							}, (error, response, body) => {
@@ -305,7 +315,7 @@ describe('Server: HTTP API', function() {
 						it(`reusable = ${reusable}`, function(done) {
 							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.server.ca,
+								ca: server.ca,
 								qs: this.query,
 								json: true,
 							}, (error, response, body) => {
@@ -372,7 +382,7 @@ describe('Server: HTTP API', function() {
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('channelRequest');
 							expect(body.callback).to.equal('https://localhost:3000/lnurl');
-							expect(body.uri).to.equal(this.ln.config.nodeUri);
+							expect(body.uri).to.equal(mock.config.nodeUri);
 						},
 					},
 				];
@@ -613,11 +623,11 @@ describe('Server: HTTP API', function() {
 								} else {
 									params = test.params;
 								}
-								const apiKey = this.apiKeys[0];
+								const apiKey = apiKeys[0];
 								const query = helpers.prepareSignedRequest(apiKey, tag, params);
 								helpers.request('get', {
 									url: 'https://localhost:3000/lnurl',
-									ca: this.server.ca,
+									ca: server.ca,
 									qs: query,
 									json: true,
 								}, (error, response, body) => {
@@ -638,11 +648,11 @@ describe('Server: HTTP API', function() {
 											break;
 										default:
 											const { id, s } = query;
-											secret = this.server.hash(`${id}-${s}`);
+											secret = server.hash(`${id}-${s}`);
 											break;
 									}
-									const hash = this.server.hash(secret);
-									this.server.fetchUrl(hash).then(result => {
+									const hash = server.hash(secret);
+									server.fetchUrl(hash).then(result => {
 										if (body.status === 'ERROR' && tag !== 'login') {
 											expect(result).to.equal(null);
 										} else {
@@ -664,7 +674,7 @@ describe('Server: HTTP API', function() {
 			it('invalid secret', function(done) {
 				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
+					ca: server.ca,
 					qs: {
 						q: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
@@ -692,7 +702,7 @@ describe('Server: HTTP API', function() {
 							k1: this.secret,
 							tag: 'channelRequest',
 							callback: 'https://localhost:3000/lnurl',
-							uri: this.ln.config.nodeUri,
+							uri: mock.config.nodeUri,
 						});
 					},
 				},
@@ -735,7 +745,7 @@ describe('Server: HTTP API', function() {
 					beforeEach(function() {
 						this.secret = null;
 						const params = prepareValidParams('create', tag);
-						return this.server.generateNewUrl(tag, params).then(result => {
+						return server.generateNewUrl(tag, params).then(result => {
 							this.secret = result.secret;
 						});
 					});
@@ -743,7 +753,7 @@ describe('Server: HTTP API', function() {
 						it(test.description, function(done) {
 							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.server.ca,
+								ca: server.ca,
 								qs: {
 									q: this.secret,
 								},
@@ -772,7 +782,7 @@ describe('Server: HTTP API', function() {
 			it('invalid secret', function(done) {
 				helpers.request('get', {
 					url: 'https://localhost:3000/lnurl',
-					ca: this.server.ca,
+					ca: server.ca,
 					qs: {
 						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
@@ -808,7 +818,7 @@ describe('Server: HTTP API', function() {
 						expect(body).to.deep.equal({
 							status: 'OK',
 						});
-						this.ln.expectNumRequestsToEqual('payinvoice', 1);
+						mock.expectNumRequestsToEqual('payinvoice', 1);
 					},
 				},
 				{
@@ -822,7 +832,7 @@ describe('Server: HTTP API', function() {
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({ status: 'OK' });
-						this.ln.expectNumRequestsToEqual('payinvoice', 3);
+						mock.expectNumRequestsToEqual('payinvoice', 3);
 					},
 				},
 				{
@@ -858,7 +868,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
-						this.ln.expectNumRequestsToEqual('payinvoice', 0);
+						mock.expectNumRequestsToEqual('payinvoice', 0);
 					},
 				},
 				{
@@ -875,7 +885,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
 						});
-						this.ln.expectNumRequestsToEqual('payinvoice', 0);
+						mock.expectNumRequestsToEqual('payinvoice', 0);
 					},
 				},
 			];
@@ -890,7 +900,7 @@ describe('Server: HTTP API', function() {
 						const purposeCommitHashTagData = helpers.getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
 						const { metadata } = validParams.create.payRequest;
 						expect(purposeCommitHashTagData).to.equal(lnurl.Server.prototype.hash(Buffer.from(metadata, 'utf8')));
-						this.ln.expectNumRequestsToEqual('addinvoice', 1);
+						mock.expectNumRequestsToEqual('addinvoice', 1);
 					},
 				},
 				{
@@ -903,7 +913,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount must be greater than or equal to "minSendable"',
 						});
-						this.ln.expectNumRequestsToEqual('addinvoice', 0);
+						mock.expectNumRequestsToEqual('addinvoice', 0);
 					},
 				},
 				{
@@ -916,7 +926,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount must be less than or equal to "maxSendable"',
 						});
-						this.ln.expectNumRequestsToEqual('addinvoice', 0);
+						mock.expectNumRequestsToEqual('addinvoice', 0);
 					},
 				},
 			];
@@ -985,7 +995,7 @@ describe('Server: HTTP API', function() {
 					beforeEach(function() {
 						this.secret = null;
 						const params = prepareValidParams('create', tag);
-						return this.server.generateNewUrl(tag, params).then(result => {
+						return server.generateNewUrl(tag, params).then(result => {
 							this.secret = result.secret;
 						});
 					});
@@ -1003,7 +1013,7 @@ describe('Server: HTTP API', function() {
 							});
 							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.server.ca,
+								ca: server.ca,
 								qs: params,
 								json: true,
 							}, (error, response, body) => {
@@ -1040,13 +1050,13 @@ describe('Server: HTTP API', function() {
 						beforeEach(function() {
 							this.secret = null;
 							const params = prepareValidParams('create', tag);
-							return this.server.generateNewUrl(tag, params).then(result => {
+							return server.generateNewUrl(tag, params).then(result => {
 								this.secret = result.secret;
 							});
 						});
 						beforeEach(function() {
 							if (requestType) {
-								this.ln.expectNumRequestsToEqual(requestType, 0);
+								mock.expectNumRequestsToEqual(requestType, 0);
 							}
 						});
 						beforeEach(function(done) {
@@ -1055,7 +1065,7 @@ describe('Server: HTTP API', function() {
 							});
 							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.server.ca,
+								ca: server.ca,
 								qs: this.query,
 								json: true,
 							}, (error, response, body) => {
@@ -1064,7 +1074,7 @@ describe('Server: HTTP API', function() {
 									expect(body).to.be.an('object');
 									expect(body.status).to.not.equal('ERROR');
 									if (requestType) {
-										this.ln.expectNumRequestsToEqual(requestType, 1);
+										mock.expectNumRequestsToEqual(requestType, 1);
 									}
 								} catch (error) {
 									return done(error);
@@ -1075,7 +1085,7 @@ describe('Server: HTTP API', function() {
 						it(`reusable = ${reusable}`, function(done) {
 							helpers.request('get', {
 								url: 'https://localhost:3000/lnurl',
-								ca: this.server.ca,
+								ca: server.ca,
 								qs: this.query,
 								json: true,
 							}, (error, response, body) => {
@@ -1085,7 +1095,7 @@ describe('Server: HTTP API', function() {
 										expect(body).to.be.an('object');
 										expect(body.status).to.not.equal('ERROR');
 										if (requestType) {
-											this.ln.expectNumRequestsToEqual(requestType, 2);
+											mock.expectNumRequestsToEqual(requestType, 2);
 										}
 									} else {
 										expect(body).to.deep.equal({
@@ -1093,7 +1103,7 @@ describe('Server: HTTP API', function() {
 											reason: 'Already used',
 										});
 										if (requestType) {
-											this.ln.expectNumRequestsToEqual(requestType, 1);
+											mock.expectNumRequestsToEqual(requestType, 1);
 										}
 									}
 								} catch (error) {

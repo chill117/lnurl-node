@@ -13,14 +13,6 @@ before(function(done) {
 	fs.mkdir(this.tmpDir, { recursive: true }, done);
 });
 
-before(function(done) {
-	this.ln = this.helpers.prepareMockLightningNode(process.env.LNURL_LIGHTNING_BACKEND || 'lnd', done);
-});
-
-after(function(done) {
-	this.ln.close(done);
-});
-
 after(function(done) {
 	fs.remove(this.tmpDir, done);
 });

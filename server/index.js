@@ -64,7 +64,7 @@ module.exports = function(lnurl) {
 			},
 		},
 		/*
-			Set equal to NULL not configure LN backend at the server-wide level.
+			Set equal to NULL to not configure LN backend at the server-wide level.
 		*/
 		lightning: {
 			// Which LN backend to use (only lnd supported currently):

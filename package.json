@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npm run test:unit",
-    "test:unit": "./node_modules/.bin/mocha ./test/unit/*.js ./test/unit/**/*.js"
+    "test:unit": "./node_modules/.bin/mocha --recursive ./test/unit"
   },
   "bin": {
     "lnurl": "cli.js"

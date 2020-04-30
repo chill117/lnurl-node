@@ -21,6 +21,8 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [decode](#decode)
   * [createServer](#createServer)
     * [options](#options-for-createserver-method)
+    * [Lightning Backend Configuration Options](#lightning-backend-configuration-options)
+    * [Custom Lightning Backend](#custom-lightning-backend)
   * [generateApiKey](#generateapikey)
 * [Hooks](#hooks)
   * [Login Hook](#login-hook)
@@ -331,12 +333,18 @@ const server = lnurl.createServer({
 		apiKeys: [],
 	},
 	apiKey: {
+		// Encoding for generated API keys ('hex', 'base64', etc):
 		encoding: 'hex',
 		numBytes: {
+			// Number of random bytes for API key ID:
 			id: 5,
+			// Number of random bytes for API key secret:
 			key: 32,
 		},
 	},
+	/*
+		Set equal to NULL to not configure LN backend at the server-wide level.
+	*/
 	lightning: {
 		// Which LN backend to use (only lnd supported currently):
 		backend: 'lnd',
@@ -344,7 +352,7 @@ const server = lnurl.createServer({
 		config: {
 			// Defaults here depend on the LN backend used.
 		},
-		// Whether or not to create a mock instance of the LN backend:
+		// Whether or not to create a mock instance of the LN backend.
 		mock: false,
 	},
 	tls: {
@@ -360,11 +368,75 @@ const server = lnurl.createServer({
 		days: 3650,
 	},
 	store: {
+		// Name of store backend ('knex', 'memory', 'redis'):
 		backend: 'memory',
+		// Configuration options to pass to store:
 		config: {},
 	},
 }
 ```
+
+#### Lightning Backend Configuration Options
+
+This module supports lnd, eclair, and c-lightning as Lightning Network backends.
+
+Configuration options for __lnd__ backend:
+```js
+{
+	// ...
+	lightning: {
+		backend: 'lnd',
+		config: {
+			hostname: '127.0.0.1:8080',
+			/*
+				Can alternatively provide cert as Buffer or String:
+					cert: { data: 'STRING_UTF8_ENCODED' },
+					cert: { data: Buffer.from('STRING_UTF8_ENCODED', 'utf8') },
+			*/
+			cert: '/path/to/lnd/tls.cert',
+			/*
+				Can alternatively provide macaroon as Buffer or String:
+					macaroon: { data: 'STRING_HEX_ENCODED' },
+					macaroon: { data: Buffer.from('STRING_HEX_ENCODED', 'hex') },
+			*/
+			macaroon: '/path/to/lnd/admin.macaroon',
+		},
+	},
+	// ...
+}
+```
+
+Configuration options for __eclair__ backend:
+```js
+{
+	// ...
+	lightning: {
+		backend: 'eclair',
+		config: {
+			hostname: '127.0.0.1:8080',
+			password: 'API_PW_FOR_ECLAIR_NODE',
+			protocol: 'http',
+		},
+	},
+	// ...
+}
+```
+
+Configuration options for __c-lightning__ backend:
+```js
+{
+	// ...
+	lightning: {
+		backend: 'c-lightning',
+		config: {
+			nodeUri: 'PUBKEY@127.0.0.1:9735',
+			socket: '/path/to/c-lightning/unix/sock',
+		},
+	},
+	// ...
+}
+```
+
 
 #### Custom Lightning Backend
 

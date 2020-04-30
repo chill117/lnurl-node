@@ -13,15 +13,55 @@ class Backend extends LightningBackend {
 				hostname: '127.0.0.1:8080',
 				cert: null,
 				macaroon: null,
+				protocol: 'https',
 			},
 			requiredOptions: ['hostname', 'cert', 'macaroon'],
 		});
+		this.prepareCertAndMacaroon();
 	}
 
 	checkOptions(options) {
-		const { cert, macaroon } = options;
-		fs.statSync(cert);
-		fs.statSync(macaroon);
+		if (_.isString(options.cert)) {
+			fs.statSync(options.cert);
+		} else if (_.isObject(options.cert)) {
+			if (!options.cert.data || (!_.isString(options.cert.data) && !Buffer.isBuffer(options.cert.data))) {
+				throw new Error('Invalid option ("cert"): Expected { data: Buffer/String }');
+			}
+		} else {
+			throw new Error('Invalid option ("cert"): Object or string expected');
+		}
+		if (_.isString(options.macaroon)) {
+			fs.statSync(options.macaroon);
+		} else if (_.isObject(options.macaroon)) {
+			if (!options.macaroon.data || (!_.isString(options.macaroon.data) && !Buffer.isBuffer(options.macaroon.data))) {
+				throw new Error('Invalid option ("macaroon"): Expected { data: Buffer/String }');
+			}
+		} else {
+			throw new Error('Invalid option ("cert"): Object or string expected');
+		}
+	}
+
+	prepareCertAndMacaroon() {
+		const options = this.options;
+		let cert, macaroon;
+		if (_.isString(options.cert)) {
+			cert = fs.readFileSync(options.cert).toString('utf8');
+		} else {
+			cert = options.cert.data;
+			if (Buffer.isBuffer(cert)) {
+				cert = cert.toString('utf8');
+			}
+		}
+		if (_.isString(options.macaroon)) {
+			macaroon = fs.readFileSync(options.macaroon).toString('hex');
+		} else {
+			macaroon = options.macaroon.data;
+			if (Buffer.isBuffer(macaroon)) {
+				macaroon = macaroon.toString('hex');
+			}
+		}
+		this.cert = cert;
+		this.macaroon = macaroon;
 	}
 
 	getNodeUri() {
@@ -111,67 +151,52 @@ class Backend extends LightningBackend {
 		if (!_.isObject(data)) {
 			throw new Error('Invalid argument ("data"): Object expected');
 		}
-		return this.getCertAndMacaroon().then(results => {
-			const { cert, macaroon } = results;
-			let { hostname } = this.options;
-			const parsedUrl = url.parse(`https://${hostname}${uri}`);
-			let options = {
-				method: method.toUpperCase(),
-				hostname: parsedUrl.hostname,
-				port: parsedUrl.port,
-				path: parsedUrl.path,
-				headers: {
-					'Grpc-Metadata-macaroon': macaroon,
-				},
-				ca: cert,
-			};
-			if (!_.isEmpty(data)) {
-				data = JSON.stringify(data);
-				options.headers['Content-Type'] = 'application/json';
-				options.headers['Content-Length'] = Buffer.byteLength(data);
-			}
-			return new Promise((resolve, reject) => {
-				const done = _.once(function(error, result) {
-					if (error) return reject(error);
-					resolve(result);
-				});
-				const req = https.request(options, function(res) {
-					let body = '';
-					res.on('data', function(buffer) {
-						body += buffer.toString();
-					});
-					res.on('end', function() {
-						if (res.statusCode >= 300) {
-							const status = res.statusCode;
-							return done(new Error(`Unexpected response from LN backend: HTTP_${status}_ERROR`));
-						}
-						try {
-							body = JSON.parse(body);
-						} catch (error) {
-							return done(new Error('Unexpected response format from LN backend: JSON data expected'));
-						}
-						done(null, body);
-					});
-				});
-				req.once('error', done);
-				if (!_.isEmpty(data)) {
-					req.write(data);
-				}
-				req.end();
-			});
-		});
-	}
-
-	getCertAndMacaroon() {
+		const { cert, macaroon } = this;
+		let { hostname, protocol } = this.options;
+		const parsedUrl = url.parse(`${protocol}://${hostname}${uri}`);
+		let options = {
+			method: method.toUpperCase(),
+			hostname: parsedUrl.hostname,
+			port: parsedUrl.port,
+			path: parsedUrl.path,
+			headers: {
+				'Grpc-Metadata-macaroon': macaroon,
+			},
+			ca: cert,
+		};
+		if (!_.isEmpty(data)) {
+			data = JSON.stringify(data);
+			options.headers['Content-Type'] = 'application/json';
+			options.headers['Content-Length'] = Buffer.byteLength(data);
+		}
 		return new Promise((resolve, reject) => {
-			const { cert, macaroon } = this.options;
-			async.parallel({
-				cert: fs.readFile.bind(fs, cert, 'utf8'),
-				macaroon: fs.readFile.bind(fs, macaroon, 'hex'),
-			}, (error, results) => {
+			const done = _.once(function(error, result) {
 				if (error) return reject(error);
-				resolve(results);
+				resolve(result);
 			});
+			const req = https.request(options, function(res) {
+				let body = '';
+				res.on('data', function(buffer) {
+					body += buffer.toString();
+				});
+				res.on('end', function() {
+					if (res.statusCode >= 300) {
+						const status = res.statusCode;
+						return done(new Error(`Unexpected response from LN backend: HTTP_${status}_ERROR`));
+					}
+					try {
+						body = JSON.parse(body);
+					} catch (error) {
+						return done(new Error('Unexpected response format from LN backend: JSON data expected'));
+					}
+					done(null, body);
+				});
+			});
+			req.once('error', done);
+			if (!_.isEmpty(data)) {
+				req.write(data);
+			}
+			req.end();
 		});
 	}
 };

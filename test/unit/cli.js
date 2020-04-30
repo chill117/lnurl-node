@@ -169,8 +169,18 @@ describe('Command-line interface', function() {
 			keyPath = path.join(this.tmpDir, 'tls.key');
 		});
 
+		let mock;
+		before(function(done) {
+			mock = this.helpers.prepareMockLightningNode(done);
+		});
+
+		after(function(done) {
+			if (!mock) return done();
+			mock.close(done);
+		});
+
 		beforeEach(function() {
-			this.ln.resetRequestCounters();
+			mock.resetRequestCounters();
 		});
 
 		beforeEach(function(done) {
@@ -193,8 +203,8 @@ describe('Command-line interface', function() {
 						'--host', 'localhost',
 						'--port', '3000',
 						'--auth.apiKeys', JSON.stringify(apiKeys),
-						'--lightning.backend', this.ln.backend,
-						'--lightning.config', JSON.stringify(this.ln.config),
+						'--lightning.backend', mock.backend,
+						'--lightning.config', JSON.stringify(mock.config),
 						'--tls.certPath', certPath,
 						'--tls.keyPath', keyPath,
 						'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
@@ -230,7 +240,7 @@ describe('Command-line interface', function() {
 										expect(body.k1).to.be.a('string');
 										expect(body.tag).to.equal(tag);
 										expect(body.callback).to.equal('https://localhost:3000/lnurl');
-										expect(body.uri).to.equal(this.ln.config.nodeUri);
+										expect(body.uri).to.equal(mock.config.nodeUri);
 									} catch (error) {
 										return next(error);
 									}
@@ -253,8 +263,8 @@ describe('Command-line interface', function() {
 							apiKeys: apiKeys,
 						},
 						lightning: {
-							backend: this.ln.backend,
-							config: this.ln.config,
+							backend: mock.backend,
+							config: mock.config,
 						},
 						store: {
 							backend: process.env.LNURL_STORE_BACKEND || 'memory',
