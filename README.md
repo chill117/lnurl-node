@@ -463,27 +463,19 @@ class Backend extends LightningBackend {
 	}
 
 	getNodeUri() {
-		return new Promise((resolve, reject) => {
-			resolve(this.options.nodeUri);
-		});
+		return Promise.resolve(this.options.nodeUri);
 	}
 
 	openChannel(remoteId, localAmt, pushAmt, makePrivate) {
-		return new Promise((resolve, reject) => {
-			resolve();
-		});
+		return Promise.reject('Not implemented');
 	}
 
 	payInvoice(invoice) {
-		return new Promise((resolve, reject) => {
-			resolve();
-		});
+		return Promise.reject('Not implemented');
 	}
 
 	addInvoice(amount, extra) {
-		return new Promise((resolve, reject) => {
-			resolve();
-		});
+		return Promise.reject('Not implemented');
 	}
 }
 
