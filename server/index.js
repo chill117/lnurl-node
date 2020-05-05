@@ -162,7 +162,8 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.getApiKey = function(id) {
-		return this.apiKeys.get(id) || null;
+		const apiKey = this.apiKeys.get(id) || null;
+		return Promise.resolve(apiKey);
 	};
 
 	Server.prototype.getTlsCertificate = function() {
@@ -328,12 +329,13 @@ module.exports = function(lnurl) {
 					const payload = querystring.stringify(_.omit(req.originalQuery, 's'));
 					const { s, id } = req.query;
 					// Check that the query string is signed by an authorized API key.
-					if (!this.isValidSignature(payload, s, id)) {
-						// Invalid signature.
-						return next(new HttpError('Invalid API key signature', 403));
-					}
-					// Valid signature.
-					next();
+					return this.isValidSignature(payload, s, id).then(isValid => {
+						if (!isValid) {
+							return next(new HttpError('Invalid API key signature', 403));
+						}
+						// Valid signature.
+						next();
+					}).catch(next);
 				},
 				afterCheckSignature: this.getHook('middleware:signedLnurl:afterCheckSignature'),
 				createUrl: (req, res, next) => {
@@ -476,11 +478,12 @@ module.exports = function(lnurl) {
 	};
 
 	Server.prototype.isValidSignature = function(payload, signature, id) {
-		const apiKey = this.getApiKey(id);
-		if (!apiKey) return false;
-		const { key } = apiKey;
-		const expected = this.createSignature(payload, key);
-		return signature === expected;
+		return this.getApiKey(id).then(apiKey => {
+			if (!apiKey) return false;
+			const { key } = apiKey;
+			const expected = this.createSignature(payload, key);
+			return signature === expected;
+		});
 	};
 
 	Server.prototype.createSignature = function(data, key, algorithm) {
@@ -583,15 +586,17 @@ module.exports = function(lnurl) {
 			if (!_.isString(apiKeyId)) {
 				throw new Error('Invalid argument ("apiKeyId"): String expected.');
 			}
-			const apiKey = this.getApiKey(apiKeyId);
-			if (!apiKey) {
-				throw new HttpError('Unknown API key', 400);
-			}
-			if (apiKey.lightning) {
-				return this.prepareLightningBackend(apiKey.lightning).then(ln => {
-					return _.extend({}, this, { ln });
-				});
-			}
+			return this.getApiKey(apiKeyId).then(apiKey => {
+				if (!apiKey) {
+					throw new HttpError('Unknown API key', 400);
+				}
+				if (apiKey.lightning) {
+					return this.prepareLightningBackend(apiKey.lightning).then(ln => {
+						return _.extend({}, this, { ln });
+					});
+				}
+				return this;
+			});
 		}
 		return Promise.resolve(this);
 	};
