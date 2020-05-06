@@ -1,6 +1,6 @@
 {
   "name": "lnurl",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Node.js implementation of lnurl",
   "main": "index.js",
   "scripts": {
@@ -14,6 +14,12 @@
     "type": "git",
     "url": "git+https://github.com/chill117/lnurl-node.git"
   },
+  "keywords": [
+    "lnurl",
+    "bitcoin",
+    "lightning",
+    "lightning network"
+  ],
   "author": {
     "name": "Charles Hill",
     "email": "chill@degreesofzero.com"
