@@ -912,6 +912,7 @@ module.exports = function(lnurl) {
 					return reject(error);
 				}
 				this.state = 'closed';
+				this.emit('closed');
 				resolve();
 			});
 		});
