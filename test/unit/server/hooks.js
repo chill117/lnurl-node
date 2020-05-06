@@ -9,27 +9,29 @@ describe('Server: hooks', function() {
 
 	describe('login', function() {
 
+		let server;
 		beforeEach(function() {
-			this.server = this.helpers.createServer({
+			server = this.helpers.createServer({
 				protocol: 'http',
 				listen: false,
 			});
 		});
 
 		afterEach(function() {
-			if (this.server) return this.server.close();
+			if (server) return server.close();
 		});
 
+		let secret;
 		beforeEach(function() {
-			this.secret = null;
-			return this.server.generateNewUrl('login', {}).then(result => {
-				this.secret = result.secret;
+			secret = null;
+			return server.generateNewUrl('login', {}).then(result => {
+				secret = result.secret;
 			});
 		});
 
 		it('successful login', function(done) {
 			const { pubKey, privKey } = helpers.generateLinkingKey();
-			const k1 = Buffer.from(this.secret, 'hex');
+			const k1 = Buffer.from(secret, 'hex');
 			const { signature } = secp256k1.sign(k1, privKey);
 			const derEncodedSignature = secp256k1.signatureExport(signature);
 			const params = {
@@ -37,7 +39,7 @@ describe('Server: hooks', function() {
 				key: pubKey.toString('hex'),
 			};
 			let calls = 0;
-			this.server.bindToHook('login', function(key, next) {
+			server.bindToHook('login', function(key, next) {
 				calls++;
 				try {
 					expect(key).to.be.a('string');
@@ -47,7 +49,7 @@ describe('Server: hooks', function() {
 					return done(error);
 				}
 			});
-			this.server.bindToHook('login', function(key, next) {
+			server.bindToHook('login', function(key, next) {
 				calls++;
 				try {
 					expect(calls).to.equal(2);
@@ -57,17 +59,19 @@ describe('Server: hooks', function() {
 				}
 				done();
 			});
-			this.server.runSubProtocol('login', 'action', this.secret, params).catch(done);
+			server.runSubProtocol('login', 'action', secret, params).catch(done);
 		});
 	});
 
 	describe('middleware:signedLnurl:afterCheckSignature', function() {
 
+		let apiKey;
 		beforeEach(function(done) {
-			const apiKey = this.apiKey = lnurl.generateApiKey();
-			const server = this.server = this.helpers.createServer({
+			done = _.once(done);
+			apiKey = lnurl.generateApiKey();
+			server = this.helpers.createServer({
 				auth: {
-					apiKeys: [apiKey],
+					apiKeys: [ apiKey ],
 				},
 			});
 			server.once('error', done);
@@ -75,7 +79,7 @@ describe('Server: hooks', function() {
 		});
 
 		afterEach(function() {
-			if (this.server) return this.server.close();
+			if (server) return server.close();
 		});
 
 		const tag = 'channelRequest';
@@ -89,7 +93,7 @@ describe('Server: hooks', function() {
 			const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
 			this.helpers.request('get', {
 				url: 'https://localhost:3000/lnurl',
-				ca: this.server.ca,
+				ca: server.ca,
 				qs: query,
 				json: true,
 			}, (error, response, body) => {
@@ -104,17 +108,17 @@ describe('Server: hooks', function() {
 				}
 				done();
 			});
-			this.server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
+			server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
 				done(new Error('Should not execute hook callbacks'));
 			});
 		});
 
 		it('valid authorization signature', function(done) {
 			done = _.once(done);
-			const query = this.helpers.prepareSignedRequest(this.apiKey, tag, params);
+			const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
 			this.helpers.request('get', {
 				url: 'https://localhost:3000/lnurl',
-				ca: this.server.ca,
+				ca: server.ca,
 				qs: query,
 				json: true,
 			}, (error, response, body) => {
@@ -130,7 +134,7 @@ describe('Server: hooks', function() {
 				}
 				done();
 			});
-			this.server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
+			server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
 				try {
 					expect(req).to.be.an('object');
 					expect(res).to.be.an('object');
@@ -141,7 +145,7 @@ describe('Server: hooks', function() {
 					return done(error);
 				}
 			});
-			this.server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
+			server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
 				try {
 					expect(req).to.be.an('object');
 					expect(res).to.be.an('object');
@@ -152,7 +156,7 @@ describe('Server: hooks', function() {
 					return done(error);
 				}
 			});
-			this.server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
+			server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
 				done(new Error('Should not execute further hook callbacks after next invoked with an error'));
 			});
 		});
