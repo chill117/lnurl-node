@@ -58,7 +58,7 @@ module.exports = function(options, done) {
 	});
 	app.use(bodyParser.json());
 	app.get('/v1/getinfo', (req, res, next) => {
-		app.requestCounters.getinfo++;
+		app.requestCounters && app.requestCounters.getinfo++;
 		res.json({
 			identity_pubkey: nodePublicKey,
 			alias: 'lnd-testnet',
@@ -67,7 +67,7 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/v1/channels', (req, res, next) => {
-		app.requestCounters.openchannel++;
+		app.requestCounters && app.requestCounters.openchannel++;
 		res.json({
 			output_index: 0,
 			funding_txid_bytes: null,
@@ -75,7 +75,7 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/v1/channels/transactions', (req, res, next) => {
-		app.requestCounters.payinvoice++;
+		app.requestCounters && app.requestCounters.payinvoice++;
 		const preimage = lnurl.Server.prototype.generateRandomKey();
 		res.json({
 			payment_preimage: preimage,
@@ -85,7 +85,7 @@ module.exports = function(options, done) {
 		});
 	});
 	app.post('/v1/invoices', (req, res, next) => {
-		app.requestCounters.addinvoice++;
+		app.requestCounters && app.requestCounters.addinvoice++;
 		const { value } = req.body;
 		const descriptionHash = Buffer.from(req.body.description_hash, 'base64').toString('hex');
 		const pr = generatePaymentRequest(value, { descriptionHash }, options);
