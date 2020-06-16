@@ -77,6 +77,9 @@ class Backend extends LightningBackend {
 			push_sat: pushAmt,
 			private: makePrivate,
 		}).then(result => {
+			if (result.funding_txid_bytes) {
+				result.funding_txid_str = Buffer.from(result.funding_txid_bytes, 'base64').toString('hex');
+			}
 			if (_.isUndefined(result.output_index) || !_.isNumber(result.output_index)) {
 				throw new Error('Unexpected response from LN Backend [POST /v1/channels]: Missing "output_index"');
 			}

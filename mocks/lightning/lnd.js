@@ -57,47 +57,62 @@ module.exports = function(options, done) {
 		next();
 	});
 	app.use(bodyParser.json());
-	app.get('/v1/getinfo', (req, res, next) => {
+	app.get('/v1/getinfo', function(req, res, next) {
 		app.requestCounters && app.requestCounters.getinfo++;
-		res.json({
-			identity_pubkey: nodePublicKey,
-			alias: 'lnd-testnet',
-			testnet: true,
-			uris: [ app.config.nodeUri ],
-		});
+		app.routes['GET /v1/getinfo'](req, res, next);
 	});
-	app.post('/v1/channels', (req, res, next) => {
+	app.post('/v1/channels', function(req, res, next) {
 		app.requestCounters && app.requestCounters.openchannel++;
-		res.json({
-			funding_txid_bytes: null,
-			funding_txid_str: '968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e',
-			output_index: 0,
-		});
+		app.routes['POST /v1/channels'](req, res, next);
 	});
-	app.post('/v1/channels/transactions', (req, res, next) => {
+	app.post('/v1/channels/transactions', function(req, res, next) {
 		app.requestCounters && app.requestCounters.payinvoice++;
-		const preimage = lnurl.Server.prototype.generateRandomKey();
-		res.json({
-			result: {
-				payment_hash: lnurl.Server.prototype.hash(preimage),
-				payment_hash_string: '',
-				route: {},
-			},
-			error: null,
-		});
+		app.routes['POST /v1/channels/transactions'](req, res, next);
 	});
-	app.post('/v1/invoices', (req, res, next) => {
+	app.post('/v1/invoices', function(req, res, next) {
 		app.requestCounters && app.requestCounters.addinvoice++;
-		const { value } = req.body;
-		const descriptionHash = Buffer.from(req.body.description_hash, 'base64').toString('hex');
-		const pr = generatePaymentRequest(value, { descriptionHash }, options);
-		const paymentHash = getTagDataFromPaymentRequest(pr, 'payment_hash');
-		res.json({
-			r_hash: paymentHash,
-			payment_request: pr,
-			add_index: '0',
-		});
+		app.routes['POST /v1/invoices'](req, res, next);
 	});
+	app.routes = {
+		'GET /v1/getinfo': function(req, res, next) {
+			res.json({
+				identity_pubkey: nodePublicKey,
+				alias: 'lnd-testnet',
+				testnet: true,
+				uris: [ app.config.nodeUri ],
+			});
+		},
+		'POST /v1/channels': function(req, res, next) {
+			res.json({
+				funding_txid_bytes: null,
+				// funding_txid_bytes: Buffer.from('968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e', 'hex').toString('base64'),
+				funding_txid_str: '968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e',
+				output_index: 0,
+			});
+		},
+		'POST /v1/channels/transactions': function(req, res, next) {
+			const preimage = lnurl.Server.prototype.generateRandomKey();
+			res.json({
+				result: {
+					payment_hash: lnurl.Server.prototype.hash(preimage),
+					payment_hash_string: '',
+					route: {},
+				},
+				error: null,
+			});
+		},
+		'POST /v1/invoices': function(req, res, next) {
+			const { value } = req.body;
+			const descriptionHash = Buffer.from(req.body.description_hash, 'base64').toString('hex');
+			const pr = generatePaymentRequest(value, { descriptionHash }, options);
+			const paymentHash = getTagDataFromPaymentRequest(pr, 'payment_hash');
+			res.json({
+				r_hash: paymentHash,
+				payment_request: pr,
+				add_index: '0',
+			});
+		},
+	};
 	async.parallel({
 		macaroon: prepareMacaroon.bind(undefined, options.macaroonPath),
 		tls: prepareTlsCertificate.bind(undefined, options),

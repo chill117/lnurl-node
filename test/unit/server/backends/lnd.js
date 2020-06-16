@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const fs = require('fs');
+const { generateNodeKey } = require('../../../../lib');
 
 describe('backends.lnd', function() {
 
@@ -45,14 +46,21 @@ describe('backends.lnd', function() {
 			if (server) return server.close();
 		});
 
-		it('can request channel', function(done) {
-			server.generateNewUrl('channelRequest', {
-				localAmt: 2000,
-				pushAmt: 0,
-			}).then(result => {
-				const { url } = result;
+		describe('channelRequest', function() {
+
+			let generatedUrl;
+			beforeEach(function() {
+				return server.generateNewUrl('channelRequest', {
+					localAmt: 2000,
+					pushAmt: 0,
+				}).then(result => {
+					generatedUrl = result;
+				});
+			});
+
+			it('complete LNURL flow', function(done) {
 				this.helpers.request('get', {
-					url,
+					url: generatedUrl.url,
 					json: true,
 				}, (error, response, body) => {
 					if (error) return done(error);
@@ -63,9 +71,82 @@ describe('backends.lnd', function() {
 					} catch (error) {
 						return done(error);
 					}
-					done();
+					this.helpers.request('get', {
+						url: server.getCallbackUrl(),
+						qs: {
+							k1: body.k1,
+							remoteid: generateNodeKey().nodePublicKey,
+							private: 1,
+						},
+						json: true,
+					}, (error2, response2, body2) => {
+						if (error2) return done(error2);
+						try {
+							expect(body2).to.be.an('object');
+							expect(body2.status).to.equal('OK');
+						} catch (error) {
+							return done(error);
+						}
+						done();
+					});
 				});
-			}).catch(done);
+			});
+
+			describe('"funding_txid_bytes" instead of "funding_txid_str"', function() {
+
+				let originalRoute;
+				before(function() {
+					// Override the route for channel requests.
+					originalRoute = mock.routes['POST /v1/channels'];
+					mock.routes['POST /v1/channels'] = function(req, res, next) {
+						res.json({
+							funding_txid_bytes: Buffer.from('968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e', 'hex').toString('base64'),
+							funding_txid_str: null,
+							output_index: 0,
+						});
+					};
+				});
+
+				after(function() {
+					// Put the original route back.
+					mock.routes['POST /v1/channels'] = originalRoute;
+					originalRoute = null;
+				});
+
+				it('still works', function(done) {
+					this.helpers.request('get', {
+						url: generatedUrl.url,
+						json: true,
+					}, (error, response, body) => {
+						if (error) return done(error);
+						try {
+							expect(body).to.be.an('object');
+							expect(body.status).to.not.equal('ERROR');
+							expect(body.uri.split('@')[1]).to.equal(mock.options.tcp.hostname);
+						} catch (error) {
+							return done(error);
+						}
+						this.helpers.request('get', {
+							url: server.getCallbackUrl(),
+							qs: {
+								k1: body.k1,
+								remoteid: generateNodeKey().nodePublicKey,
+								private: 1,
+							},
+							json: true,
+						}, (error2, response2, body2) => {
+							if (error2) return done(error2);
+							try {
+								expect(body2).to.be.an('object');
+								expect(body2.status).to.equal('OK');
+							} catch (error) {
+								return done(error);
+							}
+							done();
+						});
+					});
+				});
+			});
 		});
 	});
 });
