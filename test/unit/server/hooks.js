@@ -14,6 +14,7 @@ describe('Server: hooks', function() {
 			server = this.helpers.createServer({
 				protocol: 'http',
 				listen: false,
+				lightning: null,
 			});
 		});
 
@@ -73,6 +74,7 @@ describe('Server: hooks', function() {
 				auth: {
 					apiKeys: [ apiKey ],
 				},
+				lightning: null,
 			});
 			server.once('error', done);
 			server.once('listening', done);

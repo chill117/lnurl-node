@@ -142,7 +142,9 @@ module.exports = function(options, done) {
 		try {
 			fs.unlinkSync(app.config.socket);
 		} catch (error) {
-			debug.error(error);
+			if (error.message.substr(0, 'ENOENT: no such file or directory'.length) !== 'ENOENT: no such file or directory') {
+				debug.error(error);
+			}
 		}
 	};
 	destroySocketFile();

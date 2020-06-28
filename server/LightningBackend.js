@@ -8,9 +8,10 @@ class LightningBackend {
 		}
 		classOptions = classOptions || {};
 		this.checkRequiredPrototypeMethods();
+		options = _.defaults(options || {}, classOptions.defaultOptions || {});
 		this.checkRequiredOptions(options, classOptions.requiredOptions);
 		this.checkOptions && this.checkOptions(options);
-		this.options = _.defaults(options || {}, classOptions.defaultOptions || {});
+		this.options = options;
 	}
 
 	checkRequiredOptions(options, requiredOptions) {

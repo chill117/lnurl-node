@@ -10,6 +10,7 @@ describe('Server: options', function() {
 		{
 			options: {
 				protocol: 'http',
+				lightning: null,
 			},
 			tests: [
 				{

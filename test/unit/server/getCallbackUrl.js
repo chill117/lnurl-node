@@ -12,7 +12,10 @@ describe('getCallbackUrl([params])', function() {
 
 		let server;
 		before(function() {
-			server = this.helpers.createServer({ listen: false });
+			server = this.helpers.createServer({
+				listen: false,
+				lightning: null,
+			});
 		});
 
 		after(function() {
@@ -43,7 +46,12 @@ describe('getCallbackUrl([params])', function() {
 		before(function() {
 			url = 'https://does-not-exist.unknown';
 			endpoint = '/custom';
-			server = this.helpers.createServer({ url, endpoint, listen: false });
+			server = this.helpers.createServer({
+				url,
+				endpoint,
+				listen: false,
+				lightning: null,
+			});
 		});
 
 		after(function() {
