@@ -78,10 +78,10 @@ class Backend extends LightningBackend {
 			private: makePrivate,
 		}).then(result => {
 			if (_.isUndefined(result.output_index) || !_.isNumber(result.output_index)) {
-				throw new Error('Unexpected response from LN Backend [POST /v1/channels]: "output_index"');
+				throw new Error('Unexpected response from LN Backend [POST /v1/channels]: Missing "output_index"');
 			}
-			if (_.isUndefined(result.funding_txid_str) || !_.isString(result.funding_txid_str)) {
-				throw new Error('Unexpected response from LN Backend [POST /v1/channels]: "funding_txid_str"');
+			if (_.isUndefined(result.funding_txid_str) && _.isUndefined(result.funding_txid_bytes)) {
+				throw new Error('Unexpected response from LN Backend [POST /v1/channels]: Expected "funding_txid_str" or "funding_txid_bytes"');
 			}
 			return result;
 		});
@@ -91,21 +91,8 @@ class Backend extends LightningBackend {
 		return this.request('post', '/v1/channels/transactions', {
 			payment_request: invoice,
 		}).then(result => {
-			if (_.isUndefined(result.payment_preimage) || !_.isString(result.payment_preimage)) {
-				throw new Error('Unexpected response from LN Lightning [POST /v1/channels/transactions]: "payment_preimage"');
-			}
-			if (_.isUndefined(result.payment_hash) || !_.isString(result.payment_hash)) {
-				throw new Error('Unexpected response from LN Lightning [POST /v1/channels/transactions]: "payment_hash"');
-			}
-			if (_.isUndefined(result.payment_route) || !_.isObject(result.payment_route)) {
-				throw new Error('Unexpected response from LN Lightning [POST /v1/channels/transactions]: "payment_route"');
-			}
-			if (result.payment_error) {
-				const message = result.payment_error;
-				throw new Error(`Failed to pay invoice: "${message}"`);
-			}
-			if (!result.payment_preimage) {
-				throw new Error('Probable failed payment: Did not receive payment_preimage in response');
+			if (result.error) {
+				throw new Error(result.error);
 			}
 			return result;
 		});
@@ -182,7 +169,7 @@ class Backend extends LightningBackend {
 				res.on('end', function() {
 					if (res.statusCode >= 300) {
 						const status = res.statusCode;
-						return done(new Error(`Unexpected response from LN backend: HTTP_${status}_ERROR`));
+						return done(new Error(`Unexpected response from LN backend: HTTP_${status}_ERROR:\n${body}`));
 					}
 					try {
 						body = JSON.parse(body);

@@ -69,19 +69,21 @@ module.exports = function(options, done) {
 	app.post('/v1/channels', (req, res, next) => {
 		app.requestCounters && app.requestCounters.openchannel++;
 		res.json({
-			output_index: 0,
 			funding_txid_bytes: null,
 			funding_txid_str: '968a72ec4bf19a4abb628ec5f687c517a6063d5820b5ed4a4e5d371a9defaf7e',
+			output_index: 0,
 		});
 	});
 	app.post('/v1/channels/transactions', (req, res, next) => {
 		app.requestCounters && app.requestCounters.payinvoice++;
 		const preimage = lnurl.Server.prototype.generateRandomKey();
 		res.json({
-			payment_preimage: preimage,
-			payment_hash: lnurl.Server.prototype.hash(preimage),
-			payment_error: '',
-			payment_route: {},
+			result: {
+				payment_hash: lnurl.Server.prototype.hash(preimage),
+				payment_hash_string: '',
+				route: {},
+			},
+			error: null,
 		});
 	});
 	app.post('/v1/invoices', (req, res, next) => {
@@ -91,9 +93,9 @@ module.exports = function(options, done) {
 		const pr = generatePaymentRequest(value, { descriptionHash }, options);
 		const paymentHash = getTagDataFromPaymentRequest(pr, 'payment_hash');
 		res.json({
-			add_index: '0',
 			r_hash: paymentHash,
 			payment_request: pr,
+			add_index: '0',
 		});
 	});
 	fs.writeFile(options.macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {
