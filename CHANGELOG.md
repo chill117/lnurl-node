@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Fixes for changes to lnd's REST API; specifically opening channels and paying invoices.
 * v0.7.0:
   * Pass `cert` and `macaroon` options as Buffer or String for lnd backend configuration options; see [Lightning Backend Configuration Options](https://github.com/chill117/lnurl-node#lightning-backend-configuration-options)
   * Can now use custom lightning backends; see [Custom Lightning Backend](https://github.com/chill117/lnurl-node/blob/master/README.md#custom-lightning-backend)
