@@ -380,12 +380,13 @@ module.exports = function(lnurl) {
 				this.lock(secret);
 				const hash = this.hash(secret);
 				const method = req.query.q ? 'info' : 'action';
+				let tag;
 				this.emit('request:received', { hash, method, req });
 				this.fetchUrl(hash).then(url => {
 					if (!url) {
 						throw new HttpError('Invalid secret', 400);
 					}
-					const { tag } = url;
+					tag = url.tag;
 					if (!this.isReusable(tag) && url.used === true) {
 						throw new HttpError('Already used', 400);
 					}
@@ -400,6 +401,9 @@ module.exports = function(lnurl) {
 					} else {
 						result = result || { status: 'OK' };
 						return this.markUsedUrl(hash).then(() => {
+							if (this.isReusable(tag)) {
+								res.set('Cache-Control', 'private');
+							}
 							res.status(200).json(result);
 						});
 					}

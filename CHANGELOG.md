@@ -1,6 +1,7 @@
 # Changelog
 
 * TBD:
+  * Set "Cache-Control: private" header for lnurl-pay action requests. This tells HTTP proxies to not cache the response - which is important because the same URL and query string can yield different responses (e.g different payment requests) each time the lnurl-pay URL is called.
   * Fixes for changes to lnd's REST API; specifically opening channels and paying invoices.
 * v0.7.0:
   * Pass `cert` and `macaroon` options as Buffer or String for lnd backend configuration options; see [Lightning Backend Configuration Options](https://github.com/chill117/lnurl-node#lightning-backend-configuration-options)

@@ -520,7 +520,7 @@ describe('Server: HTTP API', function() {
 					},
 					{
 						params: prepareValidParams('create', 'payRequest'),
-						expected: function(body, query) {
+						expected: function(body, response, query) {
 							expect(body).to.be.an('object');
 							expect(body.tag).to.equal('payRequest');
 							const { id, s } = query;
@@ -634,7 +634,7 @@ describe('Server: HTTP API', function() {
 									if (error) return done(error);
 									try {
 										if (_.isFunction(test.expected)) {
-											test.expected.call(this, body, query);
+											test.expected.call(this, body, response, query);
 										} else {
 											expect(body).to.deep.equal(test.expected);
 										}
@@ -762,7 +762,7 @@ describe('Server: HTTP API', function() {
 								if (error) return done(error);
 								try {
 									if (_.isFunction(test.expected)) {
-										test.expected.call(this, body);
+										test.expected.call(this, body, response);
 									} else {
 										expect(body).to.deep.equal(test.expected);
 									}
@@ -893,7 +893,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'amount OK',
 					params: validParams.action.payRequest,
-					expected: function(body) {
+					expected: function(body, response) {
 						expect(body).to.be.an('object');
 						expect(body.pr).to.be.a('string');
 						expect(body.routes).to.be.an('array');
@@ -901,6 +901,7 @@ describe('Server: HTTP API', function() {
 						const { metadata } = validParams.create.payRequest;
 						expect(purposeCommitHashTagData).to.equal(lnurl.Server.prototype.hash(Buffer.from(metadata, 'utf8')));
 						mock.expectNumRequestsToEqual('addinvoice', 1);
+						expect(response.headers['cache-control']).to.equal('private');
 					},
 				},
 				{
@@ -908,12 +909,13 @@ describe('Server: HTTP API', function() {
 					params: {
 						amount: 99999,
 					},
-					expected: function(body) {
+					expected: function(body, response) {
 						expect(body).to.deep.equal({
 							status: 'ERROR',
 							reason: 'Amount must be greater than or equal to "minSendable"',
 						});
 						mock.expectNumRequestsToEqual('addinvoice', 0);
+						expect(response.headers['cache-control']).to.be.undefined;
 					},
 				},
 				{
@@ -921,12 +923,13 @@ describe('Server: HTTP API', function() {
 					params: {
 						amount: 200001,
 					},
-					expected: function(body) {
+					expected: function(body, response) {
 						expect(body).to.deep.equal({
 							status: 'ERROR',
 							reason: 'Amount must be less than or equal to "maxSendable"',
 						});
 						mock.expectNumRequestsToEqual('addinvoice', 0);
+						expect(response.headers['cache-control']).to.be.undefined;
 					},
 				},
 			];
@@ -1020,7 +1023,7 @@ describe('Server: HTTP API', function() {
 								if (error) return done(error);
 								try {
 									if (_.isFunction(test.expected)) {
-										test.expected.call(this, body);
+										test.expected.call(this, body, response);
 									} else {
 										expect(body).to.deep.equal(test.expected);
 									}
