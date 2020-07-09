@@ -23,7 +23,7 @@ module.exports = function(options, done) {
 		options = {};
 	}
 	options = _.defaults(options || {}, {
-		host: 'localhost',
+		host: '127.0.0.1',
 		port: 8080,
 		hostname: null,
 		network: 'bitcoin',// can be "regtest", "testnet", or "bitcoin"
