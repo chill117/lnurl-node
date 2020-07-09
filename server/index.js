@@ -190,7 +190,8 @@ module.exports = function(lnurl) {
 		debug.info('Generating new TLS certificate...');
 		return new Promise((resolve, reject) => {
 			const { certPath, keyPath, selfSigned, days } = this.options.tls;
-			pem.createCertificate({ selfSigned, days }, (error, result) => {
+			const altNames = [ this.options.host ];
+			pem.createCertificate({ selfSigned, days, altNames }, (error, result) => {
 				if (error) return reject(error);
 				const { certificate, serviceKey } = result;
 				async.parallel({

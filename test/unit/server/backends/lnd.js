@@ -6,6 +6,7 @@ describe('backends.lnd', function() {
 	let mock;
 	before(function(done) {
 		mock = this.helpers.prepareMockLightningNode('lnd', {
+			host: '127.0.0.1',
 			port: 18080,
 			tcp: { hostname: '127.0.0.1:19735' },
 		}, done);
@@ -57,6 +58,7 @@ describe('backends.lnd', function() {
 					if (error) return done(error);
 					try {
 						expect(body).to.be.an('object');
+						expect(body.status).to.not.equal('ERROR');
 						expect(body.uri.split('@')[1]).to.equal(mock.options.tcp.hostname);
 					} catch (error) {
 						return done(error);

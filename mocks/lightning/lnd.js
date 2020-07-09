@@ -102,7 +102,8 @@ module.exports = function(options, done) {
 		if (error) return done(error);
 		pem.createCertificate({
 			selfSigned: true,
-			days: 1
+			days: 1,
+			altNames: [ options.host ],
 		}, (error, result) => {
 			if (error) return done(error);
 			const { certificate, serviceKey } = result;
