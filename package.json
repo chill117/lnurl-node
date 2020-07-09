@@ -48,8 +48,8 @@
   "devDependencies": {
     "body-parser": "1.19.0",
     "chai": "4.2.0",
-    "fs-extra": "9.0.0",
-    "mocha": "7.1.2"
+    "fs-extra": "9.0.1",
+    "mocha": "8.0.1"
   },
   "readmeFilename": "README.md"
 }
