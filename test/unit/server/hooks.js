@@ -71,6 +71,7 @@ describe('Server: hooks', function() {
 			done = _.once(done);
 			apiKey = lnurl.generateApiKey();
 			server = this.helpers.createServer({
+				protocol: 'http',
 				auth: {
 					apiKeys: [ apiKey ],
 				},
@@ -94,7 +95,7 @@ describe('Server: hooks', function() {
 			const unknownApiKey = lnurl.Server.prototype.generateApiKey();
 			const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
 			this.helpers.request('get', {
-				url: 'https://localhost:3000/lnurl',
+				url: server.getCallbackUrl(),
 				ca: server.ca,
 				qs: query,
 				json: true,
@@ -119,7 +120,7 @@ describe('Server: hooks', function() {
 			done = _.once(done);
 			const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
 			this.helpers.request('get', {
-				url: 'https://localhost:3000/lnurl',
+				url: server.getCallbackUrl(),
 				ca: server.ca,
 				qs: query,
 				json: true,

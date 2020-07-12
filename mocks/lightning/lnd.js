@@ -42,7 +42,6 @@ module.exports = function(options, done) {
 	const { nodePrivateKey, nodePublicKey } = generateNodeKey();
 	options.nodePrivateKey = nodePrivateKey;
 	const app = new express();
-	const macaroon = lnurl.Server.prototype.generateRandomKey();
 	app.options = options;
 	app.config = {
 		hostname: options.hostname,
@@ -50,6 +49,7 @@ module.exports = function(options, done) {
 		macaroon: options.macaroonPath,
 		nodeUri: [nodePublicKey, options.tcp.hostname].join('@'),
 	};
+	let macaroon;
 	app.use('*', (req, res, next) => {
 		if (!req.headers['grpc-metadata-macaroon'] || req.headers['grpc-metadata-macaroon'] !== macaroon) {
 			return res.status(400).end();
@@ -98,29 +98,19 @@ module.exports = function(options, done) {
 			add_index: '0',
 		});
 	});
-	fs.writeFile(options.macaroonPath, Buffer.from(macaroon, 'hex'), function(error) {
+	async.parallel({
+		macaroon: prepareMacaroon.bind(undefined, options.macaroonPath),
+		tls: prepareTlsCertificate.bind(undefined, options),
+	}, (error, result) => {
 		if (error) return done(error);
-		pem.createCertificate({
-			selfSigned: true,
-			days: 1,
-			altNames: [ options.host ],
-		}, (error, result) => {
-			if (error) return done(error);
-			const { certificate, serviceKey } = result;
-			async.parallel({
-				cert: fs.writeFile.bind(fs, options.certPath, certificate),
-				key: fs.writeFile.bind(fs, options.keyPath, serviceKey),
-			}, error => {
-				if (error) return done(error);
-				const { host, port } = options;
-				app.server = https.createServer({
-					key: serviceKey,
-					cert: certificate,
-				}, app).listen(port, host, function() {
-					debug.info(`HTTPS server listening at https://${host}:${port}/`);
-					done();
-				});
-			});
+		const { host, port } = options;
+		macaroon = result.macaroon;
+		app.server = https.createServer({
+			key: result.tls.key,
+			cert: result.tls.cert,
+		}, app).listen(port, host, function() {
+			debug.info(`HTTPS server listening at https://${host}:${port}/`);
+			done();
 		});
 	});
 	app.close = function(done) {
@@ -128,4 +118,114 @@ module.exports = function(options, done) {
 		app.server.close(done);
 	};
 	return app;
+};
+
+const readFileNotExistOk = function(filePath, done) {
+	fs.readFile(filePath, function(error, buffer) {
+		if (error) {
+			// Missing file error is OK.
+			// Only return other errors.
+			const errorMsgOk = 'ENOENT: no such file or directory';
+			if (error.message.substr(0, errorMsgOk.length) !== errorMsgOk) {
+				return done(error);
+			}
+			return done(null, null);
+		}
+		done(null, buffer);
+	});
+};
+
+const prepareMacaroon = function(macaroonPath, done) {
+	getMacaroon(macaroonPath, (error, macaroon) => {
+		if (error) return done(error);
+		if (macaroon) return done(null, macaroon.toString('hex'));
+		generateMacaroon(macaroonPath, done);
+	});
+};
+
+const getMacaroon = function(macaroonPath, done) {
+	if (!macaroonPath) {
+		throw new Error('Missing required argument: "macaroonPath"');
+	}
+	if (!_.isString(macaroonPath)) {
+		throw new Error('Invalid argument ("macaroonPath"): String expected');
+	}
+	readFileNotExistOk(macaroonPath, done);
+};
+
+const generateMacaroon = function(macaroonPath, done) {
+	if (!macaroonPath) {
+		throw new Error('Missing required argument: "macaroonPath"');
+	}
+	if (!_.isString(macaroonPath)) {
+		throw new Error('Invalid argument ("macaroonPath"): String expected');
+	}
+	const macaroon = lnurl.Server.prototype.generateRandomKey();
+	fs.writeFile(macaroonPath, Buffer.from(macaroon, 'hex'), error => {
+		if (error) return done(error);
+		done(null, macaroon);
+	});
+};
+
+const prepareTlsCertificate = function(options, done) {
+	getTlsCertificate(options, (error, result) => {
+		if (error) return done(error);
+		if (result && result.cert) return done(null, result);
+		generateTlsCertificate(options, done);
+	});
+};
+
+const getTlsCertificate = function(options, done) {
+	if (!_.isObject(options)) {
+		throw new Error('Invalid argument ("options"): Object expected');
+	}
+	options = _.defaults(options || {}, {
+		certPath: null,
+		keyPath: null,
+	});
+	if (!options.certPath) {
+		throw new Error('Missing required option: "certPath"');
+	}
+	if (!options.keyPath) {
+		throw new Error('Missing required option: "keyPath"');
+	}
+	async.parallel({
+		cert: readFileNotExistOk.bind(undefined, options.certPath),
+		key: readFileNotExistOk.bind(undefined, options.keyPath),
+	}, done);
+};
+
+const generateTlsCertificate = function(options, done) {
+	if (!_.isObject(options)) {
+		throw new Error('Invalid argument ("options"): Object expected');
+	}
+	options = _.defaults(options || {}, {
+		certPath: null,
+		keyPath: null,
+	});
+	options.pem = _.defaults(options.pem || {}, {
+		selfSigned: true,
+		days: 1,
+		altNames: [ options.host ],
+	});
+	if (!options.certPath) {
+		throw new Error('Missing required option: "certPath"');
+	}
+	if (!options.keyPath) {
+		throw new Error('Missing required option: "keyPath"');
+	}
+	pem.createCertificate(options.pem, (error, result) => {
+		if (error) return done(error);
+		const { certificate, serviceKey } = result;
+		async.parallel([
+			fs.writeFile.bind(fs, options.certPath, certificate),
+			fs.writeFile.bind(fs, options.keyPath, serviceKey),
+		], error => {
+			if (error) return done(error);
+			done(null, {
+				cert: certificate,
+				key: serviceKey,
+			});
+		});
+	});
 };

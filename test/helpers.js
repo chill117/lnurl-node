@@ -15,7 +15,7 @@ const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
 module.exports = {
-	tmpDir: tmpDir,
+	tmpDir,
 	createServer: function(options) {
 		options = _.defaults(options || {}, {
 			host: 'localhost',
