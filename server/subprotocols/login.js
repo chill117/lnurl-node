@@ -21,7 +21,7 @@ module.exports = {
 			const k1 = Buffer.from(secret, 'hex');
 			const signature = secp256k1.signatureImport(Buffer.from(params.sig, 'hex'));
 			const key = Buffer.from(params.key, 'hex');
-			const signatureOk = secp256k1.verify(k1, signature, key);
+			const signatureOk = secp256k1.ecdsaVerify(signature, k1, key);
 			if (!signatureOk) {
 				throw new HttpError('Invalid signature', 400);
 			}

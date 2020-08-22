@@ -3,7 +3,6 @@ const { expect } = require('chai');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
 const { HttpError } = lnurl.Server;
-const secp256k1 = require('secp256k1');
 
 describe('Server: hooks', function() {
 
@@ -33,10 +32,9 @@ describe('Server: hooks', function() {
 		it('successful login', function(done) {
 			const { pubKey, privKey } = helpers.generateLinkingKey();
 			const k1 = Buffer.from(secret, 'hex');
-			const { signature } = secp256k1.sign(k1, privKey);
-			const derEncodedSignature = secp256k1.signatureExport(signature);
+			const sig = helpers.sign(k1, privKey);
 			const params = {
-				sig: derEncodedSignature.toString('hex'),
+				sig: sig.toString('hex'),
 				key: pubKey.toString('hex'),
 			};
 			let calls = 0;

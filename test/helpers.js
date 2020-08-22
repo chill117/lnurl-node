@@ -149,4 +149,9 @@ module.exports = {
 		const pubKey = Buffer.from(secp256k1.publicKeyCreate(privKey));
 		return { pubKey, privKey };
 	},
+	sign: function(data, privKey) {
+		const { signature } = secp256k1.ecdsaSign(data, privKey);
+		const derEncodedSignature = secp256k1.signatureExport(signature);
+		return Buffer.from(derEncodedSignature);
+	},
 };
