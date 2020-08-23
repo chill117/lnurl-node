@@ -16,6 +16,7 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [Decoding an lnurl-encoded string](#decoding-an-lnurl-encoded-string)
   * [Generating a new API key](#generating-a-new-api-key)
   * [Running an lnurl server](#running-an-lnurl-server)
+  * [Generate a new URL](#generate-a-new-url)
 * [API](#api)
   * [encode](#encode)
   * [decode](#decode)
@@ -64,7 +65,7 @@ This will install `lnurl` and add it to your application's `package.json` file.
 
 The lnurl specification defines a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported are described here in this section.
 
-Each subprotocol has two tables of parameters - server and client. The server parameters table details the parameters that you are required to provide when generating a new LNURL via [generateNewUrl()](#generateNewUrl). The client parameters are to be provided by the user's wallet application during the process of executing the respective LNURL subprotocol.
+Each subprotocol has two tables of parameters - server and client. The server parameters table details the parameters that you are required to provide when generating a new LNURL. The client parameters are to be provided by the user's wallet application during the process of executing the respective LNURL subprotocol.
 
 
 ### channelRequest
@@ -220,21 +221,65 @@ lnurl generateApiKey --help
 Start an lnurl application server:
 ```bash
 lnurl server \
-	--host="localhost" \
-	--port="3000" \
-	--auth.apiKeys='[{"id:"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"}]' \
-	--lightning.backend="lnd" \
-	--lightning.config='{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
+	--host "localhost" \
+	--port "3000" \
+	--auth.apiKeys '[{"id:"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"}]' \
+	--lightning.backend "lnd" \
+	--lightning.config '{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
 ```
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
 * To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
 * To use a custom lightning backend with your server see [Custom Lightning Backend](#custom-lightning-backend).
 
+Alternatively, a configuration file can be used:
+```bash
+lnurl server --configFile ./config.json
+```
+
 To print all available options for the server command:
 ```bash
 lnurl server --help
 ```
+
+
+### Generate a new URL
+
+To generate a new lnurl that a client application can then consume:
+
+```bash
+lnurl generateNewUrl \
+	--host "localhost" \
+	--port "3000" \
+	--protocol "http" \
+	--endpoint "/lnurl" \
+	--store.backend "knex" \
+	--store.config '{"client":"postgres","connection":{"host":"127.0.0.1","user":"postgres","password":"example","database":"lnurl_example"}}' \
+	--tag "withdrawRequest" \
+	--params '{"minWithdrawable":10000,"maxWithdrawable":10000,"defaultDescription":""}'
+```
+Alternatively, a configuration file can be used:
+```bash
+lnurl generateNewUrl \
+	--configFile ./config.json \
+	--tag "withdrawRequest" \
+	--params '{"minWithdrawable":10000,"maxWithdrawable":10000,"defaultDescription":""}'
+```
+Example output:
+```json
+{
+	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
+	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
+	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
+}
+```
+For a list of available options:
+```bash
+lnurl generateNewUrl --help
+```
+It is also possible to generate lnurls in other ways:
+* [generateNewUrl](#generateNewUrl) - API method
+* [Signed LNURLs](#signed-lnurls) - For separate (or even offline) applications
 
 
 ## API
@@ -521,7 +566,9 @@ Expected output:
 	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
-It is also possible to generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
+It is also possible to generate lnurls in other ways:
+* [Generate a new URL](#generate-a-new-url) - CLI command
+* [Signed LNURLs](#signed-lnurls) - For separate (or even offline) applications
 
 
 ### generateApiKey

@@ -2,6 +2,9 @@
 
 const _ = require('underscore');
 const commander = require('commander');
+const debug = {
+	error: require('debug')('lnurl:cli:error'),
+};
 const fs = require('fs');
 
 const lnurl = require('./index');
@@ -66,11 +69,122 @@ program
 	});
 
 program
+	.command('generateNewUrl')
+	.description('Generate a new URL for a server instance')
+	.option(
+		'--tag <value>',
+		'The tag (subprotocol name) of the newly generated URL',
+		_.identity,
+		null,
+	)
+	.option(
+		'--params [values]',
+		'Stringified JSON object of params for the newly generated URL - e.g for "withdrawRequest" valid params could be {"minWithdrawable": 1000, "maxWithdrawable": 5000}',
+		_.identity,
+		null,
+	)
+	.option(
+		'--configFile [value]',
+		'Optionally load options from a file (supported formats: ".json") (e.g "/path/to/config.json")',
+		function(value) {
+			const filePath = path.resolve(value);
+			fs.statSync(filePath);
+			return filePath;
+		},
+		null
+	)
+	.option(
+		'--host [value]',
+		'The host for the web server',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.host,
+	)
+	.option(
+		'--port [value]',
+		'The port for the web server',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.port
+	)
+	.option(
+		'--protocol [value]',
+		'The protocol to use for the web server',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.protocol
+	)
+	.option(
+		'--url [value]',
+		'The URL where the server is externally reachable',
+		_.identity,
+		lnurl.Server.prototype.getDefaultUrl()
+	)
+	.option(
+		'--endpoint [value]',
+		'The URI path of the web API end-point',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.endpoint
+	)
+	.option(
+		'--store.backend [value]',
+		'Which data store backend to use',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.store.backend
+	)
+	.option(
+		'--store.config [value]',
+		'The options object to use to configure the data store',
+		_.identity,
+		lnurl.Server.prototype.defaultOptions.store.config
+	)
+	.action(function() {
+		try {
+			let options;
+			if (this.configFile) {
+				options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
+			} else {
+				options = _.pick(this, 'host', 'port', 'protocol', 'url', 'endpoint');
+				options.store = prepareGroupOptions(this, options, 'store');
+			}
+			if (options.store && options.store.backend === 'memory') {
+				throw new Error('This command does not work with `--store.backend` set to "memory"');
+			}
+			const { tag } = this;
+			if (!tag) {
+				throw new Error('--tag is required');
+			}
+			let { params } = this;
+			if (!params) {
+				params = {};
+			} else if (_.isString(params)) {
+				try {
+					params = JSON.parse(params);
+				} catch (error) {
+					throw new Error('--params must be a valid JSON object');
+				}
+			}
+			options.listen = false
+			options.lightning = null;
+			const server = lnurl.createServer(options);
+			return server.generateNewUrl(tag, params).then(result => {
+				process.stdout.write(JSON.stringify(result, null, 2));
+				process.exit();
+			}).catch(error => {
+				debug.error(error);
+				console.error(error.message);
+				process.exit(1);
+			});
+		} catch (error) {
+			debug.error(error);
+			console.error(error.message);
+			process.exit(1);
+		}
+	});
+
+program
 	.command('server')
 	.description('Start an lnurl application server.')
 	.option(
 		'--configFile [value]',
-		'Optionally load CLI options from a file (supported formats: ".json") (e.g "/path/to/lnurl-server.json")',
+		'Optionally load CLI options from a file (supported formats: ".json") (e.g "/path/to/config.json")',
 		function(value) {
 			const filePath = path.resolve(value);
 			fs.statSync(filePath);
@@ -176,32 +290,41 @@ program
 			options = _.pick(this, 'host', 'port', 'protocol', 'url');
 		}
 		_.each(['auth', 'lightning', 'tls', 'store'], group => {
-			options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
-				.keys()
-				.map(key => {
-					let value;
-					if (!_.isUndefined(options[group])) {
-						value = options[group][key];
-					} else {
-						value = this[`${group}.${key}`];
-					}
-					if (_.isUndefined(value)) return null;
-					return [key, value];
-				})
-				.compact()
-				.object()
-				.value();
+			options[group] = prepareGroupOptions(this, options, group);
 		});
-		_.each(['lightning', 'store'], group => {
-			if (_.isString(options[group].config)) {
-				options[group].config = JSON.parse(options[group].config);
-			}
-		});
-		if (_.isString(options.auth.apiKeys)) {
-			options.auth.apiKeys = JSON.parse(options.auth.apiKeys);
-		}
 		lnurl.createServer(options);
 	});
+
+const prepareGroupOptions = function(context, options, group) {
+	return _.chain(lnurl.Server.prototype.defaultOptions[group])
+		.keys()
+		.map(key => {
+			let value;
+			if (!_.isUndefined(options[group])) {
+				value = options[group][key];
+			} else {
+				value = context[`${group}.${key}`];
+			}
+			if (_.isUndefined(value)) return null;
+			switch (group) {
+				case 'lightning':
+				case 'store':
+					if (key === 'config' && _.isString(value)) {
+						value = JSON.parse(value);
+					}
+					break;
+				case 'auth':
+					if (key === 'apiKeys' && _.isString(value)) {
+						value = JSON.parse(value);
+					}
+					break;
+			}
+			return [key, value];
+		})
+		.compact()
+		.object()
+		.value();
+};
 
 if (process.stdin.isTTY) {
 	program.parse(process.argv);

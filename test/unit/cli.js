@@ -22,6 +22,34 @@ describe('Command-line interface', function() {
 
 	describe('stdin/out', function() {
 
+		let server;
+		before(function() {
+			server = this.helpers.createServer({
+				protocol: 'http',
+				listen: false,
+				lightning: null,
+			});
+		});
+
+		const config = _.pick(lnurl.Server.prototype.defaultOptions, 'host', 'port', 'protocol', 'url', 'endpoint');
+		config.protocol = 'http';
+		config.store = {
+			backend: process.env.LNURL_STORE_BACKEND || lnurl.Server.prototype.defaultOptions.store.backend,
+			config: process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG) || {},
+		};
+		let configFilePath;
+		before(function(done) {
+			configFilePath = path.join(this.tmpDir, 'cli-test-config.json');
+			fs.writeFile(configFilePath, JSON.stringify(config, null, 2), function(error) {
+				if (error) return done(error);
+				done();
+			});
+		});
+
+		after(function() {
+			if (server) return server.close();
+		});
+
 		let tests = [
 			{
 				cmd: ['--help'],
@@ -119,13 +147,208 @@ describe('Command-line interface', function() {
 					},
 				},
 			},
+			{
+				cmd: [
+					'generateNewUrl',
+					'--host', config.host || '',
+					'--port', config.port || '',
+					'--protocol', config.protocol || '',
+					'--url', config.url || '',
+					'--endpoint', config.endpoint || '',
+					'--store.backend', 'memory',
+					'--store.config', '{}',
+					'--tag', 'withdrawRequest',
+					'--params', JSON.stringify({
+						minWithdrawable: 10000,
+						maxWithdrawable: 10000,
+						defaultDescription: '',
+					}),
+				],
+				expected: {
+					stderr: 'This command does not work with `--store.backend` set to "memory"\n',
+				},
+			},
 		];
 
+		if (process.env.LNURL_STORE_BACKEND && process.env.LNURL_STORE_BACKEND !== 'memory') {
+			tests = tests.concat([
+				{
+					description: 'Missing --tag',
+					cmd: [
+						'generateNewUrl',
+						'--host', config.host || '',
+						'--port', config.port || '',
+						'--protocol', config.protocol || '',
+						'--url', config.url || '',
+						'--endpoint', config.endpoint || '',
+						'--store.backend', config.store.backend || '',
+						'--store.config', JSON.stringify(config.store.config || '{}'),
+						// '--tag', 'MISSING',
+						'--params', JSON.stringify({
+							minWithdrawable: 10000,
+							maxWithdrawable: 10000,
+							defaultDescription: '',
+						}),
+					],
+					expected: {
+						stderr: '--tag is required\n',
+					},
+				},
+				{
+					description: '--params not valid JSON',
+					cmd: [
+						'generateNewUrl',
+						'--host', config.host || '',
+						'--port', config.port || '',
+						'--protocol', config.protocol || '',
+						'--url', config.url || '',
+						'--endpoint', config.endpoint || '',
+						'--store.backend', config.store.backend || '',
+						'--store.config', JSON.stringify(config.store.config || '{}'),
+						'--tag', 'withdrawRequest',
+						'--params', '{',
+					],
+					expected: {
+						stderr: '--params must be a valid JSON object\n',
+					},
+				},
+				{
+					description: 'Invalid params (withdrawRequest)',
+					cmd: [
+						'generateNewUrl',
+						'--host', config.host || '',
+						'--port', config.port || '',
+						'--protocol', config.protocol || '',
+						'--url', config.url || '',
+						'--endpoint', config.endpoint || '',
+						'--store.backend', config.store.backend || '',
+						'--store.config', JSON.stringify(config.store.config || '{}'),
+						'--tag', 'withdrawRequest',
+						'--params', JSON.stringify({
+							minWithdrawable: 5000,
+							maxWithdrawable: 4000,
+							defaultDescription: '',
+						}),
+					],
+					expected: {
+						stderr: '"maxWithdrawable" must be greater than or equal to "minWithdrawable"\n',
+					},
+				},
+				{
+					cmd: [
+						'generateNewUrl',
+						'--host', config.host || '',
+						'--port', config.port || '',
+						'--protocol', config.protocol || '',
+						'--url', config.url || '',
+						'--endpoint', config.endpoint || '',
+						'--store.backend', config.store.backend || '',
+						'--store.config', JSON.stringify(config.store.config || '{}'),
+						'--tag', 'withdrawRequest',
+						'--params', JSON.stringify({
+							minWithdrawable: 10000,
+							maxWithdrawable: 10000,
+							defaultDescription: 'testing new LNURL via CLI',
+						}),
+					],
+					expected: {
+						stdout: function(result) {
+							expect(result).to.not.equal('');
+							result = JSON.parse(result);
+							expect(result).to.be.an('object');
+							expect(result.encoded).to.be.a('string');
+							expect(result.secret).to.be.a('string');
+							expect(result.url).to.be.a('string');
+							expect(result.url.substr(0, 'http://localhost:3000'.length)).to.equal('http://localhost:3000');
+							const hash = server.hash(result.secret);
+							return server.fetchUrl(hash).then(fromStore => {
+								expect(fromStore).to.not.equal(null);
+								expect(fromStore).to.be.an('object');
+								expect(fromStore.tag).to.equal('withdrawRequest');
+								expect(fromStore.params).to.be.an('object');
+								expect(fromStore.params.minWithdrawable).to.equal(10000);
+								expect(fromStore.params.maxWithdrawable).to.equal(10000);
+								expect(fromStore.params.defaultDescription).to.equal('testing new LNURL via CLI');
+							});
+						},
+					},
+				},
+				{
+					description: 'usage with --configFile option',
+					cmd: function() {
+						return [
+							'generateNewUrl',
+							'--configFile', configFilePath,
+							'--tag', 'withdrawRequest',
+							'--params', JSON.stringify({
+								minWithdrawable: 20000,
+								maxWithdrawable: 20000,
+								defaultDescription: 'test w/ configFile',
+							}),
+						];
+					},
+					expected: {
+						stdout: function(result) {
+							expect(result).to.not.equal('');
+							result = JSON.parse(result);
+							expect(result).to.be.an('object');
+							expect(result.encoded).to.be.a('string');
+							expect(result.secret).to.be.a('string');
+							expect(result.url).to.be.a('string');
+							expect(result.url.substr(0, 'http://localhost:3000'.length)).to.equal('http://localhost:3000');
+							const hash = server.hash(result.secret);
+							return server.fetchUrl(hash).then(fromStore => {
+								expect(fromStore).to.not.equal(null);
+								expect(fromStore).to.be.an('object');
+								expect(fromStore.tag).to.equal('withdrawRequest');
+								expect(fromStore.params).to.be.an('object');
+								expect(fromStore.params.minWithdrawable).to.equal(20000);
+								expect(fromStore.params.maxWithdrawable).to.equal(20000);
+								expect(fromStore.params.defaultDescription).to.equal('test w/ configFile');
+							});
+						},
+					},
+				},
+			]);
+		} else {
+			tests = tests.concat([
+				{
+					description: 'usage with --configFile option',
+					cmd: function() {
+						return [
+							'generateNewUrl',
+							'--configFile', configFilePath,
+							'--tag', 'withdrawRequest',
+							'--params', JSON.stringify({
+								minWithdrawable: 20000,
+								maxWithdrawable: 20000,
+								defaultDescription: 'test w/ configFile',
+							}),
+						];
+					},
+					expected: {
+						stderr: 'This command does not work with `--store.backend` set to "memory"\n',
+					},
+				},
+			]);
+		}
+
+		const testToString = function(test) {
+			return JSON.stringify(_.mapObject(test, function(value) {
+				if (_.isFunction(value)) return value.toString().replace(/[\n\t]{1,}/g, ' ');
+				return value;
+			}));
+		};
+
 		_.each(tests, function(test) {
-			const description = test.description || test.cmd.join(' ');
+			const description = test.description || (_.isArray(test.cmd) && test.cmd.join(' ')) || '';
+			if (!description) {
+				throw new Error('Missing test description:\n' + testToString(test));
+			}
 			it(description, function(done) {
 				done = _.once(done);
-				child = spawn(cli, test.cmd);
+				const cmd = _.result(test, 'cmd');
+				child = spawn(cli, cmd);
 				let results = {
 					stdout: '',
 					stderr: '',
@@ -142,14 +365,26 @@ describe('Command-line interface', function() {
 				child.stdin.end();
 				child.on('close', () => {
 					try {
+						let promises = [];
+						if (_.isUndefined(test.expected.stderr)) {
+							expect(results.stderr).to.equal('');
+						}
 						_.each(test.expected, (expected, type) => {
 							const result = results[type];
 							if (_.isFunction(expected)) {
-								expected.call(this, result);
+								const promise = expected.call(this, result);
+								if (promise instanceof Promise) {
+									promises.push(promise);
+								}
 							} else {
 								expect(result).to.deep.equal(expected);
 							}
 						});
+						if (promises.length > 0) {
+							return Promise.all(promises).then(() => {
+								done();
+							}).catch(done);
+						}
 					} catch (error) {
 						return done(error);
 					}

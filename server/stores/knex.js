@@ -11,42 +11,55 @@ module.exports = function(lnurl) {
 		this.options = options || {};
 		this.db = knex(this.options);
 		this.prepareQueues();
-		this.prepareTable();
+		this.prepareTable().then(() => {
+			this.resumeQueue('onReady');
+		}).catch(error => {
+			this.resumeQueue('onReady', error);
+		});
 	};
 
 	Store.prototype.prepareQueues = function() {
+		this.queueError = {};
 		this.queues = {
 			onReady: async.queue((task, next) => {
-				try {
-					// Synchronous tasks.
-					task.fn();
-				} catch (error) {
-					debug.error(error);
+				const error = this.queueError.onReady || null;
+				if (error) {
+					task.reject(error);
+				} else {
+					task.resolve();
 				}
 				next();
-			}, 1/* concurrency */)
+			}, 1/* concurrency */),
 		};
 		// Pause all queues to delay execution of tasks until later.
 		_.invoke(this.queues, 'pause');
 	};
 
+	Store.prototype.resumeQueue = function(name, error) {
+		if (error) {
+			this.queueError[name] = error;
+		}
+		this.queues[name].resume();
+	};
+
 	Store.prototype.onReady = function() {
+		if (Array.from(arguments).length > 0) {
+			throw new Error('Store.onReady takes no arguments');
+		}
 		return new Promise((resolve, reject) => {
-			this.queues.onReady.push({ fn: resolve });
+			this.queues.onReady.push({ resolve, reject });
 		});
 	};
 
 	Store.prototype.prepareTable = function() {
-		this.db.schema.hasTable('urls').then(exists => {
+		return this.db.schema.hasTable('urls').then(exists => {
 			if (!exists) {
 				return this.db.schema.createTable('urls', table => {
 					table.string('hash').unique();
 					table.json('data');
 				});
 			}
-		}).then(() => {
-			this.queues.onReady.resume();
-		}).catch(debug.error);
+		});
 	};
 
 	Store.prototype.save = function(hash, data) {

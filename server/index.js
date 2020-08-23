@@ -32,7 +32,7 @@ module.exports = function(lnurl) {
 		this.prepareApiKeys();
 		this.prepareHooks();
 		this.prepareLightning();
-		this.prepareStore();
+		this.store = this.prepareStore(this.options);
 		this.app = this.createWebServer();
 		this.locks = new Map();
 	};
@@ -675,11 +675,11 @@ module.exports = function(lnurl) {
 		return callbackUrl;
 	};
 
-	Server.prototype.prepareStore = function() {
-		const { backend, config } = this.options.store;
+	Server.prototype.prepareStore = function(options) {
+		const { backend, config } = options.store;
 		const storePath = path.join(__dirname, 'stores', backend);
 		const Store = require(storePath)(lnurl);
-		this.store = new Store(config);
+		return new Store(config);
 	};
 
 	Server.prototype.isLocked = function(secret) {
