@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Updated dependencies
 * v0.7.1:
   * Provide "altNames" when creating own self-signed TLS certificates (mock lnd, lnurl-server instance) - this will prevent errors when setting "host" option to a value other than localhost (e.g "127.0.0.1")
   * Set "Cache-Control: private" header for lnurl-pay action requests. This tells HTTP proxies to not cache the response - which is important because the same URL and query string can yield different responses (e.g different payment requests) each time the lnurl-pay URL is called.
