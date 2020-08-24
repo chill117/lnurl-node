@@ -1,4 +1,6 @@
+const _ = require('underscore');
 const bech32 = require('bech32');
+const lib = require('./lib');
 
 let lnurl = {
 	bech32: {
@@ -27,6 +29,17 @@ let lnurl = {
 	},
 };
 
+// Extend the top-level public interface with a few lib methods.
+_.extend(lnurl, _.pick(lib,
+	'createAuthorizationSignature',
+	'verifyAuthorizationSignature',
+	'generateRandomLinkingKey'
+));
+
+// Expose the server prototype.
 lnurl.Server = require('./server')(lnurl);
+
+// Expose the Lightning backend prototype - for creating custom backends.
 lnurl.LightningBackend = require('./server/LightningBackend');
+
 module.exports = lnurl;

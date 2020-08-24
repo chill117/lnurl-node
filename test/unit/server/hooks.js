@@ -3,6 +3,10 @@ const { expect } = require('chai');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
 const { HttpError } = lnurl.Server;
+const {
+	createAuthorizationSignature,
+	generateRandomLinkingKey
+} = require('../../../lib');
 
 describe('Server: hooks', function() {
 
@@ -30,9 +34,9 @@ describe('Server: hooks', function() {
 		});
 
 		it('successful login', function(done) {
-			const { pubKey, privKey } = helpers.generateLinkingKey();
+			const { pubKey, privKey } = generateRandomLinkingKey();
 			const k1 = Buffer.from(secret, 'hex');
-			const sig = helpers.sign(k1, privKey);
+			const sig = createAuthorizationSignature(k1, privKey);
 			const params = {
 				sig: sig.toString('hex'),
 				key: pubKey.toString('hex'),

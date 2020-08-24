@@ -4,6 +4,12 @@ const { expect } = require('chai');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
 const querystring = require('querystring');
+const {
+	createAuthorizationSignature,
+	generatePaymentRequest,
+	generateRandomLinkingKey,
+	getTagDataFromPaymentRequest
+} = require('../../../lib');
 
 describe('Server: HTTP API', function() {
 
@@ -83,15 +89,15 @@ describe('Server: HTTP API', function() {
 					private: 1,
 				},
 				'withdrawRequest': {
-					pr: helpers.generatePaymentRequest(1000000),
+					pr: generatePaymentRequest(1000000),
 				},
 				'payRequest': {
 					amount: 150000,
 				},
 				'login': function(secret) {
-					const { pubKey, privKey } = helpers.generateLinkingKey();
+					const { pubKey, privKey } = generateRandomLinkingKey();
 					const k1 = Buffer.from(secret, 'hex');
-					const sig = helpers.sign(k1, privKey);
+					const sig = createAuthorizationSignature(k1, privKey);
 					const params = {
 						sig: sig.toString('hex'),
 						key: pubKey.toString('hex'),
@@ -535,10 +541,10 @@ describe('Server: HTTP API', function() {
 					{
 						description: 'invalid signature: signed with different private key',
 						params: function() {
-							const linkingKey1 = helpers.generateLinkingKey();
-							const linkingKey2 = helpers.generateLinkingKey();
+							const linkingKey1 = generateRandomLinkingKey();
+							const linkingKey2 = generateRandomLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
-							const sig = helpers.sign(k1, linkingKey1.privKey);
+							const sig = createAuthorizationSignature(k1, linkingKey1.privKey);
 							return {
 								tag: 'login',
 								k1: k1.toString('hex'),
@@ -554,9 +560,9 @@ describe('Server: HTTP API', function() {
 					{
 						description: 'valid signature',
 						params: function() {
-							const { pubKey, privKey } = helpers.generateLinkingKey();
+							const { pubKey, privKey } = generateRandomLinkingKey();
 							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
-							const sig = helpers.sign(k1, privKey);
+							const sig = createAuthorizationSignature(k1, privKey);
 							const params = {
 								tag: 'login',
 								k1: k1.toString('hex'),
@@ -821,9 +827,9 @@ describe('Server: HTTP API', function() {
 					description: 'multiple payment requests (total OK)',
 					params: {
 						pr: [
-							helpers.generatePaymentRequest(700000),
-							helpers.generatePaymentRequest(800000),
-							helpers.generatePaymentRequest(400000),
+							generatePaymentRequest(700000),
+							generatePaymentRequest(800000),
+							generatePaymentRequest(400000),
 						].join(','),
 					},
 					expected: function(body) {
@@ -834,7 +840,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'single payment request (total < minWithdrawable)',
 					params: {
-						pr: helpers.generatePaymentRequest(500000),
+						pr: generatePaymentRequest(500000),
 					},
 					expected: {
 						status: 'ERROR',
@@ -845,8 +851,8 @@ describe('Server: HTTP API', function() {
 					description: 'multiple payment requests (total < minWithdrawable)',
 					params: {
 						pr: [
-							helpers.generatePaymentRequest(300000),
-							helpers.generatePaymentRequest(500000),
+							generatePaymentRequest(300000),
+							generatePaymentRequest(500000),
 						].join(','),
 					},
 					expected: {
@@ -857,7 +863,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'single payment request (total > maxWithdrawable)',
 					params: {
-						pr: helpers.generatePaymentRequest(5000000),
+						pr: generatePaymentRequest(5000000),
 					},
 					expected: function(body) {
 						expect(body).to.deep.equal({
@@ -871,9 +877,9 @@ describe('Server: HTTP API', function() {
 					description: 'multiple payment requests (total > maxWithdrawable)',
 					params: {
 						pr: [
-							helpers.generatePaymentRequest(700000),
-							helpers.generatePaymentRequest(800000),
-							helpers.generatePaymentRequest(800000),
+							generatePaymentRequest(700000),
+							generatePaymentRequest(800000),
+							generatePaymentRequest(800000),
 						].join(','),
 					},
 					expected: function(body) {
@@ -893,7 +899,7 @@ describe('Server: HTTP API', function() {
 						expect(body).to.be.an('object');
 						expect(body.pr).to.be.a('string');
 						expect(body.routes).to.be.an('array');
-						const purposeCommitHashTagData = helpers.getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
+						const purposeCommitHashTagData = getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
 						const { metadata } = validParams.create.payRequest;
 						expect(purposeCommitHashTagData).to.equal(lnurl.Server.prototype.hash(Buffer.from(metadata, 'utf8')));
 						mock.expectNumRequestsToEqual('addinvoice', 1);
@@ -933,10 +939,10 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'signed with different private key',
 					params: function() {
-						const linkingKey1 = helpers.generateLinkingKey();
-						const linkingKey2 = helpers.generateLinkingKey();
+						const linkingKey1 = generateRandomLinkingKey();
+						const linkingKey2 = generateRandomLinkingKey();
 						const k1 = Buffer.from(this.secret, 'hex');
-						const sig = helpers.sign(k1, linkingKey1.privKey);
+						const sig = createAuthorizationSignature(k1, linkingKey1.privKey);
 						const params = {
 							sig: sig.toString('hex'),
 							key: linkingKey2.pubKey.toString('hex'),
@@ -951,9 +957,9 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'signed different secret',
 					params: function() {
-						const { pubKey, privKey } = helpers.generateLinkingKey();
+						const { pubKey, privKey } = generateRandomLinkingKey();
 						const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
-						const sig = helpers.sign(k1, privKey);
+						const sig = createAuthorizationSignature(k1, privKey);
 						const params = {
 							sig: sig.toString('hex'),
 							key: pubKey.toString('hex'),

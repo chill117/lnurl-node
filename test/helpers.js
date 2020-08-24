@@ -3,10 +3,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const {
-	generatePaymentRequest,
-	getTagDataFromPaymentRequest
-} = require('../lib');
 const lnurl = require('../');
 const path = require('path');
 const querystring = require('querystring');
@@ -134,24 +130,5 @@ module.exports = {
 		});
 		req.once('error', done);
 		req.end();
-	},
-	generatePaymentRequest: function() {
-		return generatePaymentRequest.apply(this, arguments);
-	},
-	getTagDataFromPaymentRequest: function() {
-		return getTagDataFromPaymentRequest.apply(this, arguments);
-	},
-	generateLinkingKey: function() {
-		let privKey;
-		do {
-			privKey = crypto.randomBytes(32);
-		} while (!secp256k1.privateKeyVerify(privKey))
-		const pubKey = Buffer.from(secp256k1.publicKeyCreate(privKey));
-		return { pubKey, privKey };
-	},
-	sign: function(data, privKey) {
-		const { signature } = secp256k1.ecdsaSign(data, privKey);
-		const derEncodedSignature = secp256k1.signatureExport(signature);
-		return Buffer.from(derEncodedSignature);
 	},
 };

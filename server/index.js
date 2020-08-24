@@ -13,6 +13,11 @@ module.exports = function(lnurl) {
 	const http = require('http');
 	const https = require('https');
 	const HttpError = require('./HttpError');
+	const {
+		createHash,
+		generateRandomByteString,
+		isHex
+	} = require('../lib');
 	const path = require('path');
 	const pem = require('pem');
 	const querystring = require('querystring');
@@ -793,20 +798,12 @@ module.exports = function(lnurl) {
 		});
 	};
 
-	Server.prototype.generateRandomKey = function(numberOfBytes, encoding) {
-		numberOfBytes = numberOfBytes || 32;
-		encoding = encoding || 'hex';
-		return crypto.randomBytes(numberOfBytes).toString(encoding);
+	Server.prototype.generateRandomKey = function() {
+		return generateRandomByteString.apply(undefined, arguments);
 	};
 
-	Server.prototype.hash = function(data) {
-		if (!_.isString(data) && !Buffer.isBuffer(data)) {
-			throw new Error('Invalid argument ("data"): String or buffer expected.');
-		}
-		if (_.isString(data) && this.isHex(data)) {
-			data = Buffer.from(data, 'hex');
-		}
-		return crypto.createHash('sha256').update(data).digest('hex');
+	Server.prototype.hash = function() {
+		return createHash.apply(undefined, arguments);
 	};
 
 	Server.prototype.prepareLightning = function() {
@@ -881,11 +878,8 @@ module.exports = function(lnurl) {
 		return JSON.parse(JSON.stringify(data));
 	};
 
-	Server.prototype.isHex = function(hex) {
-		if (!_.isString(hex)) {
-			throw new Error('Invalid argument ("hex"): String expected.');
-		}
-		return Buffer.from(hex, 'hex').toString('hex') === hex;
+	Server.prototype.isHex = function() {
+		return isHex.apply(undefined, arguments);
 	};
 
 	Server.prototype.close = function() {
