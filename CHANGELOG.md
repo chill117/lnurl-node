@@ -1,6 +1,6 @@
 # Changelog
 
-* TBD:
+* v0.8.0:
   * CLI:
     * encode/decode will now print result without newline character at end of output
   * Updated dependencies
