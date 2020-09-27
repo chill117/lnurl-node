@@ -143,7 +143,7 @@ describe('Command-line interface', function() {
 				child.on('close', () => {
 					try {
 						_.each(test.expected, (expected, type) => {
-							const result = results[type].trim();
+							const result = results[type];
 							if (_.isFunction(expected)) {
 								expected.call(this, result);
 							} else {

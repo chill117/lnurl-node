@@ -17,12 +17,12 @@ program
 program
 	.command('encode [url]')
 	.description('Encode a url as a bech32-encoded string.')
-	.action(function(url) {
+	.action(function(unencoded) {
 		if (stdin) {
-			url = stdin.replace('\n', '');
+			unencoded = stdin.replace('\n', '');
 		}
-		const encoded = lnurl.encode(url);
-		console.log(encoded);
+		const encoded = lnurl.encode(unencoded);
+		process.stdout.write(encoded);
 	});
 
 program
@@ -32,8 +32,8 @@ program
 		if (stdin) {
 			encoded = stdin.replace('\n', '');
 		}
-		const url = lnurl.decode(encoded);
-		console.log(url);
+		const decoded = lnurl.decode(encoded);
+		process.stdout.write(decoded);
 	});
 
 program

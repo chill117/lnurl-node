@@ -1,6 +1,8 @@
 # Changelog
 
 * TBD:
+  * CLI:
+    * encode/decode will now print result without newline character at end of output
   * Updated dependencies
 * v0.7.1:
   * Provide "altNames" when creating own self-signed TLS certificates (mock lnd, lnurl-server instance) - this will prevent errors when setting "host" option to a value other than localhost (e.g "127.0.0.1")
