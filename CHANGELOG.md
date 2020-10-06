@@ -3,6 +3,7 @@
 * TBD:
   * CLI:
     * Command added ("generateNewUrl"); see [Generate a new URL](https://github.com/chill117/lnurl-node/blob/master/README.md#generate-a-new-url)
+    * generateApiKey will now print result without newline character at end of output
 * v0.8.0:
   * CLI:
     * encode/decode will now print result without newline character at end of output

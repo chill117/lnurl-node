@@ -65,7 +65,7 @@ program
 		options.numBytes = {};
 		options.numBytes.id = parseInt(this['numBytes.id']);
 		options.numBytes.key = parseInt(this['numBytes.key']);
-		console.log(JSON.stringify(lnurl.generateApiKey(options), null, 2));
+		process.stdout.write(JSON.stringify(lnurl.generateApiKey(options), null, 2));
 	});
 
 program

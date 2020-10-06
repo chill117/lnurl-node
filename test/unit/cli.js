@@ -93,6 +93,8 @@ describe('Command-line interface', function() {
 				cmd: ['generateApiKey'],
 				expected: {
 					stdout: function(result) {
+						expect(result).to.not.equal('');
+						expect(result.trim()).to.equal(result);
 						result = JSON.parse(result);
 						expect(result).to.be.an('object');
 						expect(result.id).to.be.a('string');
@@ -113,6 +115,8 @@ describe('Command-line interface', function() {
 				],
 				expected: {
 					stdout: function(result) {
+						expect(result).to.not.equal('');
+						expect(result.trim()).to.equal(result);
 						result = JSON.parse(result);
 						expect(result).to.be.an('object');
 						expect(result.id).to.be.a('string');
@@ -135,6 +139,8 @@ describe('Command-line interface', function() {
 				],
 				expected: {
 					stdout: function(result) {
+						expect(result).to.not.equal('');
+						expect(result.trim()).to.equal(result);
 						result = JSON.parse(result);
 						expect(result).to.be.an('object');
 						expect(result.id).to.be.a('string');
@@ -254,6 +260,7 @@ describe('Command-line interface', function() {
 					expected: {
 						stdout: function(result) {
 							expect(result).to.not.equal('');
+							expect(result.trim()).to.equal(result);
 							result = JSON.parse(result);
 							expect(result).to.be.an('object');
 							expect(result.encoded).to.be.a('string');
@@ -290,6 +297,7 @@ describe('Command-line interface', function() {
 					expected: {
 						stdout: function(result) {
 							expect(result).to.not.equal('');
+							expect(result.trim()).to.equal(result);
 							result = JSON.parse(result);
 							expect(result).to.be.an('object');
 							expect(result.encoded).to.be.a('string');
