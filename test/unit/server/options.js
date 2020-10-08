@@ -2,6 +2,7 @@ const _ = require('underscore');
 const async = require('async');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
+const { prepareSignedQuery } = require('../../../lib');
 const path = require('path');
 
 describe('Server: options', function() {
@@ -111,7 +112,7 @@ describe('Server: options', function() {
 									localAmt: 2000,
 									pushAmt: 0,
 								};
-								const query = helpers.prepareSignedRequest(apiKey, tag, params);
+								const query = prepareSignedQuery(apiKey, tag, params);
 								return helpers.request('get', {
 									url: this.server.getCallbackUrl(),
 									qs: query,

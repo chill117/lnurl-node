@@ -1,14 +1,11 @@
 const _ = require('underscore');
 const { expect } = require('chai');
-const lnurl = require('../../../');
+const { createSignature } = require('../../../lib');
 
 describe('createSignature(data, key[, algorithm])', function() {
 
-	const method = 'createSignature';
-	const fn = lnurl.Server.prototype[method].bind(lnurl.Server.prototype);
-
 	it('is a function', function() {
-		expect(lnurl.Server.prototype[method]).to.be.a('function');
+		expect(createSignature).to.be.a('function');
 	});
 
 	const tests = [
@@ -34,7 +31,7 @@ describe('createSignature(data, key[, algorithm])', function() {
 		const { data, key } = test.args;
 		let description = test.description || JSON.stringify(test.args);
 		it(description, function() {
-			const result = fn(data, key);
+			const result = createSignature(data, key);
 			if (_.isFunction(test.expected)) {
 				test.expected.call(this, result);
 			} else {

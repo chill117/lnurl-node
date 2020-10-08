@@ -4,6 +4,7 @@ const expect = require('chai').expect;
 const fs = require('fs');
 const helpers = require('../helpers');
 const lnurl = require('../../');
+const { prepareSignedQuery } = require('../../lib');
 const path = require('path');
 const spawn = require('child_process').spawn;
 
@@ -465,7 +466,7 @@ describe('Command-line interface', function() {
 								pushAmt: 1000,
 							};
 							const apiKey = apiKeys[0];
-							const query = helpers.prepareSignedRequest(apiKey, tag, params);
+							const query = prepareSignedQuery(apiKey, tag, params);
 							return new Promise((resolve, reject) => {
 								async.retry({
 									times: 50,

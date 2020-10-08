@@ -224,7 +224,7 @@ program
 	)
 	.option(
 		'--auth.apiKeys [values]',
-		'List of API keys that can be used to authorize privileged behaviors',
+		'List of API keys that can be used to sign LNURLs for your server',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.auth.apiKeys,
 	)

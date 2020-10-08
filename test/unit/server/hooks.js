@@ -5,7 +5,8 @@ const lnurl = require('../../../');
 const { HttpError } = lnurl.Server;
 const {
 	createAuthorizationSignature,
-	generateRandomLinkingKey
+	generateRandomLinkingKey,
+	prepareSignedQuery
 } = require('../../../lib');
 
 describe('Server: hooks', function() {
@@ -96,7 +97,7 @@ describe('Server: hooks', function() {
 		it('invalid authorization signature', function(done) {
 			done = _.once(done);
 			const unknownApiKey = lnurl.Server.prototype.generateApiKey();
-			const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
+			const query = prepareSignedQuery(unknownApiKey, tag, params);
 			helpers.request('get', {
 				url: server.getCallbackUrl(),
 				ca: server.ca,
@@ -116,7 +117,7 @@ describe('Server: hooks', function() {
 
 		it('valid authorization signature', function(done) {
 			done = _.once(done);
-			const query = helpers.prepareSignedRequest(apiKey, tag, params);
+			const query = prepareSignedQuery(apiKey, tag, params);
 			helpers.request('get', {
 				url: server.getCallbackUrl(),
 				ca: server.ca,

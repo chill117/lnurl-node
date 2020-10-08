@@ -1,14 +1,11 @@
 const _ = require('underscore');
 const { expect } = require('chai');
-const lnurl = require('../../../');
+const { isHex } = require('../../../lib');
 
 describe('isHex(hex)', function() {
 
-	const method = 'isHex';
-	const fn = lnurl.Server.prototype[method].bind(lnurl.Server.prototype);
-
 	it('is a function', function() {
-		expect(lnurl.Server.prototype[method]).to.be.a('function');
+		expect(isHex).to.be.a('function');
 	});
 
 	const values = {
@@ -18,13 +15,13 @@ describe('isHex(hex)', function() {
 
 	_.each(values.hex, function(value) {
 		it(`hex = "${value}"`, function() {
-			expect(fn(value)).to.equal(true);
+			expect(isHex(value)).to.equal(true);
 		});
 	});
 
 	_.each(values.notHex, function(value) {
 		it(`notHex = "${value}"`, function() {
-			expect(fn(value)).to.equal(false);
+			expect(isHex(value)).to.equal(false);
 		});
 	});
 
@@ -32,7 +29,7 @@ describe('isHex(hex)', function() {
 		it('throws if "hex" is not a string (' + JSON.stringify(value) + ')', function() {
 			let thrownError;
 			try {
-				fn(value);
+				isHex(value);
 			} catch (error) {
 				thrownError = error;
 			}

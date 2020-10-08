@@ -1,12 +1,10 @@
 const _ = require('underscore');
-const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const lnurl = require('../');
 const path = require('path');
 const querystring = require('querystring');
-const secp256k1 = require('secp256k1');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
@@ -81,22 +79,6 @@ module.exports = {
 			}
 		};
 		return mock;
-	},
-	prepareSignedRequest: function(apiKey, tag, params, overrides) {
-		overrides = overrides || {};
-		const { id, key } = apiKey;
-		const nonce = this.generateNonce(12);
-		const query = _.extend({
-			id,
-			nonce,
-			tag,
-		}, params, overrides);
-		const payload = querystring.stringify(query);
-		query.signature = lnurl.Server.prototype.createSignature(payload, key);
-		return query;
-	},
-	generateNonce: function(numberOfBytes) {
-		return lnurl.Server.prototype.generateRandomKey(numberOfBytes);
 	},
 	request: function(method, requestOptions) {
 		return new Promise((resolve, reject) => {

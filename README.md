@@ -374,7 +374,7 @@ const server = lnurl.createServer({
 	// The URI path of the web API end-point:
 	endpoint: '/lnurl',
 	auth: {
-		// List of API keys that can be used to authorize privileged behaviors:
+		// List of API keys that can be used to sign LNURLs for your server:
 		apiKeys: [],
 	},
 	apiKey: {

@@ -8,7 +8,8 @@ const {
 	createAuthorizationSignature,
 	generatePaymentRequest,
 	generateRandomLinkingKey,
-	getTagDataFromPaymentRequest
+	getTagDataFromPaymentRequest,
+	prepareSignedQuery
 } = require('../../../lib');
 
 describe('Server: HTTP API', function() {
@@ -137,7 +138,7 @@ describe('Server: HTTP API', function() {
 				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
+				const query = prepareSignedQuery(unknownApiKey, tag, params);
 				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
@@ -156,7 +157,7 @@ describe('Server: HTTP API', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
-				const query = helpers.prepareSignedRequest(apiKey, tag, params);
+				const query = prepareSignedQuery(apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
 				return helpers.request('get', {
@@ -180,7 +181,7 @@ describe('Server: HTTP API', function() {
 					const apiKey = apiKeys[0];
 					let overrides = {};
 					overrides[field] = '';
-					const query = helpers.prepareSignedRequest(apiKey, tag, params, overrides);
+					const query = prepareSignedQuery(apiKey, tag, params, { overrides });
 					return helpers.request('get', {
 						url: server.getCallbackUrl(),
 						ca: server.ca,
@@ -200,13 +201,7 @@ describe('Server: HTTP API', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
-				let query = _.extend({
-					nonce: helpers.generateNonce(10),
-					tag: tag,
-					id: apiKey.id,
-				}, params);
-				const payload = querystring.stringify(query);
-				query.signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
+				const query = prepareSignedQuery(apiKey, tag, params);
 				const outOfOrderQuery = _.extend({
 					signature: query.signature,
 					tag: query.tag,
@@ -230,17 +225,8 @@ describe('Server: HTTP API', function() {
 			it('shortened query', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
-				const { localAmt, pushAmt } = params;
 				const apiKey = apiKeys[0];
-				let query = server.shortenQuery({
-					id: apiKey.id,
-					nonce: helpers.generateNonce(10),
-					tag,
-					localAmt,
-					pushAmt,
-				});
-				const payload = querystring.stringify(query);
-				query.signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
+				const query = prepareSignedQuery(apiKey, tag, params);
 				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
@@ -267,7 +253,7 @@ describe('Server: HTTP API', function() {
 						before(function() {
 							const params = prepareValidParams('create', tag);
 							const apiKey = apiKeys[0];
-							const query = this.query = helpers.prepareSignedRequest(apiKey, tag, params);
+							const query = this.query = prepareSignedQuery(apiKey, tag, params);
 							return helpers.request('get', {
 								url: server.getCallbackUrl(),
 								ca: server.ca,
@@ -585,7 +571,7 @@ describe('Server: HTTP API', function() {
 									params = test.params;
 								}
 								const apiKey = apiKeys[0];
-								const query = helpers.prepareSignedRequest(apiKey, tag, params);
+								const query = prepareSignedQuery(apiKey, tag, params);
 								return helpers.request('get', {
 									url: server.getCallbackUrl(),
 									ca: server.ca,

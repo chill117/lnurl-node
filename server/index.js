@@ -2,7 +2,6 @@ module.exports = function(lnurl) {
 
 	const _ = require('underscore');
 	const async = require('async');
-	const crypto = require('crypto');
 	const debug = {
 		info: require('debug')('lnurl:info'),
 		error: require('debug')('lnurl:error'),
@@ -15,8 +14,10 @@ module.exports = function(lnurl) {
 	const HttpError = require('./HttpError');
 	const {
 		createHash,
+		createSignature,
 		generateRandomByteString,
-		isHex
+		isHex,
+		unshortenQuery
 	} = require('../lib');
 	const path = require('path');
 	const pem = require('pem');
@@ -55,7 +56,7 @@ module.exports = function(lnurl) {
 		// The URI path of the web API end-point:
 		endpoint: '/lnurl',
 		auth: {
-			// List of API keys that can be used to authorize privileged behaviors:
+			// List of API keys that can be used to sign LNURLs for your server:
 			apiKeys: [],
 		},
 		apiKey: {
@@ -313,7 +314,7 @@ module.exports = function(lnurl) {
 						// Only unshorten signed LNURLs.
 						// Save the original query for signature validation later.
 						req.originalQuery = _.clone(req.query);
-						req.query = this.unshortenQuery(req.query);
+						req.query = unshortenQuery(req.query);
 					}
 					next();
 				},
@@ -491,112 +492,9 @@ module.exports = function(lnurl) {
 		return this.getApiKey(id).then(apiKey => {
 			if (!apiKey) return false;
 			const { key } = apiKey;
-			const expected = this.createSignature(payload, key);
+			const expected = createSignature(payload, key);
 			return signature === expected;
 		});
-	};
-
-	Server.prototype.createSignature = function(data, key, algorithm) {
-		algorithm = algorithm || 'sha256';
-		if (_.isString(key) && this.isHex(key)) {
-			key = Buffer.from(key, 'hex');
-		}
-		return crypto.createHmac(algorithm, key).update(data).digest('hex');
-	};
-
-	Server.prototype.unshorteningLookupTable = {
-		query: {
-			'n': 'nonce',
-			's': 'signature',
-			't': 'tag',
-		},
-		tags: {
-			'c': 'channelRequest',
-			'l': 'login',
-			'p': 'payRequest',
-			'w': 'withdrawRequest',
-		},
-		params: {
-			'c': {
-				'pl': 'localAmt',
-				'pp': 'pushAmt',
-			},
-			'l': {},
-			'p': {
-				'pn': 'minSendable',
-				'px': 'maxSendable',
-				'pm': 'metadata',
-			},
-			'w': {
-				'pn': 'minWithdrawable',
-				'px': 'maxWithdrawable',
-				'pd': 'defaultDescription',
-			},
-		},
-	};
-
-	Server.prototype.shorteningLookupTable = {
-		query: {
-			'nonce': 'n',
-			'signature': 's',
-			'tag': 't',
-		},
-		tags: {
-			'channelRequest': 'c',
-			'login': 'l',
-			'payRequest': 'p',
-			'withdrawRequest': 'w',
-		},
-		params: {
-			'channelRequest': {
-				'localAmt': 'pl',
-				'pushAmt': 'pp',
-			},
-			'login': {},
-			'payRequest': {
-				'minSendable': 'pn',
-				'maxSendable': 'px',
-				'metadata': 'pm',
-			},
-			'withdrawRequest': {
-				'minWithdrawable': 'pn',
-				'maxWithdrawable': 'px',
-				'defaultDescription': 'pd',
-			},
-		},
-	};
-
-	Server.prototype.shortenQuery = function(query) {
-		return this.invertQuery(query, this.shorteningLookupTable);
-	};
-
-	Server.prototype.unshortenQuery = function(query) {
-		return this.invertQuery(query, this.unshorteningLookupTable);
-	};
-
-	Server.prototype.invertQuery = function(query, fromTo) {
-		let inverted = _.clone(query);
-		_.each(fromTo.query, (to, from) => {
-			if (!_.isUndefined(inverted[from])) {
-				inverted[to] = inverted[from];
-				delete inverted[from];
-			}
-		});
-		const tag = _.findKey(fromTo.tags, function(to, from) {
-			return to === (inverted.tag || inverted.t) || from === (inverted.tag || inverted.t);
-		});
-		_.each(fromTo.params[tag], (to, from) => {
-			if (!_.isUndefined(inverted[from])) {
-				inverted[to] = inverted[from];
-				delete inverted[from];
-			}
-		});
-		if (inverted.tag && !_.isUndefined(fromTo.tags[inverted.tag])) {
-			inverted.tag = fromTo.tags[inverted.tag];
-		} else if (inverted.t && !_.isUndefined(fromTo.tags[inverted.t])) {
-			inverted.t = fromTo.tags[inverted.t];
-		}
-		return inverted;
 	};
 
 	Server.prototype.isReusable = function(tag) {
