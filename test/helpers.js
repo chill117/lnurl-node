@@ -98,36 +98,52 @@ module.exports = {
 	generateNonce: function(numberOfBytes) {
 		return lnurl.Server.prototype.generateRandomKey(numberOfBytes);
 	},
-	request: function(method, requestOptions, cb) {
-		const done = _.once(cb);
-		const parsedUrl = url.parse(requestOptions.url);
-		let options = _.chain(requestOptions).pick('ca').extend({
-			method: method.toUpperCase(),
-			hostname: parsedUrl.hostname,
-			port: parsedUrl.port,
-			path: parsedUrl.path,
-		}).value();
-		if (requestOptions.qs) {
-			options.path += '?' + querystring.stringify(requestOptions.qs);
-		}
-		const request = parsedUrl.protocol === 'https:' ? https.request : http.request;
-		const req = request(options, function(res) {
-			let body = '';
-			res.on('data', function(buffer) {
-				body += buffer.toString();
-			});
-			res.on('end', function() {
-				if (requestOptions.json) {
-					try {
-						body = JSON.parse(body);
-					} catch (error) {
-						return done(error);
+	request: function(method, requestOptions) {
+		return new Promise((resolve, reject) => {
+			const parsedUrl = url.parse(requestOptions.url);
+			let options = _.chain(requestOptions).pick('ca', 'headers').extend({
+				method: method.toUpperCase(),
+				hostname: parsedUrl.hostname,
+				port: parsedUrl.port,
+				path: parsedUrl.path,
+			}).value();
+			options.headers = options.headers || {};
+			if (requestOptions.qs) {
+				options.path += '?' + querystring.stringify(requestOptions.qs);
+			}
+			let postData;
+			if (requestOptions.form) {
+				options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+				postData = querystring.stringify(requestOptions.form);
+			} else if (requestOptions.body && requestOptions.json) {
+				options.headers['Content-Type'] = 'application/json';
+				postData = querystring.stringify(requestOptions.body);
+			}
+			if (postData) {
+				options.headers['Content-Length'] = Buffer.byteLength(postData);
+			}
+			const request = parsedUrl.protocol === 'https:' ? https.request : http.request;
+			const req = request(options, function(response) {
+				let body = '';
+				response.on('data', function(buffer) {
+					body += buffer.toString();
+				});
+				response.on('end', function() {
+					if (requestOptions.json) {
+						try {
+							body = JSON.parse(body);
+						} catch (error) {
+							return reject(error);
+						}
 					}
-				}
-				done(null, res, body);
+					resolve({ response, body });
+				});
 			});
+			if (postData) {
+				req.write(postData);
+			}
+			req.once('error', reject);
+			req.end();
 		});
-		req.once('error', done);
-		req.end();
 	},
 };

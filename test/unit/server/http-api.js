@@ -116,107 +116,87 @@ describe('Server: HTTP API', function() {
 			}
 		};
 
-		it('missing secret', function(done) {
-			helpers.request('get', {
+		it('missing secret', function() {
+			return helpers.request('get', {
 				url: server.getCallbackUrl(),
 				ca: server.ca,
 				qs: {},
 				json: true,
-			}, function(error, response, body) {
-				if (error) return done(error);
-				try {
-					expect(body).to.deep.equal({
-						status: 'ERROR',
-						reason: 'Missing secret',
-					});
-				} catch (error) {
-					return done(error);
-				}
-				done();
+			}).then(result => {
+				const { response, body } = result;
+				expect(body).to.deep.equal({
+					status: 'ERROR',
+					reason: 'Missing secret',
+				});
 			});
 		});
 
 		describe('?s=SIGNATURE&id=API_KEY_ID&n=NONCE&..', function() {
 
-			it('invalid authorization signature: unknown API key', function(done) {
+			it('invalid authorization signature: unknown API key', function() {
 				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
-				helpers.request('get', {
+				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: query,
 					json: true,
-				}, (error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Invalid API key signature',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.deep.equal({
+						status: 'ERROR',
+						reason: 'Invalid API key signature',
+					});
 				});
 			});
 
-			it('query tampering', function(done) {
+			it('query tampering', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
 				const query = helpers.prepareSignedRequest(apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
-				helpers.request('get', {
+				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: query,
 					json: true,
-				}, (error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Invalid API key signature',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.deep.equal({
+						status: 'ERROR',
+						reason: 'Invalid API key signature',
+					});
 				});
 			});
 
 			_.each(['id', 'nonce', 'tag'], function(field) {
-				it(`missing "${field}"`, function(done) {
+				it(`missing "${field}"`, function() {
 					const tag = 'channelRequest';
 					const params = prepareValidParams('create', tag);
 					const apiKey = apiKeys[0];
 					let overrides = {};
 					overrides[field] = '';
 					const query = helpers.prepareSignedRequest(apiKey, tag, params, overrides);
-					helpers.request('get', {
+					return helpers.request('get', {
 						url: server.getCallbackUrl(),
 						ca: server.ca,
 						qs: query,
 						json: true,
-					}, (error, response, body) => {
-						if (error) return done(error);
-						try {
-							expect(body).to.deep.equal({
-								status: 'ERROR',
-								reason: `Failed API key signature check: Missing "${field}"`,
-							});
-						} catch (error) {
-							return done(error);
-						}
-						done();
+					}).then(result => {
+						const { response, body } = result;
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: `Failed API key signature check: Missing "${field}"`,
+						});
 					});
 				});
 			});
 
-			it('out-of-order query string', function(done) {
+			it('out-of-order query string', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
@@ -233,26 +213,21 @@ describe('Server: HTTP API', function() {
 					id: query.id,
 					nonce: query.nonce,
 				}, params);
-				helpers.request('get', {
+				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: outOfOrderQuery,
 					json: true,
-				}, (error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Invalid API key signature',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.deep.equal({
+						status: 'ERROR',
+						reason: 'Invalid API key signature',
+					});
 				});
 			});
 
-			it('shortened query', function(done) {
+			it('shortened query', function() {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const { localAmt, pushAmt } = params;
@@ -266,20 +241,15 @@ describe('Server: HTTP API', function() {
 				});
 				const payload = querystring.stringify(query);
 				query.signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
-				helpers.request('get', {
+				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: query,
 					json: true,
-				}, (error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.be.an('object');
-						expect(body.status).to.not.equal('ERROR');
-					} catch (error) {
-						return done(error);
-					}
-					done();
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.be.an('object');
+					expect(body.status).to.not.equal('ERROR');
 				});
 			});
 
@@ -294,41 +264,31 @@ describe('Server: HTTP API', function() {
 						return subprotocol.reusable === true;
 					})();
 					describe(tag, function() {
-						before(function(done) {
+						before(function() {
 							const params = prepareValidParams('create', tag);
 							const apiKey = apiKeys[0];
 							const query = this.query = helpers.prepareSignedRequest(apiKey, tag, params);
-							helpers.request('get', {
+							return helpers.request('get', {
 								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: query,
 								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									this.body1 = body;
-									expect(body).to.be.an('object');
-									expect(body.status).to.not.equal('ERROR');
-								} catch (error) {
-									return done(error);
-								}
-								done();
+							}).then(result => {
+								const { response, body } = result;
+								this.body1 = body;
+								expect(body).to.be.an('object');
+								expect(body.status).to.not.equal('ERROR');
 							});
 						});
-						it(`reusable = ${reusable}`, function(done) {
-							helpers.request('get', {
+						it(`reusable = ${reusable}`, function() {
+							return helpers.request('get', {
 								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: this.query,
 								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									expect(body).to.deep.equal(this.body1);
-								} catch (error) {
-									return done(error);
-								}
-								done();
+							}).then(result => {
+								const { response, body } = result;
+								expect(body).to.deep.equal(this.body1);
 							});
 						});
 					});
@@ -617,7 +577,7 @@ describe('Server: HTTP API', function() {
 					describe(`tag: "${tag}"`, function() {
 						_.each(tests, function(test) {
 							let description = test.description || ('params: ' + JSON.stringify(test.params));
-							it(description, function(done) {
+							it(description, function() {
 								let params;
 								if (_.isFunction(test.params)) {
 									params = test.params.call(this);
@@ -626,21 +586,17 @@ describe('Server: HTTP API', function() {
 								}
 								const apiKey = apiKeys[0];
 								const query = helpers.prepareSignedRequest(apiKey, tag, params);
-								helpers.request('get', {
+								return helpers.request('get', {
 									url: server.getCallbackUrl(),
 									ca: server.ca,
 									qs: query,
 									json: true,
-								}, (error, response, body) => {
-									if (error) return done(error);
-									try {
-										if (_.isFunction(test.expected)) {
-											test.expected.call(this, body, response, query);
-										} else {
-											expect(body).to.deep.equal(test.expected);
-										}
-									} catch (error) {
-										return done(error);
+								}).then(result => {
+									const { response, body } = result;
+									if (_.isFunction(test.expected)) {
+										test.expected.call(this, body, response, query);
+									} else {
+										expect(body).to.deep.equal(test.expected);
 									}
 									let secret;
 									switch (tag) {
@@ -653,15 +609,14 @@ describe('Server: HTTP API', function() {
 											break;
 									}
 									const hash = server.hash(secret);
-									server.fetchUrl(hash).then(result => {
+									return server.fetchUrl(hash).then(fetchedUrl => {
 										if (body.status === 'ERROR' && tag !== 'login') {
-											expect(result).to.equal(null);
+											expect(fetchedUrl).to.equal(null);
 										} else {
-											expect(result).to.be.an('object');
-											expect(result.apiKeyId).to.equal(apiKey.id);
+											expect(fetchedUrl).to.be.an('object');
+											expect(fetchedUrl.apiKeyId).to.equal(apiKey.id);
 										}
-										done();
-									}).catch(done);
+									});
 								});
 							});
 						});
@@ -672,25 +627,20 @@ describe('Server: HTTP API', function() {
 
 		describe('?q=SECRET', function() {
 
-			it('invalid secret', function(done) {
-				helpers.request('get', {
+			it('invalid secret', function() {
+				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: {
 						q: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
 					json: true,
-				}, function(error, response, body) {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Invalid secret',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.deep.equal({
+						status: 'ERROR',
+						reason: 'Invalid secret',
+					});
 				});
 			});
 
@@ -751,26 +701,21 @@ describe('Server: HTTP API', function() {
 						});
 					});
 					_.each(tests, function(test) {
-						it(test.description, function(done) {
-							helpers.request('get', {
+						it(test.description, function() {
+							return helpers.request('get', {
 								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: {
 									q: this.secret,
 								},
 								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									if (_.isFunction(test.expected)) {
-										test.expected.call(this, body, response);
-									} else {
-										expect(body).to.deep.equal(test.expected);
-									}
-								} catch (error) {
-									return done(error);
+							}).then(result => {
+								const { response, body } = result;
+								if (_.isFunction(test.expected)) {
+									test.expected.call(this, body, response);
+								} else {
+									expect(body).to.deep.equal(test.expected);
 								}
-								done();
 							});
 						});
 					});
@@ -780,25 +725,20 @@ describe('Server: HTTP API', function() {
 
 		describe('?k1=SECRET&..', function() {
 
-			it('invalid secret', function(done) {
-				helpers.request('get', {
+			it('invalid secret', function() {
+				return helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: {
 						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
 					json: true,
-				}, function(error, response, body) {
-					if (error) return done(error);
-					try {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Invalid secret',
-						});
-					} catch (error) {
-						return done(error);
-					}
-					done();
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.deep.equal({
+						status: 'ERROR',
+						reason: 'Invalid secret',
+					});
 				});
 			});
 
@@ -1003,7 +943,7 @@ describe('Server: HTTP API', function() {
 					});
 					_.each(tests, function(test) {
 						let description = test.description || ('params: ' + JSON.stringify(test.params));
-						it(description, function(done) {
+						it(description, function() {
 							let params;
 							if (_.isFunction(test.params)) {
 								params = test.params.call(this);
@@ -1013,23 +953,18 @@ describe('Server: HTTP API', function() {
 							params = _.extend({}, params, {
 								k1: this.secret,
 							});
-							helpers.request('get', {
+							return helpers.request('get', {
 								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: params,
 								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									if (_.isFunction(test.expected)) {
-										test.expected.call(this, body, response);
-									} else {
-										expect(body).to.deep.equal(test.expected);
-									}
-								} catch (error) {
-									return done(error);
+							}).then(result => {
+								const { response, body } = result;
+								if (_.isFunction(test.expected)) {
+									test.expected.call(this, body, response);
+								} else {
+									expect(body).to.deep.equal(test.expected);
 								}
-								done();
 							});
 						});
 					});
@@ -1061,57 +996,47 @@ describe('Server: HTTP API', function() {
 								mock.expectNumRequestsToEqual(requestType, 0);
 							}
 						});
-						beforeEach(function(done) {
+						beforeEach(function() {
 							this.query = _.extend({}, prepareValidParams('action', tag, this.secret) || {}, {
 								k1: this.secret,
 							});
-							helpers.request('get', {
+							return helpers.request('get', {
 								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: this.query,
 								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
+							}).then(result => {
+								const { response, body } = result;
+								expect(body).to.be.an('object');
+								expect(body.status).to.not.equal('ERROR');
+								if (requestType) {
+									mock.expectNumRequestsToEqual(requestType, 1);
+								}
+							});
+						});
+						it(`reusable = ${reusable}`, function() {
+							return helpers.request('get', {
+								url: server.getCallbackUrl(),
+								ca: server.ca,
+								qs: this.query,
+								json: true,
+							}).then(result => {
+								const { response, body } = result;
+								if (reusable) {
 									expect(body).to.be.an('object');
 									expect(body.status).to.not.equal('ERROR');
 									if (requestType) {
+										mock.expectNumRequestsToEqual(requestType, 2);
+									}
+								} else {
+									expect(body).to.deep.equal({
+										status: 'ERROR',
+										reason: 'Already used',
+									});
+									if (requestType) {
 										mock.expectNumRequestsToEqual(requestType, 1);
 									}
-								} catch (error) {
-									return done(error);
 								}
-								done();
-							});
-						});
-						it(`reusable = ${reusable}`, function(done) {
-							helpers.request('get', {
-								url: server.getCallbackUrl(),
-								ca: server.ca,
-								qs: this.query,
-								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									if (reusable) {
-										expect(body).to.be.an('object');
-										expect(body.status).to.not.equal('ERROR');
-										if (requestType) {
-											mock.expectNumRequestsToEqual(requestType, 2);
-										}
-									} else {
-										expect(body).to.deep.equal({
-											status: 'ERROR',
-											reason: 'Already used',
-										});
-										if (requestType) {
-											mock.expectNumRequestsToEqual(requestType, 1);
-										}
-									}
-								} catch (error) {
-									return done(error);
-								}
-								done();
 							});
 						});
 					});

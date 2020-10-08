@@ -14,7 +14,7 @@ describe('Server: hooks', function() {
 
 		let server;
 		beforeEach(function() {
-			server = this.helpers.createServer({
+			server = helpers.createServer({
 				protocol: 'http',
 				listen: false,
 				lightning: null,
@@ -72,7 +72,7 @@ describe('Server: hooks', function() {
 		beforeEach(function(done) {
 			done = _.once(done);
 			apiKey = lnurl.generateApiKey();
-			server = this.helpers.createServer({
+			server = helpers.createServer({
 				protocol: 'http',
 				auth: {
 					apiKeys: [ apiKey ],
@@ -94,25 +94,21 @@ describe('Server: hooks', function() {
 		};
 
 		it('invalid authorization signature', function(done) {
+			done = _.once(done);
 			const unknownApiKey = lnurl.Server.prototype.generateApiKey();
-			const query = this.helpers.prepareSignedRequest(unknownApiKey, tag, params);
-			this.helpers.request('get', {
+			const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
+			helpers.request('get', {
 				url: server.getCallbackUrl(),
 				ca: server.ca,
 				qs: query,
 				json: true,
-			}, (error, response, body) => {
-				if (error) return done(error);
-				try {
-					expect(body).to.deep.equal({
-						status: 'ERROR',
-						reason: 'Invalid API key signature',
-					});
-				} catch (error) {
-					return done(error);
-				}
-				done();
-			});
+			}).then(result => {
+				const { response, body } = result;
+				expect(body).to.deep.equal({
+					status: 'ERROR',
+					reason: 'Invalid API key signature',
+				});
+			}).then(done).catch(done);
 			server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
 				done(new Error('Should not execute hook callbacks'));
 			});
@@ -120,25 +116,20 @@ describe('Server: hooks', function() {
 
 		it('valid authorization signature', function(done) {
 			done = _.once(done);
-			const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
-			this.helpers.request('get', {
+			const query = helpers.prepareSignedRequest(apiKey, tag, params);
+			helpers.request('get', {
 				url: server.getCallbackUrl(),
 				ca: server.ca,
 				qs: query,
 				json: true,
-			}, (error, response, body) => {
-				if (error) return done(error);
-				try {
-					expect(response.statusCode).to.equal(400);
-					expect(body).to.deep.equal({
-						status: 'ERROR',
-						reason: 'a custom error',
-					});
-				} catch (error) {
-					return done(error);
-				}
-				done();
-			});
+			}).then(result => {
+				const { response, body } = result;
+				expect(response.statusCode).to.equal(400);
+				expect(body).to.deep.equal({
+					status: 'ERROR',
+					reason: 'a custom error',
+				});
+			}).then(done).catch(done);
 			server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
 				try {
 					expect(req).to.be.an('object');

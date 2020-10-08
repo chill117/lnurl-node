@@ -2,6 +2,7 @@ const _ = require('underscore');
 const async = require('async');
 const expect = require('chai').expect;
 const fs = require('fs');
+const helpers = require('../helpers');
 const lnurl = require('../../');
 const path = require('path');
 const spawn = require('child_process').spawn;
@@ -24,7 +25,7 @@ describe('Command-line interface', function() {
 
 		let server;
 		before(function() {
-			server = this.helpers.createServer({
+			server = helpers.createServer({
 				protocol: 'http',
 				listen: false,
 				lightning: null,
@@ -414,7 +415,7 @@ describe('Command-line interface', function() {
 
 		let mock;
 		before(function(done) {
-			mock = this.helpers.prepareMockLightningNode(done);
+			mock = helpers.prepareMockLightningNode(done);
 		});
 
 		after(function(done) {
@@ -454,11 +455,9 @@ describe('Command-line interface', function() {
 						'--store.config', JSON.stringify((process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {}),
 					];
 				},
-				expected: function(done) {
-					waitForTlsFiles(error => {
-						if (error) return done(error);
-						fs.readFile(certPath, (error, buffer) => {
-							if (error) return done(error);
+				expected: function() {
+					return waitForTlsFiles().then(() => {
+						return getTlsCert().then(buffer => {
 							const ca = buffer.toString();
 							const tag = 'channelRequest';
 							const params = {
@@ -466,30 +465,31 @@ describe('Command-line interface', function() {
 								pushAmt: 1000,
 							};
 							const apiKey = apiKeys[0];
-							const query = this.helpers.prepareSignedRequest(apiKey, tag, params);
-							async.retry({
-								times: 75,
-								interval: 10,
-							}, next => {
-								this.helpers.request('get', {
-									url: 'https://localhost:3000/lnurl',
-									ca: ca,
-									qs: query,
-									json: true,
-								}, (error, response, body) => {
-									if (error) return next(error);
-									try {
+							const query = helpers.prepareSignedRequest(apiKey, tag, params);
+							return new Promise((resolve, reject) => {
+								async.retry({
+									times: 50,
+									interval: 10,
+								}, next => {
+									return helpers.request('get', {
+										url: 'https://localhost:3000/lnurl',
+										ca,
+										qs: query,
+										json: true,
+									}).then(result => {
+										const { response, body } = result;
 										expect(body).to.be.an('object');
 										expect(body.k1).to.be.a('string');
 										expect(body.tag).to.equal(tag);
 										expect(body.callback).to.equal('https://localhost:3000/lnurl');
 										expect(body.uri).to.equal(mock.config.nodeUri);
-									} catch (error) {
-										return next(error);
-									}
-									next();
+									}).then(next).catch(next);
+								}, error => {
+									console.log('async.retry.callback')
+									if (error) return reject(error);
+									resolve();
 								});
-							}, done);
+							});
 						});
 					});
 				},
@@ -519,71 +519,80 @@ describe('Command-line interface', function() {
 						'--configFile', configFilePath,
 					];
 				},
-				expected: function(done) {
-					async.retry({
-						times: 75,
-						interval: 10,
-					}, next => {
-						this.helpers.request('get', {
-							url: 'http://localhost:3000/lnurl',
-							json: true,
-						}, (error, response, body) => {
-							if (error) return next(error);
-							try {
+				expected: function() {
+					return new Promise((resolve, reject) => {
+						async.retry({
+							times: 50,
+							interval: 10,
+						}, next => {
+							return helpers.request('get', {
+								url: 'http://localhost:3000/lnurl',
+								json: true,
+							}).then(result => {
+								const { response, body } = result;
 								expect(body).to.deep.equal({
 									status: 'ERROR',
 									reason: 'Missing secret',
 								});
-							} catch (error) {
-								return next(error);
-							}
-							next();
+							}).then(next).catch(next);
+						}, error => {
+							if (error) return reject(error);
+							resolve();
 						});
-					}, done);
+					});
 				},
 			},
 		];
 
-		const waitForTlsFiles = function(done) {
-			const startTime = Date.now();
-			const maxWaitTime = 1500;
-			async.until(next => {
-				const files = [ certPath, keyPath ];
-				async.map(files, (file, nextFile) => {
-					fs.stat(file, error => {
-						nextFile(null, !error);
+		const waitForTlsFiles = function() {
+			return new Promise((resolve, reject) => {
+				const startTime = Date.now();
+				const maxWaitTime = 1500;
+				async.until(next => {
+					const files = [ certPath, keyPath ];
+					async.map(files, (file, nextFile) => {
+						fs.stat(file, error => {
+							nextFile(null, !error);
+						});
+					}, (error, results) => {
+						next(null, !error && _.every(results));
 					});
-				}, (error, results) => {
-					next(null, !error && _.every(results));
+				}, next => {
+					if (Date.now() - startTime > maxWaitTime) {
+						return next(new Error('Timed-out while waiting for existence of TLS files'));
+					}
+					_.delay(next, 10);
+				}, error => {
+					if (error) return reject(error);
+					resolve();
 				});
-			}, next => {
-				if (Date.now() - startTime > maxWaitTime) {
-					return next(new Error('Timed-out while waiting for existence of TLS files'));
-				}
-				_.delay(next, 10);
-			}, error => {
-				if (error) return done(error);
-				done();
+			});
+		};
+
+		const getTlsCert = function() {
+			return new Promise((resolve, reject) => {
+				fs.readFile(certPath, (error, buffer) => {
+					if (error) return reject(error);
+					resolve(buffer);
+				});
 			});
 		};
 
 		_.each(tests, function(test) {
-			it(test.description, function(done) {
-				done = _.once(done);
-				const cmd = _.isFunction(test.cmd) ? test.cmd.call(this) : test.cmd;
-				child = spawn(cli, cmd);
-				child.stderr.on('data', function(data) {
-					done(new Error(data.toString()));
+			it(test.description, function() {
+				return new Promise((resolve, reject) => {
+					reject = _.once(reject);
+					const cmd = _.isFunction(test.cmd) ? test.cmd.call(this) : test.cmd;
+					child = spawn(cli, cmd);
+					child.stderr.on('data', function(data) {
+						reject(new Error(data.toString()));
+					});
+					if (test.stdin) {
+						child.stdin.write(test.stdin);
+					}
+					child.stdin.end();
+					return test.expected.call(this).then(resolve).catch(reject);
 				});
-				if (test.stdin) {
-					child.stdin.write(test.stdin);
-				}
-				child.stdin.end();
-				try {
-					test.expected.call(this, done);
-				} catch (error) {
-					return done(error);
-				}
 			});
 		});
 	});

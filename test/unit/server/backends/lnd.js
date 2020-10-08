@@ -1,12 +1,13 @@
 const { expect } = require('chai');
 const fs = require('fs');
+const helpers = require('../../../helpers');
 const { generateNodeKey } = require('../../../../lib');
 
 describe('backends.lnd', function() {
 
 	let mock;
 	before(function(done) {
-		mock = this.helpers.prepareMockLightningNode('lnd', {
+		mock = helpers.prepareMockLightningNode('lnd', {
 			host: '127.0.0.1',
 			port: 18080,
 			tcp: { hostname: '127.0.0.1:19735' },
@@ -23,7 +24,7 @@ describe('backends.lnd', function() {
 		let server, cert;
 		before(function(done) {
 			cert = fs.readFileSync(mock.options.certPath).toString('utf8');
-			server = this.helpers.createServer({
+			server = helpers.createServer({
 				protocol: 'http',
 				lightning: {
 					backend: 'lnd',
@@ -58,20 +59,16 @@ describe('backends.lnd', function() {
 				});
 			});
 
-			it('complete LNURL flow', function(done) {
-				this.helpers.request('get', {
+			it('complete LNURL flow', function() {
+				return helpers.request('get', {
 					url: generatedUrl.url,
 					json: true,
-				}, (error, response, body) => {
-					if (error) return done(error);
-					try {
-						expect(body).to.be.an('object');
-						expect(body.status).to.not.equal('ERROR');
-						expect(body.uri.split('@')[1]).to.equal(mock.options.tcp.hostname);
-					} catch (error) {
-						return done(error);
-					}
-					this.helpers.request('get', {
+				}).then(result => {
+					const { response, body } = result;
+					expect(body).to.be.an('object');
+					expect(body.status).to.not.equal('ERROR');
+					expect(body.uri.split('@')[1]).to.equal(mock.options.tcp.hostname);
+					return helpers.request('get', {
 						url: server.getCallbackUrl(),
 						qs: {
 							k1: body.k1,
@@ -79,15 +76,10 @@ describe('backends.lnd', function() {
 							private: 1,
 						},
 						json: true,
-					}, (error2, response2, body2) => {
-						if (error2) return done(error2);
-						try {
-							expect(body2).to.be.an('object');
-							expect(body2.status).to.equal('OK');
-						} catch (error) {
-							return done(error);
-						}
-						done();
+					}).then(result2 => {
+						const body2 = result2.body;
+						expect(body2).to.be.an('object');
+						expect(body2.status).to.equal('OK');
 					});
 				});
 			});
@@ -113,20 +105,16 @@ describe('backends.lnd', function() {
 					originalRoute = null;
 				});
 
-				it('still works', function(done) {
-					this.helpers.request('get', {
+				it('still works', function() {
+					return helpers.request('get', {
 						url: generatedUrl.url,
 						json: true,
-					}, (error, response, body) => {
-						if (error) return done(error);
-						try {
-							expect(body).to.be.an('object');
-							expect(body.status).to.not.equal('ERROR');
-							expect(body.uri.split('@')[1]).to.equal(mock.options.tcp.hostname);
-						} catch (error) {
-							return done(error);
-						}
-						this.helpers.request('get', {
+					}).then(result => {
+						const { response, body } = result;
+						expect(body).to.be.an('object');
+						expect(body.status).to.not.equal('ERROR');
+						expect(body.uri.split('@')[1]).to.equal(mock.options.tcp.hostname);
+						return helpers.request('get', {
 							url: server.getCallbackUrl(),
 							qs: {
 								k1: body.k1,
@@ -134,15 +122,10 @@ describe('backends.lnd', function() {
 								private: 1,
 							},
 							json: true,
-						}, (error2, response2, body2) => {
-							if (error2) return done(error2);
-							try {
-								expect(body2).to.be.an('object');
-								expect(body2.status).to.equal('OK');
-							} catch (error) {
-								return done(error);
-							}
-							done();
+						}).then(result2 => {
+							const body2 = result2.body;
+							expect(body2).to.be.an('object');
+							expect(body2.status).to.equal('OK');
 						});
 					});
 				});

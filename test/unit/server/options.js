@@ -15,23 +15,18 @@ describe('Server: options', function() {
 			tests: [
 				{
 					description: 'server responds to HTTP requests',
-					expected: function(done) {
+					expected: function() {
 						const callbackUrl = this.server.getCallbackUrl();
 						expect(callbackUrl.substr(0, 'http:'.length)).to.equal('http:');
-						helpers.request('get', {
+						return helpers.request('get', {
 							url: callbackUrl,
 							json: true,
-						}, (error, response, body) => {
-							if (error) return done(error);
-							try {
-								expect(body).to.deep.equal({
-									status: 'ERROR',
-									reason: 'Missing secret',
-								});
-							} catch (error) {
-								return done(error);
-							}
-							done();
+						}).then(result => {
+							const { response, body } = result;
+							expect(body).to.deep.equal({
+								status: 'ERROR',
+								reason: 'Missing secret',
+							});
 						});
 					},
 				},
@@ -53,26 +48,20 @@ describe('Server: options', function() {
 			tests: [
 				{
 					description: 'can use a custom lightning backend',
-					expected: function(done) {
-						this.server.generateNewUrl('channelRequest', {
+					expected: function() {
+						return this.server.generateNewUrl('channelRequest', {
 							localAmt: 2000,
 							pushAmt: 0,
-						}).then(result => {
-							const { url } = result;
-							helpers.request('get', {
-								url,
+						}).then(generatedUrl => {
+							return helpers.request('get', {
+								url: generatedUrl.url,
 								json: true,
-							}, (error, response, body) => {
-								if (error) return done(error);
-								try {
-									expect(body).to.be.an('object');
-									expect(body.uri).to.equal('000000000010101@127.0.0.1:9735');
-								} catch (error) {
-									return done(error);
-								}
-								done();
+							}).then(result => {
+								const { response, body } = result;
+								expect(body).to.be.an('object');
+								expect(body.uri).to.equal('000000000010101@127.0.0.1:9735');
 							});
-						}).catch(done);
+						});
 					},
 				},
 			],
@@ -114,30 +103,30 @@ describe('Server: options', function() {
 			tests: [
 				{
 					description: 'each API key uses the correct lightning backend',
-					expected: function(done) {
-						async.each(this.server.options.auth.apiKeys, (apiKey, next) => {
-							const tag = 'channelRequest';
-							const params = {
-								localAmt: 2000,
-								pushAmt: 0,
-							};
-							const query = helpers.prepareSignedRequest(apiKey, tag, params);
-							helpers.request('get', {
-								url: this.server.getCallbackUrl(),
-								qs: query,
-								json: true,
-							}, (error, response, body) => {
-								if (error) return next(error);
-								try {
+					expected: function() {
+						return new Promise((resolve, reject) => {
+							async.each(this.server.options.auth.apiKeys, (apiKey, next) => {
+								const tag = 'channelRequest';
+								const params = {
+									localAmt: 2000,
+									pushAmt: 0,
+								};
+								const query = helpers.prepareSignedRequest(apiKey, tag, params);
+								return helpers.request('get', {
+									url: this.server.getCallbackUrl(),
+									qs: query,
+									json: true,
+								}).then(result => {
+									const { response, body } = result;
 									const { port } = apiKey.lightning.config;
 									expect(body.status).to.not.equal('ERROR');
 									expect(body.uri.substr(-5)).to.equal(':' + port);
-								} catch (error) {
-									return next(error);
-								}
-								next();
+								}).then(next).catch(next);
+							}, error => {
+								if (error) return reject(error);
+								resolve();
 							});
-						}, done);
+						});
 					},
 				},
 			],
@@ -161,12 +150,8 @@ describe('Server: options', function() {
 				}
 			});
 			_.each(testGroup.tests, function(test) {
-				it(test.description, function(done) {
-					try {
-						test.expected.call(this, done);
-					} catch (error) {
-						return done(error);
-					}
+				it(test.description, function() {
+					return test.expected.call(this);
 				});
 			});
 		});
