@@ -87,13 +87,12 @@ module.exports = {
 		const { id, key } = apiKey;
 		const nonce = this.generateNonce(12);
 		const query = _.extend({
-			id: id,
-			n: nonce,
-			tag: tag,
+			id,
+			nonce,
+			tag,
 		}, params, overrides);
 		const payload = querystring.stringify(query);
-		const signature = lnurl.Server.prototype.createSignature(payload, key);
-		query.s = signature;
+		query.signature = lnurl.Server.prototype.createSignature(payload, key);
 		return query;
 	},
 	generateNonce: function(numberOfBytes) {

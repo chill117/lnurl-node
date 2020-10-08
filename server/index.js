@@ -309,7 +309,7 @@ module.exports = function(lnurl) {
 			},
 			signedLnurl: {
 				unshortenQuery: (req, res, next) => {
-					if (req.query.s) {
+					if (req.query.s || req.query.signature) {
 						// Only unshorten signed LNURLs.
 						// Save the original query for signature validation later.
 						req.originalQuery = _.clone(req.query);
@@ -318,24 +318,24 @@ module.exports = function(lnurl) {
 					next();
 				},
 				checkSignature: (req, res, next) => {
-					if (!req.query.s) return next();
+					if (!req.query.signature) return next();
 					/*
 						Signed LNURLs must include:
 						id (API key ID)
-						n (nonce)
-						s (signature)
+						nonce
+						signature
 						tag (subprotocol to be used)
 					*/
-					_.each(['id', 'n', 'tag'], field => {
+					_.each(['id', 'nonce', 'tag'], field => {
 						if (!req.query[field]) {
 							throw new HttpError(`Failed API key signature check: Missing "${field}"`, 400);
 						}
 					});
 					// Payload is everything in the querystring less the signature itself.
-					const payload = querystring.stringify(_.omit(req.originalQuery, 's'));
-					const { s, id } = req.query;
+					const payload = querystring.stringify(_.omit(req.originalQuery, 's', 'signature'));
+					const { signature, id } = req.query;
 					// Check that the query string is signed by an authorized API key.
-					return this.isValidSignature(payload, s, id).then(isValid => {
+					return this.isValidSignature(payload, signature, id).then(isValid => {
 						if (!isValid) {
 							return next(new HttpError('Invalid API key signature', 403));
 						}
@@ -345,9 +345,9 @@ module.exports = function(lnurl) {
 				},
 				afterCheckSignature: this.getHook('middleware:signedLnurl:afterCheckSignature'),
 				createUrl: (req, res, next) => {
-					if (!req.query.s) return next();
+					if (!req.query.signature) return next();
 					const { tag } = req.query;
-					const params = _.omit(req.query, 's', 'id', 'n', 'tag');
+					const params = _.omit(req.query, 'signature', 'id', 'nonce', 'tag');
 					const apiKeyId = req.query.id || null;
 					let secret;
 					switch (tag) {
@@ -359,8 +359,8 @@ module.exports = function(lnurl) {
 						default:
 							// Use the hash of API key ID + signature as the secret.
 							// This will make each signed lnurl one-time-use only.
-							const { s, id } = req.query;
-							secret = this.hash(`${id}-${s}`);
+							const { signature, id } = req.query;
+							secret = this.hash(`${id}-${signature}`);
 							req.query = { q: secret };
 							break;
 					}
@@ -504,59 +504,99 @@ module.exports = function(lnurl) {
 		return crypto.createHmac(algorithm, key).update(data).digest('hex');
 	};
 
+	Server.prototype.unshorteningLookupTable = {
+		query: {
+			'n': 'nonce',
+			's': 'signature',
+			't': 'tag',
+		},
+		tags: {
+			'c': 'channelRequest',
+			'l': 'login',
+			'p': 'payRequest',
+			'w': 'withdrawRequest',
+		},
+		params: {
+			'c': {
+				'pl': 'localAmt',
+				'pp': 'pushAmt',
+			},
+			'l': {},
+			'p': {
+				'pn': 'minSendable',
+				'px': 'maxSendable',
+				'pm': 'metadata',
+			},
+			'w': {
+				'pn': 'minWithdrawable',
+				'px': 'maxWithdrawable',
+				'pd': 'defaultDescription',
+			},
+		},
+	};
+
+	Server.prototype.shorteningLookupTable = {
+		query: {
+			'nonce': 'n',
+			'signature': 's',
+			'tag': 't',
+		},
+		tags: {
+			'channelRequest': 'c',
+			'login': 'l',
+			'payRequest': 'p',
+			'withdrawRequest': 'w',
+		},
+		params: {
+			'channelRequest': {
+				'localAmt': 'pl',
+				'pushAmt': 'pp',
+			},
+			'login': {},
+			'payRequest': {
+				'minSendable': 'pn',
+				'maxSendable': 'px',
+				'metadata': 'pm',
+			},
+			'withdrawRequest': {
+				'minWithdrawable': 'pn',
+				'maxWithdrawable': 'px',
+				'defaultDescription': 'pd',
+			},
+		},
+	};
+
+	Server.prototype.shortenQuery = function(query) {
+		return this.invertQuery(query, this.shorteningLookupTable);
+	};
+
 	Server.prototype.unshortenQuery = function(query) {
-		let unshortened = _.clone(query);
-		const fromTo = {
-			query: {
-				't': 'tag',
-			},
-			tags: {
-				'c': 'channelRequest',
-				'l': 'login',
-				'p': 'payRequest',
-				'w': 'withdrawRequest',
-			},
-			params: {
-				'channelRequest': {
-					'pl': 'localAmt',
-					'pp': 'pushAmt',
-				},
-				'login': {
-				},
-				'payRequest': {
-					'pn': 'minSendable',
-					'px': 'maxSendable',
-					'pm': 'metadata',
-				},
-				'withdrawRequest': {
-					'pn': 'minWithdrawable',
-					'px': 'maxWithdrawable',
-					'pd': 'defaultDescription',
-				},
-			}
-		};
+		return this.invertQuery(query, this.unshorteningLookupTable);
+	};
+
+	Server.prototype.invertQuery = function(query, fromTo) {
+		let inverted = _.clone(query);
 		_.each(fromTo.query, (to, from) => {
-			if (!_.isUndefined(unshortened[from])) {
-				unshortened[to] = unshortened[from];
-				delete unshortened[from];
+			if (!_.isUndefined(inverted[from])) {
+				inverted[to] = inverted[from];
+				delete inverted[from];
 			}
 		});
-		let tag = unshortened.tag;
-		if (tag) {
-			if (fromTo.tags[tag]) {
-				tag = unshortened.tag = fromTo.tags[tag];
+		const tag = _.findKey(fromTo.tags, function(to, from) {
+			return to === (inverted.tag || inverted.t) || from === (inverted.tag || inverted.t);
+		});
+		_.each(fromTo.params[tag], (to, from) => {
+			if (!_.isUndefined(inverted[from])) {
+				inverted[to] = inverted[from];
+				delete inverted[from];
 			}
-			const params = fromTo.params[tag];
-			if (params) {
-				_.each(params, (to, from) => {
-					if (!_.isUndefined(unshortened[from])) {
-						unshortened[to] = unshortened[from];
-						delete unshortened[from];
-					}
-				});
-			}
+		});
+		if (inverted.tag && !_.isUndefined(fromTo.tags[inverted.tag])) {
+			inverted.tag = fromTo.tags[inverted.tag];
+		} else if (inverted.t && !_.isUndefined(fromTo.tags[inverted.t])) {
+			inverted.t = fromTo.tags[inverted.t];
 		}
-		return unshortened;
+		return inverted;
 	};
 
 	Server.prototype.isReusable = function(tag) {

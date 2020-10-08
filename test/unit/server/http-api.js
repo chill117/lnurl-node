@@ -118,7 +118,7 @@ describe('Server: HTTP API', function() {
 
 		it('missing secret', function(done) {
 			helpers.request('get', {
-				url: 'https://localhost:3000/lnurl',
+				url: server.getCallbackUrl(),
 				ca: server.ca,
 				qs: {},
 				json: true,
@@ -144,7 +144,7 @@ describe('Server: HTTP API', function() {
 				const params = prepareValidParams('create', tag);
 				const query = helpers.prepareSignedRequest(unknownApiKey, tag, params);
 				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
+					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: query,
 					json: true,
@@ -170,7 +170,7 @@ describe('Server: HTTP API', function() {
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
 				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
+					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: query,
 					json: true,
@@ -188,7 +188,7 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			_.each(['id', 'n', 'tag'], function(field) {
+			_.each(['id', 'nonce', 'tag'], function(field) {
 				it(`missing "${field}"`, function(done) {
 					const tag = 'channelRequest';
 					const params = prepareValidParams('create', tag);
@@ -197,7 +197,7 @@ describe('Server: HTTP API', function() {
 					overrides[field] = '';
 					const query = helpers.prepareSignedRequest(apiKey, tag, params, overrides);
 					helpers.request('get', {
-						url: 'https://localhost:3000/lnurl',
+						url: server.getCallbackUrl(),
 						ca: server.ca,
 						qs: query,
 						json: true,
@@ -221,21 +221,20 @@ describe('Server: HTTP API', function() {
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
 				let query = _.extend({
-					n: helpers.generateNonce(10),
+					nonce: helpers.generateNonce(10),
 					tag: tag,
 					id: apiKey.id,
 				}, params);
 				const payload = querystring.stringify(query);
-				const signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
-				query.s = signature;
+				query.signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
 				const outOfOrderQuery = _.extend({
-					s: query.s,
+					signature: query.signature,
 					tag: query.tag,
 					id: query.id,
-					n: query.n,
+					nonce: query.nonce,
 				}, params);
 				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
+					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: outOfOrderQuery,
 					json: true,
@@ -256,17 +255,17 @@ describe('Server: HTTP API', function() {
 			it('shortened query', function(done) {
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
+				const { localAmt, pushAmt } = params;
 				const apiKey = apiKeys[0];
-				let query = {
+				let query = server.shortenQuery({
 					id: apiKey.id,
-					n: helpers.generateNonce(10),
-					t: tag,
-					pl: params.localAmt,
-					pp: params.pushAmt,
-				};
+					nonce: helpers.generateNonce(10),
+					tag,
+					localAmt,
+					pushAmt,
+				});
 				const payload = querystring.stringify(query);
-				const signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
-				query.s = signature;
+				query.signature = lnurl.Server.prototype.createSignature(payload, apiKey.key);
 				helpers.request('get', {
 					url: server.getCallbackUrl(),
 					ca: server.ca,
@@ -318,7 +317,7 @@ describe('Server: HTTP API', function() {
 						});
 						it(`reusable = ${reusable}`, function(done) {
 							helpers.request('get', {
-								url: 'https://localhost:3000/lnurl',
+								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: this.query,
 								json: true,
@@ -385,7 +384,7 @@ describe('Server: HTTP API', function() {
 							expect(body).to.be.an('object');
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('channelRequest');
-							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+							expect(body.callback).to.equal(server.getCallbackUrl());
 							expect(body.uri).to.equal(mock.config.nodeUri);
 						},
 					},
@@ -419,7 +418,7 @@ describe('Server: HTTP API', function() {
 							expect(body).to.be.an('object');
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('withdrawRequest');
-							expect(body.callback).to.equal('https://localhost:3000/lnurl');
+							expect(body.callback).to.equal(server.getCallbackUrl());
 							const params = prepareValidParams('create', 'withdrawRequest');
 							_.each(params, function(value, key) {
 								expect(body[key]).to.equal(params[key]);
@@ -527,9 +526,9 @@ describe('Server: HTTP API', function() {
 						expected: function(body, response, query) {
 							expect(body).to.be.an('object');
 							expect(body.tag).to.equal('payRequest');
-							const { id, s } = query;
-							const secret = lnurl.Server.prototype.hash(`${id}-${s}`);
-							expect(body.callback).to.equal(`https://localhost:3000/lnurl/${secret}`);
+							const { id, signature } = query;
+							const secret = lnurl.Server.prototype.hash(`${id}-${signature}`);
+							expect(body.callback).to.equal(server.getCallbackUrl() + '/' + secret);
 							const params = prepareValidParams('create', 'payRequest');
 							_.each(params, function(value, key) {
 								expect(body[key]).to.equal(params[key]);
@@ -628,7 +627,7 @@ describe('Server: HTTP API', function() {
 								const apiKey = apiKeys[0];
 								const query = helpers.prepareSignedRequest(apiKey, tag, params);
 								helpers.request('get', {
-									url: 'https://localhost:3000/lnurl',
+									url: server.getCallbackUrl(),
 									ca: server.ca,
 									qs: query,
 									json: true,
@@ -649,8 +648,8 @@ describe('Server: HTTP API', function() {
 											secret = query.k1;
 											break;
 										default:
-											const { id, s } = query;
-											secret = server.hash(`${id}-${s}`);
+											const { id, signature } = query;
+											secret = server.hash(`${id}-${signature}`);
 											break;
 									}
 									const hash = server.hash(secret);
@@ -675,7 +674,7 @@ describe('Server: HTTP API', function() {
 
 			it('invalid secret', function(done) {
 				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
+					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: {
 						q: '469bf65fd2b3575a1604d62fc7a6a94f',
@@ -703,7 +702,7 @@ describe('Server: HTTP API', function() {
 						expect(body).to.deep.equal({
 							k1: this.secret,
 							tag: 'channelRequest',
-							callback: 'https://localhost:3000/lnurl',
+							callback: server.getCallbackUrl(),
 							uri: mock.config.nodeUri,
 						});
 					},
@@ -716,7 +715,7 @@ describe('Server: HTTP API', function() {
 						expect(body).to.deep.equal(_.extend({
 							k1: this.secret,
 							tag: 'withdrawRequest',
-							callback: 'https://localhost:3000/lnurl',
+							callback: server.getCallbackUrl(),
 						}, prepareValidParams('create', 'withdrawRequest')));
 					},
 				},
@@ -728,7 +727,7 @@ describe('Server: HTTP API', function() {
 						const { secret } = this;
 						expect(body).to.deep.equal(_.extend({
 							tag: 'payRequest',
-							callback: `https://localhost:3000/lnurl/${secret}`,
+							callback: server.getCallbackUrl() + '/' + secret,
 						}, prepareValidParams('create', 'payRequest')));
 					},
 				},
@@ -754,7 +753,7 @@ describe('Server: HTTP API', function() {
 					_.each(tests, function(test) {
 						it(test.description, function(done) {
 							helpers.request('get', {
-								url: 'https://localhost:3000/lnurl',
+								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: {
 									q: this.secret,
@@ -783,7 +782,7 @@ describe('Server: HTTP API', function() {
 
 			it('invalid secret', function(done) {
 				helpers.request('get', {
-					url: 'https://localhost:3000/lnurl',
+					url: server.getCallbackUrl(),
 					ca: server.ca,
 					qs: {
 						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
@@ -1015,7 +1014,7 @@ describe('Server: HTTP API', function() {
 								k1: this.secret,
 							});
 							helpers.request('get', {
-								url: 'https://localhost:3000/lnurl',
+								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: params,
 								json: true,
@@ -1067,7 +1066,7 @@ describe('Server: HTTP API', function() {
 								k1: this.secret,
 							});
 							helpers.request('get', {
-								url: 'https://localhost:3000/lnurl',
+								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: this.query,
 								json: true,
@@ -1087,7 +1086,7 @@ describe('Server: HTTP API', function() {
 						});
 						it(`reusable = ${reusable}`, function(done) {
 							helpers.request('get', {
-								url: 'https://localhost:3000/lnurl',
+								url: server.getCallbackUrl(),
 								ca: server.ca,
 								qs: this.query,
 								json: true,

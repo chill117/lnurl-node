@@ -2,7 +2,7 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const lnurl = require('../../../');
 
-describe('unshortenQuery(query)', function() {
+describe('unshortenQuery(shortened)', function() {
 
 	const method = 'unshortenQuery';
 	const fn = lnurl.Server.prototype[method].bind(lnurl.Server.prototype);
@@ -14,7 +14,7 @@ describe('unshortenQuery(query)', function() {
 	const tests = [
 		{
 			args: {
-				query: {
+				shortened: {
 					t: 'c',
 					pl: 1000,
 					pp: 500,
@@ -28,7 +28,27 @@ describe('unshortenQuery(query)', function() {
 		},
 		{
 			args: {
-				query: {
+				shortened: {
+					id: '9bb19f843d',
+					n: '3f03c3fd5b57ac6b837b',
+					s: 'b11135b4d2cf4dc3a3cc4ae52dea627a8cbae2f6eb37ce3d08e5692e4a705614',
+					t: 'channelRequest',
+					pl: 1000,
+					pp: 0,
+				},
+			},
+			expected: {
+				id: '9bb19f843d',
+				nonce: '3f03c3fd5b57ac6b837b',
+				signature: 'b11135b4d2cf4dc3a3cc4ae52dea627a8cbae2f6eb37ce3d08e5692e4a705614',
+				tag: 'channelRequest',
+				localAmt: 1000,
+				pushAmt: 0,
+			},
+		},
+		{
+			args: {
+				shortened: {
 					t: 'c',
 					localAmt: 800,
 					pp: 400,
@@ -42,7 +62,7 @@ describe('unshortenQuery(query)', function() {
 		},
 		{
 			args: {
-				query: {
+				shortened: {
 					t: 'l',
 				},
 			},
@@ -52,7 +72,17 @@ describe('unshortenQuery(query)', function() {
 		},
 		{
 			args: {
-				query: {
+				shortened: {
+					tag: 'login',
+				},
+			},
+			expected: {
+				tag: 'login',
+			},
+		},
+		{
+			args: {
+				shortened: {
 					id: 'some-id',
 					t: 'l',
 				},
@@ -64,7 +94,7 @@ describe('unshortenQuery(query)', function() {
 		},
 		{
 			args: {
-				query: {
+				shortened: {
 					t: 'w',
 					pn: 1,
 					px: 5000,
@@ -80,7 +110,7 @@ describe('unshortenQuery(query)', function() {
 		},
 		{
 			args: {
-				query: {
+				shortened: {
 					t: 'p',
 					pn: 1000,
 					px: 5000,
@@ -97,10 +127,10 @@ describe('unshortenQuery(query)', function() {
 	];
 
 	_.each(tests, function(test) {
-		const { query } = test.args;
+		const { shortened } = test.args;
 		let description = test.description || JSON.stringify(test.args);
 		it(description, function() {
-			const result = fn(query);
+			const result = fn(shortened);
 			if (_.isFunction(test.expected)) {
 				test.expected.call(this, result);
 			} else {
