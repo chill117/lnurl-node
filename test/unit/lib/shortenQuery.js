@@ -19,7 +19,21 @@ describe('shortenQuery(unshortened)', function() {
 			},
 			expected: {
 				t: 'c',
-				pl: 1000,
+				pl: '1e3',
+				pp: 500,
+			},
+		},
+		{
+			args: {
+				unshortened: {
+					tag: 'channelRequest',
+					localAmt: 1000,
+					pushAmt: 500,
+				},
+			},
+			expected: {
+				t: 'c',
+				pl: '1e3',
 				pp: 500,
 			},
 		},
@@ -67,7 +81,7 @@ describe('shortenQuery(unshortened)', function() {
 			expected: {
 				t: 'w',
 				pn: 1,
-				px: 5000,
+				px: '5e3',
 				pd: 'default memo',
 			},
 		},
@@ -89,7 +103,7 @@ describe('shortenQuery(unshortened)', function() {
 				s: 'b11135b4d2cf4dc3a3cc4ae52dea627a8cbae2f6eb37ce3d08e5692e4a705614',
 				t: 'w',
 				pn: 1,
-				px: 5000,
+				px: '5e3',
 				pd: 'default memo',
 			},
 		},
@@ -104,8 +118,24 @@ describe('shortenQuery(unshortened)', function() {
 			},
 			expected: {
 				t: 'p',
-				pn: 1000,
-				px: 5000,
+				pn: '1e3',
+				px: '5e3',
+				pm: '[["text/plain","example metadata"]]',
+			},
+		},
+		{
+			args: {
+				unshortened: {
+					tag: 'payRequest',
+					minSendable: 1000000,
+					maxSendable: 5000000,
+					metadata: '[["text/plain","example metadata"]]',
+				},
+			},
+			expected: {
+				t: 'p',
+				pn: '1e6',
+				px: '5e6',
 				pm: '[["text/plain","example metadata"]]',
 			},
 		},
