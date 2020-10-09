@@ -644,21 +644,59 @@ server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, re
 
 ## Signed LNURLs
 
-It is possible to generate new lnurls in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - see [Generating a new API key](#generating-a-new-api-key).
+It is possible to create signed LNURLs in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - see [Generating a new API key](#generating-a-new-api-key).
 
-See the script [signed-lnurls.js](https://github.com/chill117/lnurl-node/blob/master/examples/signed-lnurls.js) for an example of how to create signed LNURLs. The output of the script will be something like this:
+```js
+const apiKey = {
+	id: 'b6cb8e81e3',
+	key: '74a8f70391e48b7a35c676e5e448eda034db88c654213feff7b80228dcad7fa0',
+};
+const tag = 'withdrawRequest';
+const params = {
+	minWithdrawable: 50000,
+	maxWithdrawable: 60000,
+	defaultDescription: '',
+};
+const options = {
+	baseUrl: 'https://localhost:3000/lnurl',
+	encode: false,
+};
+const signedUrl = lnurl.createSignedUrl(apiKey, tag, params, options);
+console.log(signedUrl);
 ```
-https://your-lnurl-server.com/lnurl?id=5619b36a2e&n=1f69afb26c643302&tag=withdrawRequest&minWithdrawable=1000&maxWithdrawable=500000&s=7ef95168e1afa90834ec98b0ebe7a5dc93b4a7e7345d0a1f9e3be3caaebf8925
+Sample expected output:
 ```
-* `id` - the ID of the offline app's API key
-* `n` - randomly generated nonce
-* `s` - the signature created from the URL's querystring and the offline app's API key
-* `tag` - the subprotocol to use
-* `minWithdrawable` and `maxWithdrawable` - parameters that depend on which subprotocol being used
+https://localhost:3000/lnurl?id=b6cb8e81e3&nonce=c58731a56c317082fe1c&tag=withdrawRequest&minWithdrawable=50000&maxWithdrawable=60000&defaultDescription=&signature=d3d23b8a629670c6fe260b26e2384f6f54b14e6d507024aee4bc2ac6383fdf6c
+```
 
-And the URL when encoded as a bech32-encoded string:
+List of options:
+```js
+{
+	// The algorithm to use when creating the signature via HMAC:
+	algorithm: 'sha256',
+	// The "protocol://host:port/endpoint" for your lnurl server (e.g "https://yourlnurlserver.com/lnurl").
+	// You must provide a base URL.
+	baseUrl: null,
+	// Whether or not to lnurl encode the signed URL:
+	encode: false,
+	// The number of random bytes to use when generating the nonce:
+	nonceBytes: 10,
+	// Before the signature is created, override any querystring parameter:
+	overrides: {},
+	// Whether or not to shorten the querystring parameters.
+	// This helps with scannability when encoding the URL as a QR code.
+	shorten: false,
+}
 ```
-lnurl1dp68gurn8ghj77t0w4ez6mrww4excttnv4e8vetj9e3k7mf0d3h82unv8a5kg0f4xccnjc3nxesnyefxdc7nze3k89skvc3jxe3nvdpnxvcryfn5v9nn6amfw35xgunpwafx2ut4v4ehgfndd9h9w6t5dpj8ycthv93xcefaxycrqvpxd4shs4mfw35xgunpwaskymr9856nqvpsxqczvueaxajkvwf4xymrsef3v9nxzwfs8qengetr8yuxyvr9vfjnwcf4v33njvmzx3snwefhxv6r2epsvyckvwt9xd3x2vmrv9sk2cnx8qunydglm8pum
+With `shorten: true` the querystring parameters will be shortened:
+```
+https://localhost:3000/lnurl?id=b6cb8e81e3&n=f13ee060477a68651c81&s=e461ebcc73286495eb29f0373835b386ce1aedb2abda187a28e26bf5caa46e2f&t=w&pn=5e4&px=6e4&pd=
+```
+This helps with the scannability of QR codes.
+
+With `encode: true` the output will be lnurl encoded:
+```
+lnurl1dp68gurn8ghj7mr0vdskc6r0wd6r5vesxqcz7mrww4exc0mfvs7kydnrvgux2wp3v5ejvm3avccnxet9xqmrqdphxasnvwpkx5ckxwp3yeen6ef5xcck2cnrvvmnxv3cxc6rjdt9vgerje3sxvmnxwpnx43rxwpkvdjnzct9v33ryctzv3snzwphvyersefjxe3xvdtrv9sngdn9xfnzvapawun8qm3ax4jngfns0q7nvef5yecxg0g6zs8hq
 ```
 
 

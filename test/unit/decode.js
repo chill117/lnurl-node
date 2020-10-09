@@ -2,26 +2,26 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const lnurl = require('../../');
 
-describe('decode(url)', function() {
+describe('decode(encoded)', function() {
 
 	it('is a function', function() {
 		expect(lnurl.decode).to.be.a('function');
 	});
 
-	_.each([undefined, null, 0, {}, []], function(url) {
-		it('throws if "url" is not a string (' + JSON.stringify(url) + ')', function() {
+	_.each([undefined, null, 0, {}, []], function(encoded) {
+		it('throws if "encoded" is not a string (' + JSON.stringify(encoded) + ')', function() {
 			let thrownError;
 			try {
-				lnurl.decode(url);
+				lnurl.decode(encoded);
 			} catch (error) {
 				thrownError = error;
 			}
 			expect(thrownError).to.not.be.undefined;
-			expect(thrownError.message).to.equal('Invalid "url" provided. String expected.');
+			expect(thrownError.message).to.equal('Invalid argument ("encoded"): String expected');
 		});
 	});
 
-	it('decodes urls correctly', function() {
+	it('decodes encoded strings correctly', function() {
 		_.each([
 			{
 				encoded: 'lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns',
