@@ -2,7 +2,7 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const { createAuthorizationSignature } = require('../../../lib');
 
-describe.only('createAuthorizationSignature(data, privKey)', function() {
+describe('createAuthorizationSignature(data, privKey)', function() {
 
 	it('is a function', function() {
 		expect(createAuthorizationSignature).to.be.a('function');

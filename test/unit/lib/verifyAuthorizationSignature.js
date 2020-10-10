@@ -7,7 +7,7 @@ const {
 	verifyAuthorizationSignature
 } = require('../../../lib');
 
-describe.only('verifyAuthorizationSignature(sig, k1, key)', function() {
+describe('verifyAuthorizationSignature(sig, k1, key)', function() {
 
 	it('is a function', function() {
 		expect(verifyAuthorizationSignature).to.be.a('function');
