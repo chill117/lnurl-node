@@ -35,7 +35,6 @@ module.exports = function(lnurl) {
 		this.prepareLightning();
 		this.store = this.prepareStore(this.options);
 		this.app = this.createWebServer();
-		this.locks = new Map();
 	};
 
 	util.inherits(Server, SafeEventEmitter);
@@ -361,11 +360,11 @@ module.exports = function(lnurl) {
 							// Use the hash of API key ID + signature as the secret.
 							// This will make each signed lnurl one-time-use only.
 							const { signature, id } = req.query;
-							secret = this.hash(`${id}-${signature}`);
+							secret = createHash(`${id}-${signature}`);
 							req.query = { q: secret };
 							break;
 					}
-					return this.createUrl(secret, tag, params, apiKeyId).then(() => {
+					return this.createUrl(secret, tag, params, { apiKeyId }).then(() => {
 						next();
 					}).catch(error => {
 						if (!/duplicate/i.test(error.message)) {
@@ -381,45 +380,40 @@ module.exports = function(lnurl) {
 				if (!secret) {
 					return next(new HttpError('Missing secret', 400));
 				}
-				if (this.isLocked(secret)) {
-					throw new HttpError('Invalid secret', 400);
-				}
-				this.lock(secret);
-				const hash = this.hash(secret);
+				const hash = createHash(secret);
 				const method = req.query.q ? 'info' : 'action';
-				let tag;
 				this.emit('request:received', { hash, method, req });
-				this.fetchUrl(hash).then(url => {
-					if (!url) {
+				this.fetchUrl(hash).then(fetchedUrl => {
+					if (!fetchedUrl) {
 						throw new HttpError('Invalid secret', 400);
 					}
-					tag = url.tag;
-					if (!this.isReusable(tag) && url.used === true) {
-						throw new HttpError('Already used', 400);
+					if (method === 'info') {
+						return fetchedUrl;
 					}
-					const apiKeyId = url.apiKeyId || null;
-					const params = _.extend({}, req.query, url.params);
-					this.emit('request:processing', { hash, method, req });
+					const { uses } = fetchedUrl;
+					if (uses <= 0) {
+						throw new HttpError('Maximum number of uses already reached', 400);
+					}
+					return this.useUrl(hash).then(ok => {
+						if (!ok) {
+							throw new HttpError('Maximum number of uses already reached', 400);
+						}
+						return fetchedUrl;
+					});
+				}).then(fetchedUrl => {
+					const { tag, apiKeyId } = fetchedUrl;
+					const params = _.extend({}, req.query, fetchedUrl.params);
 					return this.runSubProtocol(tag, method, secret, params, apiKeyId);
 				}).then(result => {
 					this.emit('request:processed', { hash, method, req });
-					if (method === 'info') {
-						res.status(200).json(result);
-					} else {
-						result = result || { status: 'OK' };
-						return this.markUsedUrl(hash).then(() => {
-							if (this.isReusable(tag)) {
-								res.set('Cache-Control', 'private');
-							}
-							res.status(200).json(result);
-						});
+					if (method === 'action' && !result) {
+						result = { status: 'OK' };
 					}
-				}).then(() => {
-					this.unlock(secret);
+					res.set('Cache-Control', 'private');
+					res.status(200).json(result);
 				}).catch(error => {
 					const reason = error instanceof HttpError ? error.message : 'Internal server error';
 					this.emit('request:failed', { hash, method, reason, req });
-					this.unlock(secret);
 					next(error);
 				});
 			},
@@ -495,14 +489,6 @@ module.exports = function(lnurl) {
 			const expected = createSignature(payload, key);
 			return signature === expected;
 		});
-	};
-
-	Server.prototype.isReusable = function(tag) {
-		const subprotocol = this.getSubProtocol(tag);
-		if (!subprotocol) {
-			throw new Error(`Unknown subprotocol: "${tag}"`);
-		}
-		return subprotocol.reusable === true;
 	};
 
 	Server.prototype.runSubProtocol = function(tag, method, secret, params, apiKeyId) {
@@ -605,8 +591,7 @@ module.exports = function(lnurl) {
 		if (!_.isObject(params)) {
 			throw new Error('Invalid argument ("params"): Object expected.');
 		}
-		const { url } = this.options;
-		let callbackUrl = `${url}${uri}`;
+		let callbackUrl = this.options.url + uri;
 		if (!_.isEmpty(params)) {
 			callbackUrl += '?' + querystring.stringify(params);
 		}
@@ -620,18 +605,6 @@ module.exports = function(lnurl) {
 		return new Store(config);
 	};
 
-	Server.prototype.isLocked = function(secret) {
-		return this.locks.has(secret);
-	};
-
-	Server.prototype.lock = function(secret) {
-		this.locks.set(secret, true);
-	};
-
-	Server.prototype.unlock = function(secret) {
-		this.locks.delete(secret);
-	};
-
 	Server.prototype.generateApiKey = function(options) {
 		options = this.deepClone(options || {});
 		const defaultOptions = this.options || this.defaultOptions;
@@ -643,42 +616,39 @@ module.exports = function(lnurl) {
 		return { id, key };
 	};
 
-	Server.prototype.generateNewUrl = function(tag, params, apiKeyId) {
-		return this.validateSubProtocolParameters(tag, params).then(() => {
-			return this.generateSecret(tag, params, apiKeyId).then(secret => {
-				let params;
+	Server.prototype.generateNewUrl = function(tag, params, options) {
+		return this.generateSecret().then(secret => {
+			return this.createUrl(secret, tag, params, options).then(result => {
+				let query;
 				switch (tag) {
 					case 'login':
-						params = { tag, k1: secret };
+						query = { tag, k1: secret };
 						break;
 					default:
-						params = { q: secret };
+						query = { q: secret };
 						break;
 				}
-				const url = this.getCallbackUrl(params);
-				const encoded = lnurl.encode(url);
-				return { encoded, secret, url };
+				const newUrl = this.getCallbackUrl(query);
+				const encoded = lnurl.encode(newUrl);
+				return { encoded, secret, url: newUrl };
 			});
 		});
 	};
 
-	Server.prototype.createUrl = function(key, tag, params, apiKeyId) {
-		apiKeyId = apiKeyId || null;
-		return this.validateSubProtocolParameters(tag, params).then(() => {
-			return this.saveUrl(key, tag, params, apiKeyId);
+	Server.prototype.createUrl = function(secret, tag, params, options) {
+		if (_.isUndefined(params)) {
+			params = {};
+		}
+		if (!_.isObject(params)) {
+			throw new Error('Invalid argument ("params"): Object expected.');
+		}
+		options = _.defaults(options || {}, {
+			apiKeyId: null,
+			uses: 1,
 		});
-	};
-
-	Server.prototype.saveUrl = function(key, tag, params, apiKeyId) {
-		apiKeyId = apiKeyId || null;
-		const hash = this.hash(key);
-		return this.store.exists(hash).then(exists => {
-			if (exists) {
-				throw new Error(`Cannot save duplicate URL (hash: "${hash}")`);
-			} else {
-				const data = { tag, params, apiKeyId, used: false };
-				return this.store.save(hash, data);
-			}
+		return this.validateSubProtocolParameters(tag, params).then(() => {
+			const hash = createHash(secret);
+			return this.store.create(hash, tag, params, options);
 		});
 	};
 
@@ -686,52 +656,37 @@ module.exports = function(lnurl) {
 		return this.store.fetch(hash);
 	};
 
-	Server.prototype.markUsedUrl = function(hash) {
-		return this.fetchUrl(hash).then(data => {
-			data.used = true;
-			return this.store.save(hash, data);
-		});
+	Server.prototype.useUrl = function(hash) {
+		return this.store.use(hash);
 	};
 
-	Server.prototype.generateSecret = function(tag, params, apiKeyId) {
-		if (_.isUndefined(params)) {
-			params = {};
-		}
-		if (!_.isObject(params)) {
-			throw new Error('Invalid argument ("params"): Object expected.');
-		}
-		params = this.deepClone(params);
+	Server.prototype.generateSecret = function() {
 		return new Promise((resolve, reject) => {
-			const maxAttempts = 7;
+			const maxAttempts = 5;
 			let numAttempts = 0;
-			let key;
+			let secret;
 			async.until(next => {
-				next(null, !!key || (numAttempts >= maxAttempts));
+				if (numAttempts >= maxAttempts) {
+					return next(new Error('Too many failed attempts to generate unique secret.'));
+				}
+				next(null, !!secret);
 			}, next => {
 				try {
 					numAttempts++;
-					key = this.generateRandomKey();
-					return this.saveUrl(key, tag, params, apiKeyId).then(() => {
-						next();
-					}).catch(error => {
-						if (/duplicate/i.test(error.message)) {
-							key = null;
-							next();
-						} else {
-							next(error);
+					secret = this.generateRandomKey();
+					const hash = createHash(secret);
+					return this.fetchUrl(hash).then(result => {
+						const exists = !!result;
+						if (exists) {
+							secret = null;
 						}
-					});
+					}).then(next).catch(next);
 				} catch (error) {
 					return next(error);
 				}
 			}, error => {
-				if (error) {
-					return reject(error);
-				}
-				if (!key) {
-					return reject(new Error('Too many failed attempts to generate unique secret.'));
-				}
-				resolve(key);
+				if (error) return reject(error);
+				resolve(secret);
 			});
 		});
 	};

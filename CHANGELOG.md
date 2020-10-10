@@ -1,6 +1,7 @@
 # Changelog
 
 * TBD:
+  * Added "uses" allowing for the creation of URLs that can be used a specific number of times (or unlimited)
   * Removed Redis support
 * v0.9.0:
   * New top-level method "createSignedUrl"

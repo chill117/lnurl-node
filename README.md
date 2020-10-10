@@ -25,6 +25,7 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
     * [Lightning Backend Configuration Options](#lightning-backend-configuration-options)
     * [Custom Lightning Backend](#custom-lightning-backend)
   * [generateApiKey](#generateapikey)
+  * [generateNewUrl](#generatenewurl)
 * [Hooks](#hooks)
   * [Login Hook](#login-hook)
   * [Middleware Hooks](#middleware-hooks)
@@ -267,6 +268,16 @@ Example output:
 	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
+It is possible to set the number of uses allowed for the new URL:
+```bash
+lnurl generateNewUrl \
+	--configFile ./config.json \
+	--tag "withdrawRequest" \
+	--params '{"minWithdrawable":10000,"maxWithdrawable":10000,"defaultDescription":""}' \
+	--uses 3
+```
+Set `--uses` equal to `0` to allow the URL to be used an unlimited number of times.
+
 For a list of available options:
 ```bash
 lnurl generateNewUrl --help
@@ -542,10 +553,12 @@ const server = lnurl.createServer({
 
 To generate a new lnurl that a client application can then consume:
 ```js
-server.generateNewUrl('channelRequest', {
+const tag = 'channelRequest';
+const params = {
 	localAmt: 2000,
-	pushAmt: 0
-}).then(result => {
+	pushAmt: 0,
+};
+server.generateNewUrl(tag, params).then(result => {
 	const { encoded, secret, url } = result;
 	console.log({ encoded, secret, url });
 }).catch(error => {
@@ -560,6 +573,25 @@ Expected output:
 	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
+It is possible to set the number of uses allowed for the new URL:
+```js
+const tag = 'channelRequest';
+const params = {
+	localAmt: 2000,
+	pushAmt: 0,
+};
+const options = {
+	uses: 3,
+};
+server.generateNewUrl(tag, params, options).then(result => {
+	const { encoded, secret, url } = result;
+	console.log({ encoded, secret, url });
+}).catch(error => {
+	console.error(error);
+});
+```
+Set `uses` equal to `0` to allow the URL to be used an unlimited number of times.
+
 It is also possible to generate lnurls in other ways:
 * [Generate a new URL](#generate-a-new-url) - CLI command
 * [Signed LNURLs](#signed-lnurls) - For separate (or even offline) applications

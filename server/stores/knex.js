@@ -1,19 +1,22 @@
 const _ = require('underscore');
 const async = require('async');
-const knex = require('knex');
 const debug = {
+	info: require('debug')('lnurl:store:knex:info'),
 	error: require('debug')('lnurl:store:knex:error'),
 };
+const knex = require('knex');
+const path = require('path');
 
 let Store = function(options) {
-	this.options = options || {};
+	this.options = this.deepClone(options || {});
+	this.options.migrations = _.chain(this.options.migrations || {}).defaults({
+		tableName: 'lnurl_migrations',
+	}).extend({
+		directory: path.join(__dirname, 'migrations'),
+	}).value();
 	this.db = knex(this.options);
 	this.prepareQueues();
-	this.prepareTable().then(() => {
-		this.resumeQueue('onReady');
-	}).catch(error => {
-		this.resumeQueue('onReady', error);
-	});
+	this.runMigrations();
 };
 
 Store.prototype.prepareQueues = function() {
@@ -49,40 +52,37 @@ Store.prototype.onReady = function() {
 	});
 };
 
-Store.prototype.prepareTable = function() {
-	return this.db.schema.hasTable('urls').then(exists => {
-		if (!exists) {
-			return this.db.schema.createTable('urls', table => {
-				table.string('hash').unique();
-				table.json('data');
-			});
-		}
-	});
-};
-
-Store.prototype.save = function(hash, data) {
-	return this.onReady().then(() => {
-		data = JSON.stringify(data);
-		return this.exists(hash).then(exists => {
-			if (exists) {
-				return this.db('urls').update({ data }).where('hash', hash);
-			}
-			return this.db.insert({ hash, data }).into('urls');
+Store.prototype.runMigrations = function() {
+	return this.db.migrate.latest()
+		.then(() => {
+			debug.info('Database migrations completed');
+			this.resumeQueue('onReady');
+		}).catch(error => {
+			this.resumeQueue('onReady', error);
 		});
-	});
 };
 
-Store.prototype.exists = function(hash) {
-	return this.fetch(hash).then(data => {
-		return !!data;
+Store.prototype.create = function(hash, tag, params, options) {
+	const { apiKeyId, uses } = options || {};
+	return this.onReady().then(() => {
+		return this.db.insert({
+			hash,
+			data: JSON.stringify({
+				tag,
+				params,
+				apiKeyId,
+			}),
+			remainingUses: uses,
+			initialUses: uses,
+		}).into('urls');
 	});
 };
 
 Store.prototype.fetch = function(hash) {
 	return this.onReady().then(() => {
-		return this.db.select('*').from('urls').where('hash', hash).then(result => {
+		return this.db.select('*').from('urls').where({ hash }).then(results => {
 			let data;
-			let row = result[0] || null;
+			let row = results[0] || null;
 			if (row) {
 				if (_.isString(row.data)) {
 					data = JSON.parse(row.data);
@@ -95,10 +95,45 @@ Store.prototype.fetch = function(hash) {
 	});
 };
 
-Store.prototype.delete = function(hash) {
+Store.prototype.use = function(hash) {
 	return this.onReady().then(() => {
-		return this.db.del().from('urls').where('hash', hash);
+		return this.db.select('initialUses').from('urls').where({ hash }).then(selectResults => {
+			const exists = !!selectResults[0];
+			if (!exists) {
+				// URL not found. Cannot use.
+				return false;
+			}
+			const { initialUses } = selectResults[0];
+			if (initialUses === 0) {
+				// Unlimited uses.
+				return true;
+			}
+			// Try to decrease the number of remaining uses.
+			let dbQuery = this.db('urls')
+				.where({ hash })
+				.andWhere('remainingUses', '>', 0)
+				.decrement('remainingUses', 1);
+			switch (this.options.client) {
+				case 'postgres':
+				case 'pg':
+					dbQuery.returning('hash');
+			}
+			return dbQuery.then(updateResults => {
+					switch (this.options.client) {
+						case 'sqlite3':
+						case 'mysql':
+						case 'mysql2':
+							return updateResults === 1;
+						default:
+							return updateResults.length === 1;
+					}
+				});
+		});
 	});
+};
+
+Store.prototype.deepClone = function(data) {
+	return JSON.parse(JSON.stringify(data));
 };
 
 Store.prototype.close = function() {

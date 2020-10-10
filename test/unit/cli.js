@@ -4,8 +4,12 @@ const expect = require('chai').expect;
 const fs = require('fs');
 const helpers = require('../helpers');
 const lnurl = require('../../');
-const { prepareSignedQuery } = require('../../lib');
+const {
+	generatePaymentRequest,
+	prepareSignedQuery
+} = require('../../lib');
 const path = require('path');
+const querystring = require('querystring');
 const spawn = require('child_process').spawn;
 
 describe('Command-line interface', function() {
@@ -24,13 +28,27 @@ describe('Command-line interface', function() {
 
 	describe('stdin/out', function() {
 
+		let mock;
+		before(function(done) {
+			mock = helpers.prepareMockLightningNode(done);
+		});
+
+		after(function(done) {
+			if (!mock) return done();
+			mock.close(done);
+		});
+
 		let server;
-		before(function() {
+		before(function(done) {
 			server = helpers.createServer({
 				protocol: 'http',
-				listen: false,
-				lightning: null,
+				lightning: {
+					backend: mock.backend,
+					config: mock.config,
+				},
 			});
+			server.once('error', done);
+			server.once('listening', done);
 		});
 
 		const config = _.pick(lnurl.Server.prototype.defaultOptions, 'host', 'port', 'protocol', 'url', 'endpoint');
@@ -319,6 +337,67 @@ describe('Command-line interface', function() {
 						},
 					},
 				},
+				{
+					description: '--uses 3',
+					cmd: function() {
+						return [
+							'generateNewUrl',
+							'--configFile', configFilePath,
+							'--uses', 3,
+							'--tag', 'withdrawRequest',
+							'--params', JSON.stringify({
+								minWithdrawable: 20000,
+								maxWithdrawable: 20000,
+								defaultDescription: 'test w/ configFile',
+							}),
+						];
+					},
+					expected: {
+						stdout: function(result) {
+							expect(result).to.not.equal('');
+							expect(result.trim()).to.equal(result);
+							result = JSON.parse(result);
+							const infoUrl = result.url;
+							const uses = 3;
+							const attempts = 5;
+							return new Promise((resolve, reject) => {
+								return helpers.request('get', {
+									url: infoUrl,
+									json: true,
+								}).then(result2 => {
+									const pr = generatePaymentRequest(20000);
+									const { callback, k1 } = result2.body;
+									const actionUrl = callback + '?' + querystring.stringify({
+										k1,
+										pr,
+									});
+									async.timesSeries(attempts, function(index, next) {
+										const n = index + 1;
+										helpers.request('get', {
+											url: actionUrl,
+											json: true,
+										}).then(result3 => {
+											if (n <= uses) {
+												// Expecting success.
+												expect(result3.body).to.be.an('object');
+												expect(result3.body.status).to.not.equal('ERROR');
+											} else {
+												// Expecting failure.
+												expect(result3.body).to.deep.equal({
+													reason: 'Maximum number of uses already reached',
+													status: 'ERROR',
+												});
+											}
+										}).then(next).catch(next);
+									}, function(error) {
+										if (error) return reject(error);
+										resolve();
+									});
+								});
+							});
+						},
+					},
+				},
 			]);
 		} else {
 			tests = tests.concat([
@@ -486,7 +565,6 @@ describe('Command-line interface', function() {
 										expect(body.uri).to.equal(mock.config.nodeUri);
 									}).then(next).catch(next);
 								}, error => {
-									console.log('async.retry.callback')
 									if (error) return reject(error);
 									resolve();
 								});

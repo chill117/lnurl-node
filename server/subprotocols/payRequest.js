@@ -1,9 +1,9 @@
 const _ = require('underscore');
 const BigNumber = require('bignumber.js');
+const createHash = require('../../lib/createHash');
 const HttpError = require('../HttpError');
 
 module.exports = {
-	reusable: true,
 	params: {
 		required: ['minSendable', 'maxSendable', 'metadata'],
 	},
@@ -87,7 +87,7 @@ module.exports = {
 		// !!! fromnodes=<nodeId1,nodeId2,...>
 		const extra = {
 			description: metadata,
-			descriptionHash: this.hash(Buffer.from(metadata, 'utf8')),
+			descriptionHash: createHash(Buffer.from(metadata, 'utf8')),
 		};
 		// Create an invoice.
 		return this.ln.addInvoice(amount, extra).then(pr => {

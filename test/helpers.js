@@ -8,6 +8,13 @@ const querystring = require('querystring');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
+const lightningBackendRequestTypes = {
+	channelRequest: 'openchannel',
+	login: null,
+	payRequest: 'addinvoice',
+	withdrawRequest: 'payinvoice',
+};
+
 module.exports = {
 	tmpDir,
 	createServer: function(options) {
@@ -70,12 +77,12 @@ module.exports = {
 				return 0;
 			});
 		};
-		mock.expectNumRequestsToEqual = function(type, total) {
-			if (_.isUndefined(mock.requestCounters[type])) {
-				throw new Error(`Unknown request type: "${type}"`);
-			}
-			if (mock.requestCounters[type] !== total) {
-				throw new Error(`Expected ${total} requests of type: "${type}"`);
+		mock.expectNumRequestsToEqual = function(tag, total) {
+			const type = lightningBackendRequestTypes[tag];
+			if (!_.isUndefined(mock.requestCounters[type])) {
+				if (mock.requestCounters[type] !== total) {
+					throw new Error(`Expected ${total} requests of type: "${type}"`);
+				}
 			}
 		};
 		return mock;

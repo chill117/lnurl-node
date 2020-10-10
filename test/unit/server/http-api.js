@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const async = require('async');
 const bolt11 = require('bolt11');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
@@ -13,13 +14,6 @@ const {
 } = require('../../../lib');
 
 describe('Server: HTTP API', function() {
-
-	const lightningBackendRequestTypes = {
-		channelRequest: 'openchannel',
-		login: null,
-		payRequest: 'addinvoice',
-		withdrawRequest: 'payinvoice',
-	};
 
 	let mock;
 	before(function(done) {
@@ -236,48 +230,6 @@ describe('Server: HTTP API', function() {
 					const { response, body } = result;
 					expect(body).to.be.an('object');
 					expect(body.status).to.not.equal('ERROR');
-				});
-			});
-
-			describe('link reuse', function() {
-				_.each([
-					'channelRequest',
-					'payRequest',
-					'withdrawRequest'
-				], function(tag) {
-					const reusable = (function() {
-						const subprotocol = lnurl.Server.prototype.getSubProtocol(tag);
-						return subprotocol.reusable === true;
-					})();
-					describe(tag, function() {
-						before(function() {
-							const params = prepareValidParams('create', tag);
-							const apiKey = apiKeys[0];
-							const query = this.query = prepareSignedQuery(apiKey, tag, params);
-							return helpers.request('get', {
-								url: server.getCallbackUrl(),
-								ca: server.ca,
-								qs: query,
-								json: true,
-							}).then(result => {
-								const { response, body } = result;
-								this.body1 = body;
-								expect(body).to.be.an('object');
-								expect(body.status).to.not.equal('ERROR');
-							});
-						});
-						it(`reusable = ${reusable}`, function() {
-							return helpers.request('get', {
-								url: server.getCallbackUrl(),
-								ca: server.ca,
-								qs: this.query,
-								json: true,
-							}).then(result => {
-								const { response, body } = result;
-								expect(body).to.deep.equal(this.body1);
-							});
-						});
-					});
 				});
 			});
 
@@ -957,73 +909,123 @@ describe('Server: HTTP API', function() {
 				});
 			});
 
-			describe('link reuse', function() {
-				_.each([
-					'channelRequest',
-					'login',
-					'payRequest',
-					'withdrawRequest'
-				], function(tag) {
-					const reusable = (function() {
-						const subprotocol = lnurl.Server.prototype.getSubProtocol(tag);
-						return subprotocol.reusable === true;
-					})();
-					const requestType = lightningBackendRequestTypes[tag];
-					describe(tag, function() {
-						beforeEach(function() {
-							this.secret = null;
-							const params = prepareValidParams('create', tag);
-							return server.generateNewUrl(tag, params).then(result => {
-								this.secret = result.secret;
-							});
+			describe('uses', function() {
+
+				describe('simultaneous requests', function() {
+
+					const uses = 1;
+					const attempts = 5;
+					const tag = 'withdrawRequest';
+					let secret;
+					before(function() {
+						const params = prepareValidParams('create', tag);
+						return server.generateNewUrl(tag, params, { uses }).then(result => {
+							secret = result.secret;
 						});
-						beforeEach(function() {
-							if (requestType) {
-								mock.expectNumRequestsToEqual(requestType, 0);
+					});
+
+					it('has expected number of successes and failures', function(done) {
+						const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
+							k1: secret,
+						});
+						async.times(attempts, function(index, next) {
+							return helpers.request('get', {
+								url: server.getCallbackUrl(),
+								ca: server.ca,
+								qs: query,
+								json: true,
+							}).then(result => {
+								next(null, result.body);
+							}).catch(next);
+						}, function(error, results) {
+							if (error) return done(error);
+							try {
+								const successes = (_.where(results, { status: 'OK' }) || []).length;
+								expect(successes).to.equal(uses);
+							} catch (error) {
+								return done(error);
 							}
+							done();
 						});
-						beforeEach(function() {
-							this.query = _.extend({}, prepareValidParams('action', tag, this.secret) || {}, {
-								k1: this.secret,
-							});
-							return helpers.request('get', {
-								url: server.getCallbackUrl(),
-								ca: server.ca,
-								qs: this.query,
-								json: true,
-							}).then(result => {
-								const { response, body } = result;
-								expect(body).to.be.an('object');
-								expect(body.status).to.not.equal('ERROR');
-								if (requestType) {
-									mock.expectNumRequestsToEqual(requestType, 1);
-								}
+					});
+				});
+
+				const tests = [
+					{
+						description: 'default (1)',
+						tag: 'withdrawRequest',
+						attempts: 2,
+						expected: {
+							success: 1,
+						},
+					},
+					{
+						description: 'user defined',
+						tag: 'withdrawRequest',
+						uses: 3,
+						attempts: 5,
+						expected: {
+							success: 3,
+						},
+					},
+					{
+						description: 'unlimited',
+						tag: 'withdrawRequest',
+						uses: 0,
+						attempts: 7,
+						expected: {
+							success: 7,
+						},
+					},
+				];
+
+				_.each(tests, function(test) {
+
+					const { description, tag, uses } = test;
+
+					describe(description, function() {
+
+						let secret;
+						before(function() {
+							const params = prepareValidParams('create', tag);
+							return server.generateNewUrl(tag, params, { uses }).then(result => {
+								secret = result.secret;
 							});
 						});
-						it(`reusable = ${reusable}`, function() {
-							return helpers.request('get', {
-								url: server.getCallbackUrl(),
-								ca: server.ca,
-								qs: this.query,
-								json: true,
-							}).then(result => {
-								const { response, body } = result;
-								if (reusable) {
-									expect(body).to.be.an('object');
-									expect(body.status).to.not.equal('ERROR');
-									if (requestType) {
-										mock.expectNumRequestsToEqual(requestType, 2);
-									}
-								} else {
-									expect(body).to.deep.equal({
-										status: 'ERROR',
-										reason: 'Already used',
-									});
-									if (requestType) {
-										mock.expectNumRequestsToEqual(requestType, 1);
-									}
-								}
+
+						before(function() {
+							mock.resetRequestCounters();
+							mock.expectNumRequestsToEqual(tag, 0);
+						});
+
+						it('has expected number of successes and failures', function(done) {
+							const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
+								k1: secret,
 							});
+							async.timesSeries(test.attempts, function(index, next) {
+								const n = index + 1;
+								return helpers.request('get', {
+									url: server.getCallbackUrl(),
+									ca: server.ca,
+									qs: query,
+									json: true,
+								}).then(result => {
+									const { response, body } = result;
+									if (n <= test.expected.success) {
+										// Expecting success.
+										expect(body).to.be.an('object');
+										expect(body.status).to.not.equal('ERROR');
+										mock.expectNumRequestsToEqual(tag, n);
+									} else {
+										// Expecting failure.
+										expect(body).to.deep.equal({
+											reason: 'Maximum number of uses already reached',
+											status: 'ERROR',
+										});
+										mock.expectNumRequestsToEqual(tag, test.expected.success);
+									}
+								}).then(next).catch(next);
+							}, done);
 						});
 					});
 				});

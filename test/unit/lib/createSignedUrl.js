@@ -98,7 +98,6 @@ describe('createSignedUrl(apiKey, tag, params[, options])', function() {
 				}),
 			}),
 			expected: function(result) {
-				console.log(result);
 				expect(result).to.be.a('string');
 				expect(result.substr(0, 'lnurl'.length)).to.equal('lnurl');
 				const decoded = lnurl.decode(result);
