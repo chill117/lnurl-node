@@ -95,7 +95,7 @@ module.exports = function(lnurl) {
 			days: 3650,
 		},
 		store: {
-			// Name of store backend ('knex', 'memory', 'redis'):
+			// Name of store backend ('knex', 'memory'):
 			backend: 'memory',
 			// Configuration options to pass to store:
 			config: {},

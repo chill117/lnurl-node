@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Removed Redis support
 * v0.9.0:
   * New top-level method "createSignedUrl"
   * CLI:

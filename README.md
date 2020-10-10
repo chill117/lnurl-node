@@ -31,7 +31,6 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
     * [middleware:signedLnurl:afterCheckSignature](#middlewaresignedLnurlafterCheckSignature)
 * [Signed LNURLs](#signed-lnurls)
 * [Configuring Data Store](#configuring-data-store)
-  * [Redis](#redis)
   * [SQLite](#sqlite)
   * [MySQL](#mysql)
   * [PostgreSQL](#postgresql)
@@ -408,7 +407,7 @@ const server = lnurl.createServer({
 		days: 3650,
 	},
 	store: {
-		// Name of store backend ('knex', 'memory', 'redis'):
+		// Name of store backend ('knex', 'memory'):
 		backend: 'memory',
 		// Configuration options to pass to store:
 		config: {},
@@ -702,35 +701,7 @@ lnurl1dp68gurn8ghj7mr0vdskc6r0wd6r5vesxqcz7mrww4exc0mfvs7kydnrvgux2wp3v5ejvm3avc
 
 ## Configuring Data Store
 
-By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [Redis](#redis), [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
-
-
-### Redis
-
-To use Redis as your data store you will need to install the [ioredis module](https://github.com/luin/ioredis) wherever you are running your lnurl server:
-```bash
-npm install ioredis
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'redis',
-		config: {
-			prefix: 'lnurl:',
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="redis" \
-	--store.config='{"prefix":"lnurl:"}'
-```
+By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
 
 
 ### SQLite
