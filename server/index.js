@@ -616,7 +616,7 @@ module.exports = function(lnurl) {
 	Server.prototype.prepareStore = function(options) {
 		const { backend, config } = options.store;
 		const storePath = path.join(__dirname, 'stores', backend);
-		const Store = require(storePath)(lnurl);
+		const Store = require(storePath);
 		return new Store(config);
 	};
 
