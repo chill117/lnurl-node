@@ -1,6 +1,6 @@
 # Changelog
 
-* TBD:
+* v0.10.0:
   * Added "uses" allowing for the creation of URLs that can be used a specific number of times (or unlimited)
   * Removed Redis support
 * v0.9.0:
