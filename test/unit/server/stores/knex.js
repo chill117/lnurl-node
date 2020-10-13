@@ -71,6 +71,12 @@ describe('stores.knex', function() {
 
 			it('existing URLs should be migrated to the new schema correctly', function() {
 				return store.db('urls').select().then(results => {
+					results = _.map(results, function(result) {
+						if (_.isString(result.data)) {
+							result.data = JSON.parse(result.data);
+						}
+						return result;
+					});
 					expect(results).to.deep.equal([
 						{
 							hash: 'b3c5a924417e2582cc4b0b0a65279ae8dbaf549e565482fe02ffc32bb7cfcc3d',

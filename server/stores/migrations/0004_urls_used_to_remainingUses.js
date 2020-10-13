@@ -2,7 +2,8 @@ const _ = require('underscore');
 
 const filterResults = function(results) {
 	return _.chain(results).filter(function(result) {
-		return result.data && result.data.used === false;
+		const data = _.isString(result.data) ? JSON.parse(result.data) : result.data;
+		return data && data.used === false;
 	}).pluck('hash').value();
 };
 
