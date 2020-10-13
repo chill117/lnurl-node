@@ -17,6 +17,9 @@ let Store = function(options) {
 	this.db = knex(this.options);
 	this.prepareQueues();
 	this.runMigrations();
+	this.onReady().then(() => {
+		debug.info('Store initialized and ready for use');
+	});
 };
 
 Store.prototype.prepareQueues = function() {

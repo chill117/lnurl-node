@@ -1,8 +1,24 @@
 const _ = require('underscore');
+const { bold, red, yellow } = require('colorette');
+const debug = {
+	info: require('debug')('lnurl:store:memory:info'),
+	error: require('debug')('lnurl:store:memory:error'),
+};
 
 let Store = function(options) {
-	this.options = options || {};
+	this.options = _.defaults(options || {}, {
+		noWarning: false,
+	});
 	this.map = new Map();
+	if (this.options.noWarning !== true) {
+		console.log(
+			red(bold('\n---------------------- WARNING: ----------------------')),
+			yellow('\nYou are using the in-memory data store. For production environments, it is strongly recommended to configure a proper data store. You can find more details, in the relevant documentation at the link below:'),
+			yellow('\nhttps://github.com/chill117/lnurl-node#configuring-data-store'),
+			red(bold('\n------------------------------------------------------\n')),
+		);
+	}
+	debug.info('Store initialized and ready for use');
 };
 
 Store.prototype.create = function(hash, tag, params, options) {

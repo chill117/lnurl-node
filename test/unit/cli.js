@@ -174,6 +174,7 @@ describe('Command-line interface', function() {
 				},
 			},
 			{
+				description: 'generateNewUrl command does not support memory data store',
 				cmd: [
 					'generateNewUrl',
 					'--host', config.host || '',
@@ -182,7 +183,7 @@ describe('Command-line interface', function() {
 					'--url', config.url || '',
 					'--endpoint', config.endpoint || '',
 					'--store.backend', 'memory',
-					'--store.config', '{}',
+					'--store.config', '{"noWarning":true}',
 					'--tag', 'withdrawRequest',
 					'--params', JSON.stringify({
 						minWithdrawable: 10000,
@@ -582,7 +583,7 @@ describe('Command-line interface', function() {
 						port: 3000,
 						protocol: 'http',
 						auth: {
-							apiKeys: apiKeys,
+							apiKeys,
 						},
 						lightning: {
 							backend: mock.backend,
