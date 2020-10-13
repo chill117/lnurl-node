@@ -24,7 +24,7 @@ _.each([
 });
 
 // Expose the server prototype.
-lnurl.Server = require('./server')(lnurl);
+lnurl.Server = require('./server');
 
 // Expose the Lightning backend prototype - for creating custom backends.
 lnurl.LightningBackend = require('./server/LightningBackend');
