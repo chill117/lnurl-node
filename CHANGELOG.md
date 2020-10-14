@@ -1,6 +1,10 @@
 # Changelog
 
 * v0.10.0:
+  * New schema for knex data store - data migration from previous versions is automated:
+    * Removed `data` column - now data is stored as `tag`, `params`, `apiKeyId` columns
+    * Added `initialUses` and `remainingUses` columns
+    * Added timestamp columns (`createdAt`, `updatedAt`)
   * Added "uses" allowing for the creation of URLs that can be used a specific number of times (or unlimited)
   * Removed Redis support
 * v0.9.0:
