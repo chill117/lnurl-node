@@ -60,6 +60,18 @@ describe('stores.knex', function() {
 								used: false,
 							}),
 						},
+						{
+							hash: '8810cb9f6d07ba997050ccd6dc44bd8f83d79cc7eb6b7842ee371f79aa3fb418',
+							data: JSON.stringify({
+								tag: 'channelRequest',
+								params: {
+									localAmt: 100000,
+									pushAmt: 0,
+								},
+								apiKeyId: 'dEaqCUc=',
+								used: false,
+							}),
+						},
 					]);
 				});
 			});
@@ -72,37 +84,46 @@ describe('stores.knex', function() {
 			it('existing URLs should be migrated to the new schema correctly', function() {
 				return store.db('urls').select().then(results => {
 					results = _.map(results, function(result) {
-						if (_.isString(result.data)) {
-							result.data = JSON.parse(result.data);
+						if (_.isString(result.params)) {
+							result.params = JSON.parse(result.params);
 						}
-						return result;
+						expect(result).to.have.property('createdAt');
+						expect(result).to.have.property('updatedAt');
+						return _.omit(result, 'createdAt', 'updatedAt');
 					});
 					expect(results).to.deep.equal([
 						{
 							hash: 'b3c5a924417e2582cc4b0b0a65279ae8dbaf549e565482fe02ffc32bb7cfcc3d',
-							data: {
-								tag: 'withdrawRequest',
-								params: {
-									minWithdrawable: 50000,
-									maxWithdrawable: 70000,
-									defaultDescription: 'already used',
-								},
-								used: true,
+							tag: 'withdrawRequest',
+							params: {
+								minWithdrawable: 50000,
+								maxWithdrawable: 70000,
+								defaultDescription: 'already used',
 							},
+							apiKeyId: null,
 							initialUses: 1,
 							remainingUses: 0,
 						},
 						{
 							hash: '40bfe2e19ed2356db4dd36d448bd96ed9972e3769bdd7cd1d03ac95d50d970f9',
-							data: {
-								tag: 'withdrawRequest',
-								params: {
-									minWithdrawable: 10000,
-									maxWithdrawable: 10000,
-									defaultDescription: 'this URL was not used yet',
-								},
-								used: false,
+							tag: 'withdrawRequest',
+							params: {
+								minWithdrawable: 10000,
+								maxWithdrawable: 10000,
+								defaultDescription: 'this URL was not used yet',
 							},
+							apiKeyId: null,
+							initialUses: 1,
+							remainingUses: 1,
+						},
+						{
+							hash: '8810cb9f6d07ba997050ccd6dc44bd8f83d79cc7eb6b7842ee371f79aa3fb418',
+							tag: 'channelRequest',
+							params: {
+								localAmt: 100000,
+								pushAmt: 0,
+							},
+							apiKeyId: 'dEaqCUc=',
 							initialUses: 1,
 							remainingUses: 1,
 						},

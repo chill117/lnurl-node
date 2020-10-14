@@ -68,15 +68,21 @@ Store.prototype.runMigrations = function() {
 Store.prototype.create = function(hash, tag, params, options) {
 	const { apiKeyId, uses } = options || {};
 	return this.onReady().then(() => {
+		let createdAt, updatedAt;
+		switch (this.options.client) {
+			case 'sqlite3':
+				createdAt = updatedAt = Date.now();
+				break;
+		}
 		return this.db.insert({
 			hash,
-			data: JSON.stringify({
-				tag,
-				params,
-				apiKeyId,
-			}),
+			tag,
+			params: JSON.stringify(params || {}),
+			apiKeyId,
 			remainingUses: uses,
 			initialUses: uses,
+			createdAt,
+			updatedAt,
 		}).into('urls');
 	});
 };
@@ -84,14 +90,9 @@ Store.prototype.create = function(hash, tag, params, options) {
 Store.prototype.fetch = function(hash) {
 	return this.onReady().then(() => {
 		return this.db.select('*').from('urls').where({ hash }).then(results => {
-			let data;
-			let row = results[0] || null;
-			if (row) {
-				if (_.isString(row.data)) {
-					data = JSON.parse(row.data);
-				} else {
-					data = row.data;
-				}
+			let data = results[0] || null;
+			if (data && data.params && _.isString(data.params)) {
+				data.params = JSON.parse(data.params);
 			}
 			return data || null;
 		});
@@ -141,9 +142,11 @@ Store.prototype.deepClone = function(data) {
 
 Store.prototype.close = function() {
 	return new Promise((resolve, reject) => {
-		this.db.destroy(error => {
-			if (error) return reject(error);
-			resolve();
+		return this.onReady().then(() => {
+			this.db.destroy(error => {
+				if (error) return reject(error);
+				resolve();
+			});
 		});
 	});
 };

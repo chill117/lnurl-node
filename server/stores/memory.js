@@ -27,12 +27,15 @@ Store.prototype.create = function(hash, tag, params, options) {
 	}
 	const { apiKeyId, uses } = options || {};
 	try {
+		const now = new Date(Date.now()).toISOString();
 		data = this.deepClone({
 			tag,
 			params,
 			apiKeyId,
 			remainingUses: uses,
 			initialUses: uses,
+			createdAt: now,
+			updatedAt: now,
 		});
 		this.map.set(hash, data);
 	} catch (error) {
@@ -67,6 +70,7 @@ Store.prototype.use = function(hash) {
 		} else if (!_.isUndefined(data.remainingUses) && data.remainingUses > 0) {
 			// At least one use remaining.
 			data.remainingUses--;
+			data.updatedAt = new Date(Date.now()).toISOString();
 			this.map.set(hash, data);
 			ok = true;
 		}
