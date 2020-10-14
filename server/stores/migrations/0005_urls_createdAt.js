@@ -3,11 +3,12 @@ exports.up = function(knex) {
 		if (!exists) {
 			return knex.schema.table('urls', table => {
 				switch (knex.client.config.client) {
-					case 'sqlite3':
-						table.timestamp('createdAt');
+					case 'mysql':
+					case 'mysql2':
+						table.timestamp('createdAt').defaultTo(knex.fn.now());
 						break;
 					default:
-						table.timestamp('createdAt').defaultTo(knex.fn.now());
+						table.timestamp('createdAt');
 						break;
 				}
 			});

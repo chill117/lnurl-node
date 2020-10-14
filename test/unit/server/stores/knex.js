@@ -89,6 +89,14 @@ describe('stores.knex', function() {
 						}
 						expect(result).to.have.property('createdAt');
 						expect(result).to.have.property('updatedAt');
+						switch (store.db.client.config.client) {
+							case 'pg':
+							case 'postgres':
+							case 'sqlite3':
+								expect(result.createdAt).to.equal(null);
+								expect(result.updatedAt).to.equal(null);
+								break;
+						}
 						return _.omit(result, 'createdAt', 'updatedAt');
 					});
 					expect(results).to.deep.equal([

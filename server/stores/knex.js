@@ -73,6 +73,9 @@ Store.prototype.create = function(hash, tag, params, options) {
 			case 'sqlite3':
 				createdAt = updatedAt = Date.now();
 				break;
+			default:
+				createdAt = updatedAt = this.db.fn.now();
+				break;
 		}
 		return this.db.insert({
 			hash,
