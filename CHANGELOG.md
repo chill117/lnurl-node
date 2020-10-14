@@ -1,6 +1,7 @@
 # Changelog
 
 * v0.10.0:
+  * Added console warning if using memory data store
   * New schema for knex data store - data migration from previous versions is automated:
     * Removed `data` column - now data is stored as `tag`, `params`, `apiKeyId` columns
     * Added `initialUses` and `remainingUses` columns
