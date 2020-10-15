@@ -527,6 +527,7 @@ describe('Command-line interface', function() {
 						'server',
 						'--host', 'localhost',
 						'--port', '3000',
+						'--endpoint', '/non-standard',
 						'--auth.apiKeys', JSON.stringify(apiKeys),
 						'--lightning.backend', mock.backend,
 						'--lightning.config', JSON.stringify(mock.config),
@@ -552,17 +553,19 @@ describe('Command-line interface', function() {
 									times: 50,
 									interval: 10,
 								}, next => {
+									const callbackUrl = 'https://localhost:3000/non-standard';
 									return helpers.request('get', {
-										url: 'https://localhost:3000/lnurl',
+										url: callbackUrl,
 										ca,
 										qs: query,
 										json: true,
 									}).then(result => {
 										const { response, body } = result;
 										expect(body).to.be.an('object');
+										expect(body.status).to.not.equal('ERROR');
 										expect(body.k1).to.be.a('string');
 										expect(body.tag).to.equal(tag);
-										expect(body.callback).to.equal('https://localhost:3000/lnurl');
+										expect(body.callback).to.equal(callbackUrl);
 										expect(body.uri).to.equal(mock.config.nodeUri);
 									}).then(next).catch(next);
 								}, error => {

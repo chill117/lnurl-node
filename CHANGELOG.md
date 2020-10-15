@@ -1,5 +1,8 @@
 # Changelog
 
+* TBD:
+  * CLI:
+    * Fix: server command's `--endpoint` argument now properly passed as option to `createServer`
 * v0.10.0:
   * Added console warning if using memory data store
   * New schema for knex data store - data migration from previous versions is automated:

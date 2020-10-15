@@ -296,7 +296,7 @@ program
 		if (this.configFile) {
 			options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
 		} else {
-			options = _.pick(this, 'host', 'port', 'protocol', 'url');
+			options = _.pick(this, 'host', 'port', 'protocol', 'url', 'endpoint');
 		}
 		_.each(['auth', 'lightning', 'tls', 'store'], group => {
 			options[group] = prepareGroupOptions(this, options, group);
