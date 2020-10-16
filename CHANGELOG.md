@@ -1,6 +1,6 @@
 # Changelog
 
-* TBD:
+* v0.10.1:
   * CLI:
     * Fix: server command's `--endpoint` argument now properly passed as option to `createServer`
     * Fix: generateNewUrl command with `--uses 0` now allows unlimited uses as expected
