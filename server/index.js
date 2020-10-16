@@ -13,6 +13,7 @@ const HttpError = require('./HttpError');
 const {
 	createHash,
 	createSignature,
+	deepClone,
 	encode,
 	generateRandomByteString,
 	isHex,
@@ -26,7 +27,7 @@ const subprotocols = require('./subprotocols');
 const util = require('util');
 
 let Server = function(options) {
-	this.options = this.prepareOptions(options);
+	this.options = this.prepareOptions(options, this.defaultOptions);
 	this.state = 'initializing';
 	this.checkOptions();
 	this.prepareApiKeys();
@@ -100,22 +101,29 @@ Server.prototype.defaultOptions = {
 	},
 };
 
-Server.prototype.prepareOptions = function(options) {
+Server.prototype.prepareOptions = function(options, defaultOptions) {
 	if (!_.isUndefined(options) && !_.isObject(options)) {
 		throw new Error('Invalid argument ("options"): Object expected.');
 	}
-	options = this.deepClone(options || {});
-	options = _.defaults(options || {}, this.defaultOptions);
-	options.auth = _.defaults(options.auth || {}, this.defaultOptions.auth);
-	options.apiKey = _.defaults(options.apiKey || {}, this.defaultOptions.apiKey);
-	if (!_.isNull(options.lightning)) {
-		options.lightning = _.defaults(options.lightning || {}, this.defaultOptions.lightning);
-		options.lightning.config = _.defaults(options.lightning.config || {}, this.defaultOptions.lightning.config);
+	if (!_.isUndefined(defaultOptions) && !_.isObject(defaultOptions)) {
+		throw new Error('Invalid argument ("defaultOptions"): Object expected.');
 	}
-	options.tls = _.defaults(options.tls || {}, this.defaultOptions.tls);
+	options = deepClone(options || {});
+	options = _.defaults(options || {}, defaultOptions || {});
+	_.each(['auth', 'apiKey', 'lightning', 'tls'], function(group) {
+		if (defaultOptions[group]) {
+			options[group] = _.defaults(options[group] || {}, defaultOptions[group]);
+		}
+	});
+	if (defaultOptions.lightning && defaultOptions.lightning.config) {
+		options.lightning.config = _.defaults(options.lightning.config || {}, defaultOptions.lightning.config);
+	}
 	if (!options.url) {
 		const { host, port, protocol } = options;
 		options.url = `${protocol}://${host}:${port}`;
+	}
+	if (options.endpoint.substr(0, 1) !== '/') {
+		throw new Error('Invalid option ("endpoint"): Must begin with a forward slash (/)');
 	}
 	return options;
 };
@@ -605,7 +613,7 @@ Server.prototype.prepareStore = function(options) {
 };
 
 Server.prototype.generateApiKey = function(options) {
-	options = this.deepClone(options || {});
+	options = deepClone(options || {});
 	const defaultOptions = this.options || this.defaultOptions;
 	options = _.defaults({}, options || {}, defaultOptions.apiKey);
 	options.numBytes = _.defaults({}, options.numBytes || {}, defaultOptions.apiKey.numBytes);
@@ -766,8 +774,8 @@ Server.prototype.destroyMockLightningNodes = function(done) {
 	this.mocks = [];
 };
 
-Server.prototype.deepClone = function(data) {
-	return JSON.parse(JSON.stringify(data));
+Server.prototype.deepClone = function() {
+	return deepClone.apply(undefined, arguments);
 };
 
 Server.prototype.isHex = function() {
