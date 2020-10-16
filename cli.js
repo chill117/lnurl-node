@@ -172,6 +172,7 @@ program
 			}
 			options.listen = false
 			options.lightning = null;
+			options.tls = { generate: false };
 			const server = lnurl.createServer(options);
 			return server.generateNewUrl(tag, params, { uses }).then(result => {
 				process.stdout.write(JSON.stringify(result, null, 2));
