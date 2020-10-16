@@ -3,6 +3,8 @@
 * TBD:
   * CLI:
     * Fix: server command's `--endpoint` argument now properly passed as option to `createServer`
+    * Fix: generateNewUrl command with `--uses 0` now allows unlimited uses as expected
+    * Fix: generateNewUrl command no longer causes generation of TLS cert, key files
 * v0.10.0:
   * Added console warning if using memory data store
   * New schema for knex data store - data migration from previous versions is automated:
