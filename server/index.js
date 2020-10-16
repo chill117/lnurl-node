@@ -27,10 +27,10 @@ const subprotocols = require('./subprotocols');
 const util = require('util');
 
 let Server = function(options) {
-	this.options = this.prepareOptions(options, this.defaultOptions);
 	this.state = 'initializing';
-	this.checkOptions();
-	this.prepareApiKeys();
+	this.options = this.prepareOptions(options, this.defaultOptions);
+	this.checkOptions(this.options, this.defaultOptions);
+	this.apiKeys = this.prepareApiKeys(this.options);
 	this.prepareHooks();
 	this.prepareLightning();
 	this.store = this.prepareStore(this.options);
@@ -128,13 +128,13 @@ Server.prototype.prepareOptions = function(options, defaultOptions) {
 	return options;
 };
 
-Server.prototype.checkOptions = function() {
-	this.checkRequiredOptions();
-	if (this.options.auth.apiKeys) {
-		if (!_.isArray(this.options.auth.apiKeys)) {
+Server.prototype.checkOptions = function(options, defaultOptions) {
+	this.checkRequiredOptions(options, ['host', 'port']);
+	if (options.auth.apiKeys) {
+		if (!_.isArray(options.auth.apiKeys)) {
 			throw new Error('Invalid option ("apiKeys"): Array expected');
 		}
-		_.each(this.options.auth.apiKeys, apiKey => {
+		_.each(options.auth.apiKeys, apiKey => {
 			if (!_.isObject(apiKey)) {
 				throw new Error('Invalid option ("apiKeys"): Array of objects expected');
 			}
@@ -143,34 +143,36 @@ Server.prototype.checkOptions = function() {
 			}
 		});
 	}
-	this.rejectUnknownOptions();
+	this.rejectUnknownOptions(options, defaultOptions);
 };
 
-Server.prototype.rejectUnknownOptions = function() {
-	_.each(this.options, (value, key) => {
-		if (_.isUndefined(this.defaultOptions[key])) {
+Server.prototype.rejectUnknownOptions = function(options, defaultOptions) {
+	_.each(options, (value, key) => {
+		if (_.isUndefined(defaultOptions[key])) {
 			throw new Error(`Unknown option: "${key}"`);
 		}
 	});
 };
 
-Server.prototype.checkRequiredOptions = function() {
-	_.each(['host', 'port'], name => {
-		if (!this.options[name]) {
+Server.prototype.checkRequiredOptions = function(options, requiredOptions) {
+	requiredOptions = requiredOptions || [];
+	_.each(requiredOptions, name => {
+		if (!options[name]) {
 			throw new Error(`Missing required option: "${name}"`);
 		}
 	});
 };
 
-Server.prototype.prepareApiKeys = function() {
-	this.apiKeys = new Map();
-	_.each(this.options.auth.apiKeys, apiKey => {
+Server.prototype.prepareApiKeys = function(options) {
+	let apiKeys = new Map();
+	_.each(options.auth.apiKeys, apiKey => {
 		const { id } = apiKey;
-		if (this.apiKeys.has(id)) {
+		if (apiKeys.has(id)) {
 			throw new Error(`Duplicate API key identifier ("${id}")`);
 		}
-		this.apiKeys.set(id, _.omit(apiKey, 'id'));
+		apiKeys.set(id, _.omit(apiKey, 'id'));
 	});
+	return apiKeys;
 };
 
 Server.prototype.getApiKey = function(id) {
