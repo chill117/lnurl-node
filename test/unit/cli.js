@@ -174,7 +174,7 @@ describe('Command-line interface', function() {
 				},
 			},
 			{
-				description: 'generateNewUrl command does not support memory data store',
+				description: 'generateNewUrl: does not support memory data store',
 				cmd: [
 					'generateNewUrl',
 					'--host', config.host || '',
@@ -200,7 +200,7 @@ describe('Command-line interface', function() {
 		if (process.env.LNURL_STORE_BACKEND && process.env.LNURL_STORE_BACKEND !== 'memory') {
 			tests = tests.concat([
 				{
-					description: 'Missing --tag',
+					description: 'generateNewUrl: Missing --tag',
 					cmd: [
 						'generateNewUrl',
 						'--host', config.host || '',
@@ -222,7 +222,7 @@ describe('Command-line interface', function() {
 					},
 				},
 				{
-					description: '--params not valid JSON',
+					description: 'generateNewUrl: --params not valid JSON',
 					cmd: [
 						'generateNewUrl',
 						'--host', config.host || '',
@@ -240,7 +240,7 @@ describe('Command-line interface', function() {
 					},
 				},
 				{
-					description: 'Invalid params (withdrawRequest)',
+					description: 'generateNewUrl: Invalid params (withdrawRequest)',
 					cmd: [
 						'generateNewUrl',
 						'--host', config.host || '',
@@ -262,6 +262,7 @@ describe('Command-line interface', function() {
 					},
 				},
 				{
+					description: 'generateNewUrl: valid arguments',
 					cmd: [
 						'generateNewUrl',
 						'--host', config.host || '',
@@ -302,7 +303,7 @@ describe('Command-line interface', function() {
 					},
 				},
 				{
-					description: 'usage with --configFile option',
+					description: 'generateNewUrl: --configFile',
 					cmd: function() {
 						return [
 							'generateNewUrl',
@@ -339,17 +340,16 @@ describe('Command-line interface', function() {
 					},
 				},
 				{
-					description: '--uses 3',
+					description: `generateNewUrl: default number of uses (1)`,
 					cmd: function() {
 						return [
 							'generateNewUrl',
 							'--configFile', configFilePath,
-							'--uses', 3,
 							'--tag', 'withdrawRequest',
 							'--params', JSON.stringify({
 								minWithdrawable: 20000,
 								maxWithdrawable: 20000,
-								defaultDescription: 'test w/ configFile',
+								defaultDescription: '',
 							}),
 						];
 					},
@@ -358,43 +358,66 @@ describe('Command-line interface', function() {
 							expect(result).to.not.equal('');
 							expect(result.trim()).to.equal(result);
 							result = JSON.parse(result);
-							const infoUrl = result.url;
-							const uses = 3;
-							const attempts = 5;
-							return new Promise((resolve, reject) => {
-								return helpers.request('get', {
-									url: infoUrl,
-									json: true,
-								}).then(result2 => {
-									const pr = generatePaymentRequest(20000);
-									const { callback, k1 } = result2.body;
-									const actionUrl = callback + '?' + querystring.stringify({
-										k1,
-										pr,
-									});
-									async.timesSeries(attempts, function(index, next) {
-										const n = index + 1;
-										helpers.request('get', {
-											url: actionUrl,
-											json: true,
-										}).then(result3 => {
-											if (n <= uses) {
-												// Expecting success.
-												expect(result3.body).to.be.an('object');
-												expect(result3.body.status).to.not.equal('ERROR');
-											} else {
-												// Expecting failure.
-												expect(result3.body).to.deep.equal({
-													reason: 'Maximum number of uses already reached',
-													status: 'ERROR',
-												});
-											}
-										}).then(next).catch(next);
-									}, function(error) {
-										if (error) return reject(error);
-										resolve();
-									});
-								});
+							return testUrlNumberOfUses(result.url, {
+								uses: 1,
+								attempts: 2,
+								successes: 1,
+							});
+						},
+					},
+				},
+				{
+					description: `generateNewUrl: --uses 3`,
+					cmd: function() {
+						return [
+							'generateNewUrl',
+							'--configFile', configFilePath,
+							'--tag', 'withdrawRequest',
+							'--uses', 3,
+							'--params', JSON.stringify({
+								minWithdrawable: 20000,
+								maxWithdrawable: 20000,
+								defaultDescription: '',
+							}),
+						];
+					},
+					expected: {
+						stdout: function(result) {
+							expect(result).to.not.equal('');
+							expect(result.trim()).to.equal(result);
+							result = JSON.parse(result);
+							return testUrlNumberOfUses(result.url, {
+								uses: 3,
+								attempts: 5,
+								successes: 3,
+							});
+						},
+					},
+				},
+				{
+					description: `generateNewUrl: --uses 0 (unlimited)`,
+					cmd: function() {
+						return [
+							'generateNewUrl',
+							'--configFile', configFilePath,
+							'--uses', 0,
+							'--tag', 'withdrawRequest',
+							'--params', JSON.stringify({
+								minWithdrawable: 20000,
+								maxWithdrawable: 20000,
+								defaultDescription: '',
+							}),
+						];
+					},
+					expected: {
+						stdout: function(result) {
+							expect(result).to.not.equal('');
+							expect(result.trim()).to.equal(result);
+							result = JSON.parse(result);
+							return testUrlNumberOfUses(result.url, {
+								uses: 0,
+								attempts: 5,
+								successes: 5,
 							});
 						},
 					},
@@ -680,3 +703,52 @@ describe('Command-line interface', function() {
 		});
 	});
 });
+
+const testUrlNumberOfUses = function(infoUrl, options) {
+	options = _.defaults(options || {}, {
+		uses: 1,
+		attempts: 2,
+		successes: 1,
+	});
+	const { uses, attempts, successes } = options;
+	return new Promise((resolve, reject) => {
+		return helpers.request('get', {
+			url: infoUrl,
+			json: true,
+		}).then(result => {
+			let actionUrl;
+			switch (result.body.tag) {
+				case 'withdrawRequest':
+					const pr = generatePaymentRequest(result.body.minWithdrawable);
+					const { callback, k1 } = result.body;
+					actionUrl = callback + '?' + querystring.stringify({
+						k1,
+						pr,
+					});
+					break;
+			}
+			async.timesSeries(attempts, function(index, next) {
+				const n = index + 1;
+				helpers.request('get', {
+					url: actionUrl,
+					json: true,
+				}).then(result2 => {
+					if (n <= successes) {
+						// Expecting success.
+						expect(result2.body).to.be.an('object');
+						expect(result2.body.status).to.not.equal('ERROR');
+					} else {
+						// Expecting failure.
+						expect(result2.body).to.deep.equal({
+							reason: 'Maximum number of uses already reached',
+							status: 'ERROR',
+						});
+					}
+				}).then(next).catch(next);
+			}, function(error) {
+				if (error) return reject(error);
+				resolve();
+			});
+		});
+	});
+};

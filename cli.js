@@ -166,7 +166,7 @@ program
 					throw new Error('--params must be a valid JSON object');
 				}
 			}
-			uses = uses && parseInt(uses) || 1;
+			uses = uses && parseInt(uses);
 			if (_.isNaN(uses)) {
 				throw new Error('--uses must be an integer');
 			}
