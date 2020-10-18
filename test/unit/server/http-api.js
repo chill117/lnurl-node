@@ -7,6 +7,7 @@ const lnurl = require('../../../');
 const querystring = require('querystring');
 const {
 	createAuthorizationSignature,
+	createHash,
 	generatePaymentRequest,
 	generateRandomLinkingKey,
 	getTagDataFromPaymentRequest,
@@ -913,10 +914,73 @@ describe('Server: HTTP API', function() {
 
 				describe('signed URL', function() {
 
-					let signedUrl;
+					let tag, signedUrl, secret, hash;
 					before(function() {
+						const apiKey = apiKeys[0];
+						tag = 'withdrawRequest';
 						const params = prepareValidParams('create', tag);
+						const options = {
+							baseUrl: server.getCallbackUrl(),
+							shorten: false,
+							encode: false,
+						};
 						signedUrl = lnurl.createSignedUrl(apiKey, tag, params, options);
+					});
+
+					before(function() {
+						mock.resetRequestCounters();
+						mock.expectNumRequestsToEqual(tag, 0);
+					});
+
+					it('can be used only once', function(done) {
+						helpers.request('get', {
+							url: signedUrl,
+							ca: server.ca,
+							json: true,
+						}).then(result => {
+							expect(result.body).to.be.an('object');
+							expect(result.body.status).to.be.undefined;
+							expect(result.body).to.have.property('k1');
+							return helpers.request('get', {
+								url: signedUrl,
+								ca: server.ca,
+								json: true,
+							}).then(result2 => {
+								expect(result2.body).to.be.an('object');
+								expect(result2.body.status).to.be.undefined;
+								expect(result2.body).to.have.property('k1');
+								const { callback, k1 } = result2.body;
+								const query = _.extend({}, prepareValidParams('action', tag, k1) || {}, {
+									k1,
+								});
+								const attempts = 3;
+								const success = 1;
+								async.timesSeries(attempts, function(index, next) {
+									const n = index + 1;
+									helpers.request('get', {
+										url: callback,
+										ca: server.ca,
+										qs: query,
+										json: true,
+									}).then(result3 => {
+										const { body } = result3;
+										if (n <= success) {
+											// Expecting success.
+											expect(body).to.be.an('object');
+											expect(body.status).to.not.equal('ERROR');
+											mock.expectNumRequestsToEqual(tag, n);
+										} else {
+											// Expecting failure.
+											expect(body).to.deep.equal({
+												reason: 'Maximum number of uses already reached',
+												status: 'ERROR',
+											});
+											mock.expectNumRequestsToEqual(tag, success);
+										}
+									}).then(next).catch(next);
+								}, done);
+							});
+						}).catch(done);
 					});
 				});
 

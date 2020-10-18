@@ -57,6 +57,11 @@ Store.prototype.fetch = function(hash) {
 	return Promise.resolve(data);
 };
 
+Store.prototype.exists = function(hash) {
+	const exists = this.map.has(hash);
+	return Promise.resolve(exists);
+};
+
 Store.prototype.use = function(hash) {
 	let ok = false;
 	try {

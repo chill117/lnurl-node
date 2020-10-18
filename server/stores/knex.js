@@ -104,6 +104,15 @@ Store.prototype.fetch = function(hash) {
 	});
 };
 
+Store.prototype.exists = function(hash) {
+	return this.onReady().then(() => {
+		return this.db('urls').select('hash').where({ hash }).then(results => {
+			const result = results && results[0] || null;
+			return result && result.hash === hash;
+		});
+	});
+};
+
 Store.prototype.use = function(hash) {
 	return this.onReady().then(() => {
 		return this.db.select('initialUses').from('urls').where({ hash }).then(selectResults => {

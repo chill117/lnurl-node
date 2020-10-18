@@ -373,14 +373,33 @@ Server.prototype.middleware = function() {
 						req.query = { q: secret };
 						break;
 				}
-				return this.createUrl(secret, tag, params, { apiKeyId }).then(() => {
-					next();
-				}).catch(error => {
-					if (!/duplicate/i.test(error.message)) {
-						return next(error);
+				return this.hasUrl(secret).then(exists => {
+					if (!exists) {
+						return this.createUrl(secret, tag, params, { apiKeyId }).catch(error => {
+							if (this.options.store.backend === 'knex') {
+								let uniqueConstraintRegex;
+								switch (this.store.db.client.config.client) {
+									case 'mysql':
+									case 'mysql2':
+										uniqueConstraintRegex = /ER_DUP_ENTRY/;
+										break;
+									default:
+										uniqueConstraintRegex = /unique constraint/i;
+										break;
+								}
+								if (uniqueConstraintRegex.test(error.message)) {
+									// Error was related to unique constraint.
+									// Safe to ignore it here.
+								} else {
+									// Some other kind of error happened.
+									throw error;
+								}
+							}
+						});
 					}
+				}).then(() => {
 					next();
-				});
+				}).catch(next);
 			},
 		},
 		processUrl: (req, res, next) => {
@@ -659,6 +678,11 @@ Server.prototype.createUrl = function(secret, tag, params, options) {
 		const hash = createHash(secret);
 		return this.store.create(hash, tag, params, options);
 	});
+};
+
+Server.prototype.hasUrl = function(secret) {
+	const hash = createHash(secret);
+	return this.store.exists(hash);
 };
 
 Server.prototype.fetchUrl = function(hash) {
