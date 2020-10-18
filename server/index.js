@@ -375,31 +375,30 @@ Server.prototype.middleware = function() {
 				}
 				return this.hasUrl(secret).then(exists => {
 					if (!exists) {
-						return this.createUrl(secret, tag, params, { apiKeyId }).catch(error => {
-							if (this.options.store.backend === 'knex') {
-								let uniqueConstraintRegex;
-								switch (this.store.db.client.config.client) {
-									case 'mysql':
-									case 'mysql2':
-										uniqueConstraintRegex = /ER_DUP_ENTRY/;
-										break;
-									default:
-										uniqueConstraintRegex = /unique constraint/i;
-										break;
-								}
-								if (uniqueConstraintRegex.test(error.message)) {
-									// Error was related to unique constraint.
-									// Safe to ignore it here.
-								} else {
-									// Some other kind of error happened.
-									throw error;
-								}
-							}
-						});
+						return this.createUrl(secret, tag, params, { apiKeyId });
 					}
 				}).then(() => {
 					next();
-				}).catch(next);
+				}).catch(error => {
+					if (this.options.store.backend === 'knex') {
+						let uniqueConstraintRegex;
+						switch (this.store.db.client.config.client) {
+							case 'mysql':
+							case 'mysql2':
+								uniqueConstraintRegex = /ER_DUP_ENTRY/;
+								break;
+							default:
+								uniqueConstraintRegex = /unique constraint/i;
+								break;
+						}
+						if (uniqueConstraintRegex.test(error.message)) {
+							// Error was related to unique constraint.
+							// Safe to ignore it here.
+							return next();
+						}
+					}
+					next(error);
+				});
 			},
 		},
 		processUrl: (req, res, next) => {
