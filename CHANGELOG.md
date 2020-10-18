@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Fix for knex (for SQLite3 only) data store: The unique constraint on the hash column (defined in the urls table initialization) was being dropped (or ignored) by knex during each table alteration. A new migration to be run only if using SQLite3 will ensure the unique constraint is redefined after all migrations have run.
 * v0.10.1:
   * CLI:
     * Fix: server command's `--endpoint` argument now properly passed as option to `createServer`

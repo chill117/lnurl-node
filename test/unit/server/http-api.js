@@ -911,6 +911,15 @@ describe('Server: HTTP API', function() {
 
 			describe('uses', function() {
 
+				describe('signed URL', function() {
+
+					let signedUrl;
+					before(function() {
+						const params = prepareValidParams('create', tag);
+						signedUrl = lnurl.createSignedUrl(apiKey, tag, params, options);
+					});
+				});
+
 				describe('simultaneous requests', function() {
 
 					const uses = 1;

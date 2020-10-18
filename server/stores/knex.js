@@ -16,9 +16,17 @@ let Store = function(options) {
 	}).value();
 	this.db = knex(this.options);
 	this.prepareQueues();
-	this.runMigrations();
+	this.runMigrations().then(() => {
+		debug.info('Database migrations completed');
+		this.resumeQueue('onReady');
+	}).catch(error => {
+		debug.info('Database migrations failed');
+		this.resumeQueue('onReady', error);
+	});
 	this.onReady().then(() => {
 		debug.info('Store initialized and ready for use');
+	}).catch(error => {
+		debug.info('Store initialization failed');
 	});
 };
 
@@ -56,13 +64,7 @@ Store.prototype.onReady = function() {
 };
 
 Store.prototype.runMigrations = function() {
-	return this.db.migrate.latest()
-		.then(() => {
-			debug.info('Database migrations completed');
-			this.resumeQueue('onReady');
-		}).catch(error => {
-			this.resumeQueue('onReady', error);
-		});
+	return this.db.migrate.latest();
 };
 
 Store.prototype.create = function(hash, tag, params, options) {
@@ -77,7 +79,7 @@ Store.prototype.create = function(hash, tag, params, options) {
 				createdAt = updatedAt = this.db.fn.now();
 				break;
 		}
-		return this.db.insert({
+		return this.db('urls').insert({
 			hash,
 			tag,
 			params: JSON.stringify(params || {}),
@@ -86,13 +88,13 @@ Store.prototype.create = function(hash, tag, params, options) {
 			initialUses: uses,
 			createdAt,
 			updatedAt,
-		}).into('urls');
+		});
 	});
 };
 
 Store.prototype.fetch = function(hash) {
 	return this.onReady().then(() => {
-		return this.db.select('*').from('urls').where({ hash }).then(results => {
+		return this.db('urls').select('*').where({ hash }).then(results => {
 			let data = results[0] || null;
 			if (data && data.params && _.isString(data.params)) {
 				data.params = JSON.parse(data.params);

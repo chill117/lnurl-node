@@ -1,6 +1,7 @@
 if (process.env.LNURL_STORE_BACKEND !== 'knex') return;
 
 const _ = require('underscore');
+const { createHash, generateRandomByteString } = require('../../../../lib');
 const { expect } = require('chai');
 const helpers = require('../../../helpers');
 const Store = require('../../../../server/stores/knex');
@@ -16,6 +17,45 @@ describe('stores.knex', function() {
 
 	after(function() {
 		if (store) return store.close();
+	});
+
+	describe('create(hash, tag, params[, options])', function() {
+
+		it('duplicate hash', function(done) {
+			const hash = createHash(generateRandomByteString());
+			const tag = 'withdrawRequest';
+			const params = {
+				minWithdrawable: 10000,
+				maxWithdrawable: 10000,
+				defaultDescription: '',
+			};
+			store.create(hash, tag, params).then(result => {
+				return store.create(hash, tag, params).then(result2 => {
+					return store.db('urls').select('*').where({ hash }).then(results => {
+						if (results.length > 1) {
+							done(new Error('Should not have been able to save a duplicate entry in the data store'));
+						}
+					});
+				}).catch(error => {
+					let uniqueConstraintRegex;
+					switch (store.db.client.config.client) {
+						case 'mysql':
+						case 'mysql2':
+							uniqueConstraintRegex = /ER_DUP_ENTRY/;
+							break;
+						default:
+							uniqueConstraintRegex = /unique constraint/i;
+							break;
+					}
+					if (uniqueConstraintRegex.test(error.message)) {
+						// Error was related to unique constraint, as expected.
+						return done();
+					}
+					// Unexpected error.
+					done(error);
+				});
+			}).catch(done);
+		});
 	});
 
 	describe('migrations', function() {
