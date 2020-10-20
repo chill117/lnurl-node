@@ -1,11 +1,14 @@
 const _ = require('underscore');
-const { expect } = require('chai');
 const { createSignature } = require('../../../lib');
+const { expect } = require('chai');
+const helpers = require('../../helpers');
 
 describe('createSignature(data, key[, algorithm])', function() {
 
+	const fn = createSignature;
+
 	it('is a function', function() {
-		expect(createSignature).to.be.a('function');
+		expect(fn).to.be.a('function');
 	});
 
 	const tests = [
@@ -37,15 +40,9 @@ describe('createSignature(data, key[, algorithm])', function() {
 	];
 
 	_.each(tests, function(test) {
-		const { data, key, algorithm } = test.args;
-		let description = test.description || JSON.stringify(test.args);
-		it(description, function() {
-			const result = createSignature(data, key, algorithm);
-			if (_.isFunction(test.expected)) {
-				test.expected.call(this, result);
-			} else {
-				expect(result).to.deep.equal(test.expected);
-			}
+		test.fn = fn;
+		it(helpers.prepareTestDescription(test), function() {
+			return helpers.runTest(test);
 		});
 	});
 });

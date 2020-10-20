@@ -9,10 +9,10 @@ const express = require('express');
 const {
 	generateNodeKey,
 	generatePaymentRequest,
+	generateRandomByteString,
 	getTagDataFromPaymentRequest
 } = require('../../lib');
 const http = require('http');
-const lnurl = require('../../');
 
 module.exports = function(options, done) {
 	if (_.isFunction(options)) {
@@ -30,7 +30,7 @@ module.exports = function(options, done) {
 		options.hostname = [options.host, options.port].join(':');
 	}
 	if (!options.password) {
-		options.password = lnurl.Server.prototype.generateRandomKey(16, 'base64');
+		options.password = generateRandomByteString(16, 'base64');
 	}
 	const { hostname } = options;
 	const { nodePrivateKey, nodePublicKey } = generateNodeKey();

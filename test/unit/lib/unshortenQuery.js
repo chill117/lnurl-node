@@ -1,11 +1,14 @@
 const _ = require('underscore');
 const { expect } = require('chai');
+const helpers = require('../../helpers');
 const { unshortenQuery } = require('../../../lib');
 
 describe('unshortenQuery(shortened)', function() {
 
+	const fn = unshortenQuery;
+
 	it('is a function', function() {
-		expect(unshortenQuery).to.be.a('function');
+		expect(fn).to.be.a('function');
 	});
 
 	const tests = [
@@ -124,15 +127,9 @@ describe('unshortenQuery(shortened)', function() {
 	];
 
 	_.each(tests, function(test) {
-		const { shortened } = test.args;
-		let description = test.description || JSON.stringify(test.args);
-		it(description, function() {
-			const result = unshortenQuery(shortened);
-			if (_.isFunction(test.expected)) {
-				test.expected.call(this, result);
-			} else {
-				expect(result).to.deep.equal(test.expected);
-			}
+		test.fn = fn;
+		it(helpers.prepareTestDescription(test), function() {
+			return helpers.runTest(test);
 		});
 	});
 });

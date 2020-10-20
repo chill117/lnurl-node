@@ -8,12 +8,13 @@ const debug = {
 const express = require('express');
 const fs = require('fs');
 const {
+	createHash,
 	generateNodeKey,
 	generatePaymentRequest,
+	generateRandomByteString,
 	getTagDataFromPaymentRequest
 } = require('../../lib');
 const https = require('https');
-const lnurl = require('../../');
 const path = require('path');
 const pem = require('pem');
 
@@ -91,10 +92,10 @@ module.exports = function(options, done) {
 			});
 		},
 		'POST /v1/channels/transactions': function(req, res, next) {
-			const preimage = lnurl.Server.prototype.generateRandomKey();
+			const preimage = generateRandomByteString();
 			res.json({
 				result: {
-					payment_hash: lnurl.Server.prototype.hash(preimage),
+					payment_hash: createHash(preimage),
 					payment_hash_string: '',
 					route: {},
 				},
@@ -175,7 +176,7 @@ const generateMacaroon = function(macaroonPath, done) {
 	if (!_.isString(macaroonPath)) {
 		throw new Error('Invalid argument ("macaroonPath"): String expected');
 	}
-	const macaroon = lnurl.Server.prototype.generateRandomKey();
+	const macaroon = generateRandomByteString();
 	fs.writeFile(macaroonPath, Buffer.from(macaroon, 'hex'), error => {
 		if (error) return done(error);
 		done(null, macaroon);

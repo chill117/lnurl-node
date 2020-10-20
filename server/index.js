@@ -15,6 +15,7 @@ const {
 	createSignature,
 	deepClone,
 	encode,
+	generateApiKey,
 	generateRandomByteString,
 	isHex,
 	unshortenQuery
@@ -633,14 +634,7 @@ Server.prototype.prepareStore = function(options) {
 };
 
 Server.prototype.generateApiKey = function(options) {
-	options = deepClone(options || {});
-	const defaultOptions = this.options || this.defaultOptions;
-	options = _.defaults({}, options || {}, defaultOptions.apiKey);
-	options.numBytes = _.defaults({}, options.numBytes || {}, defaultOptions.apiKey.numBytes);
-	const { encoding, numBytes } = options;
-	const id = this.generateRandomKey(numBytes.id, encoding);
-	const key = this.generateRandomKey(numBytes.key, encoding);
-	return { id, key };
+	return generateApiKey.call(undefined, options, this.defaultOptions.apiKey);
 };
 
 Server.prototype.generateNewUrl = function(tag, params, options) {
@@ -705,7 +699,7 @@ Server.prototype.generateSecret = function() {
 		}, next => {
 			try {
 				numAttempts++;
-				secret = this.generateRandomKey();
+				secret = generateRandomByteString();
 				const hash = createHash(secret);
 				return this.fetchUrl(hash).then(result => {
 					const exists = !!result;
@@ -721,14 +715,6 @@ Server.prototype.generateSecret = function() {
 			resolve(secret);
 		});
 	});
-};
-
-Server.prototype.generateRandomKey = function() {
-	return generateRandomByteString.apply(undefined, arguments);
-};
-
-Server.prototype.hash = function() {
-	return createHash.apply(undefined, arguments);
 };
 
 Server.prototype.prepareLightning = function() {
@@ -799,14 +785,6 @@ Server.prototype.destroyMockLightningNodes = function(done) {
 	this.mocks = [];
 };
 
-Server.prototype.deepClone = function() {
-	return deepClone.apply(undefined, arguments);
-};
-
-Server.prototype.isHex = function() {
-	return isHex.apply(undefined, arguments);
-};
-
 Server.prototype.close = function() {
 	debug.info('Closing lnurl server...');
 	if (this.state === 'closed') {
@@ -840,6 +818,26 @@ Server.prototype.close = function() {
 			resolve();
 		});
 	});
+};
+
+// Deprecated method - will remove in a few releases.
+Server.prototype.generateRandomKey = function() {
+	return generateRandomByteString.apply(undefined, arguments);
+};
+
+// Deprecated method - will remove in a few releases.
+Server.prototype.hash = function() {
+	return createHash.apply(undefined, arguments);
+};
+
+// Deprecated method - will remove in a few releases.
+Server.prototype.deepClone = function() {
+	return deepClone.apply(undefined, arguments);
+};
+
+// Deprecated method - will remove in a few releases.
+Server.prototype.isHex = function() {
+	return isHex.apply(undefined, arguments);
 };
 
 module.exports = Server;

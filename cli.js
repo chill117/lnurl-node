@@ -150,9 +150,6 @@ program
 				options = _.pick(this, 'host', 'port', 'protocol', 'url', 'endpoint');
 				options.store = prepareGroupOptions(this, options, 'store');
 			}
-			if (options.store && options.store.backend === 'memory') {
-				throw new Error('This command does not work with `--store.backend` set to "memory"');
-			}
 			let { tag, params, uses } = this;
 			if (!tag) {
 				throw new Error('--tag is required');
@@ -169,6 +166,9 @@ program
 			uses = uses && parseInt(uses);
 			if (_.isNaN(uses)) {
 				throw new Error('--uses must be an integer');
+			}
+			if (options.store && options.store.backend === 'memory') {
+				throw new Error('This command does not work with `--store.backend` set to "memory"');
 			}
 			options.listen = false
 			options.lightning = null;

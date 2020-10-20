@@ -1,14 +1,17 @@
 const _ = require('underscore');
 const { expect } = require('chai');
-const lnurl = require('../../../');
+const {
+	generateRandomByteString,
+	isHex
+} = require('../../../lib');
+const helpers = require('../../helpers');
 
-describe('generateRandomKey([numberOfBytes])', function() {
+describe('generateRandomByteString([numberOfBytes[, encoding]])', function() {
 
-	const method = 'generateRandomKey';
-	const fn = lnurl.Server.prototype[method].bind(lnurl.Server.prototype);
+	const fn = generateRandomByteString;
 
 	it('is a function', function() {
-		expect(lnurl.Server.prototype[method]).to.be.a('function');
+		expect(fn).to.be.a('function');
 	});
 
 	const tests = [
@@ -20,7 +23,7 @@ describe('generateRandomKey([numberOfBytes])', function() {
 			expected: function(result) {
 				expect(result).to.be.a('string');
 				expect(result).to.have.length(64);
-				expect(lnurl.Server.prototype.isHex(result)).to.equal(true);
+				expect(isHex(result)).to.equal(true);
 			},
 		},
 		{
@@ -31,7 +34,7 @@ describe('generateRandomKey([numberOfBytes])', function() {
 			expected: function(result) {
 				expect(result).to.be.a('string');
 				expect(result).to.have.length(40);
-				expect(lnurl.Server.prototype.isHex(result)).to.equal(true);
+				expect(isHex(result)).to.equal(true);
 			},
 		},
 		{
@@ -41,23 +44,18 @@ describe('generateRandomKey([numberOfBytes])', function() {
 			},
 			expected: function(result) {
 				expect(result).to.be.a('string');
-				expect(lnurl.Server.prototype.isHex(result)).to.equal(false);
+				expect(isHex(result)).to.equal(false);
 				const hex = Buffer.from(result, 'base64').toString('hex');
 				expect(hex).to.have.length(24);
-				expect(lnurl.Server.prototype.isHex(hex)).to.equal(true);
+				expect(isHex(hex)).to.equal(true);
 			},
 		},
 	];
 
 	_.each(tests, function(test) {
-		it(JSON.stringify(test.args), function() {
-			const args = _.values(test.args);
-			const result = fn.apply(undefined, args);
-			if (_.isFunction(test.expected)) {
-				test.expected.call(this, result);
-			} else {
-				expect(result).to.deep.equal(test.expected);
-			}
+		test.fn = fn;
+		it(helpers.prepareTestDescription(test), function() {
+			return helpers.runTest(test);
 		});
 	});
 });

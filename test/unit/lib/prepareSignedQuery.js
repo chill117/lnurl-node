@@ -4,12 +4,15 @@ const {
 	createSignature,
 	prepareSignedQuery
 } = require('../../../lib');
+const helpers = require('../../helpers');
 const querystring = require('querystring');
 
 describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 
+	const fn = prepareSignedQuery;
+
 	it('is a function', function() {
-		expect(prepareSignedQuery).to.be.a('function');
+		expect(fn).to.be.a('function');
 	});
 
 	const validArgs = {
@@ -158,39 +161,15 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 	_.each(['apiKey', 'tag'], function(argName) {
 		tests.push({
 			description: `missing required argument "${argName}"`,
-			args: _.omit(validArgs, argName),
+			args: helpers.setKeyUndefined(validArgs, argName),
 			expectThrownError: `Missing required argument: "${argName}"`,
 		});
 	});
 
 	_.each(tests, function(test) {
-		const { apiKey, tag, params, options } = test.args;
-		let description = test.description || JSON.stringify(test.args);
-		it(description, function() {
-			let result;
-			let thrownError;
-			try {
-				result = prepareSignedQuery(apiKey, tag, params, options);
-			} catch (error) {
-				thrownError = error;
-			}
-			if (!_.isUndefined(thrownError)) {
-				// An error was thrown.
-				if (test.expectThrownError) {
-					// Check if the thrown error message matches what as expected.
-					expect(thrownError.message).to.equal(test.expectThrownError);
-				} else {
-					// Rethrow because an error wasn't expected.
-					throw thrownError;
-				}
-			} else if (test.expectThrownError) {
-				throw new Error(`Expected error to be thrown: '${test.expectThrownError}'`);
-			}
-			if (_.isFunction(test.expected)) {
-				test.expected.call(this, result, thrownError);
-			} else {
-				expect(result).to.deep.equal(test.expected);
-			}
+		test.fn = fn;
+		it(helpers.prepareTestDescription(test), function() {
+			return helpers.runTest(test);
 		});
 	});
 });

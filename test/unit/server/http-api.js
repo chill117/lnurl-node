@@ -9,6 +9,7 @@ const {
 	createAuthorizationSignature,
 	createHash,
 	generatePaymentRequest,
+	generateRandomByteString,
 	generateRandomLinkingKey,
 	getTagDataFromPaymentRequest,
 	prepareSignedQuery
@@ -441,7 +442,7 @@ describe('Server: HTTP API', function() {
 						params: function() {
 							const linkingKey1 = generateRandomLinkingKey();
 							const linkingKey2 = generateRandomLinkingKey();
-							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
+							const k1 = Buffer.from(generateRandomByteString(), 'hex');
 							const sig = createAuthorizationSignature(k1, linkingKey1.privKey);
 							return {
 								tag: 'login',
@@ -459,7 +460,7 @@ describe('Server: HTTP API', function() {
 						description: 'valid signature',
 						params: function() {
 							const { pubKey, privKey } = generateRandomLinkingKey();
-							const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
+							const k1 = Buffer.from(generateRandomByteString(), 'hex');
 							const sig = createAuthorizationSignature(k1, privKey);
 							const params = {
 								tag: 'login',
@@ -779,7 +780,7 @@ describe('Server: HTTP API', function() {
 						expect(body.routes).to.be.an('array');
 						const purposeCommitHashTagData = getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
 						const { metadata } = validParams.create.payRequest;
-						expect(purposeCommitHashTagData).to.equal(lnurl.Server.prototype.hash(Buffer.from(metadata, 'utf8')));
+						expect(purposeCommitHashTagData).to.equal(createHash(Buffer.from(metadata, 'utf8')));
 						mock.expectNumRequestsToEqual('addinvoice', 1);
 						expect(response.headers['cache-control']).to.equal('private');
 					},
@@ -836,7 +837,7 @@ describe('Server: HTTP API', function() {
 					description: 'signed different secret',
 					params: function() {
 						const { pubKey, privKey } = generateRandomLinkingKey();
-						const k1 = Buffer.from(lnurl.Server.prototype.generateRandomKey(), 'hex');
+						const k1 = Buffer.from(generateRandomByteString(), 'hex');
 						const sig = createAuthorizationSignature(k1, privKey);
 						const params = {
 							sig: sig.toString('hex'),

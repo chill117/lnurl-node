@@ -1,13 +1,13 @@
 const _ = require('underscore');
-const bech32 = require('bech32');
+const Server = require('./server');
 
 let lnurl = {
 	bech32: require('./bech32-rules.json'),
 	createServer(options) {
-		return new this.Server(options);
+		return new Server(options);
 	},
 	generateApiKey(options) {
-		return this.Server.prototype.generateApiKey(options);
+		return Server.prototype.generateApiKey(options);
 	},
 };
 
@@ -24,7 +24,7 @@ _.each([
 });
 
 // Expose the server prototype.
-lnurl.Server = require('./server');
+lnurl.Server = Server;
 
 // Expose the Lightning backend prototype - for creating custom backends.
 lnurl.LightningBackend = require('./server/LightningBackend');
