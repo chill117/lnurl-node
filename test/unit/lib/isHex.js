@@ -33,7 +33,7 @@ describe('isHex(value)', function() {
 
 	_.each([undefined, null, 0, {}, []], function(value) {
 		tests.push({
-			description: 'throws if "hex" is not a string (' + JSON.stringify(value) + ')',
+			description: 'throws if "value" is not a string (' + JSON.stringify(value) + ')',
 			args: {
 				value,
 			},

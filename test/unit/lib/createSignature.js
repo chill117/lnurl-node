@@ -13,7 +13,7 @@ describe('createSignature(data, key[, algorithm])', function() {
 
 	const tests = [
 		{
-			description: 'key is utf8',
+			description: 'key is utf8 string',
 			args: {
 				data: 'data to be signed',
 				key: 'super secret key 123',
@@ -21,12 +21,28 @@ describe('createSignature(data, key[, algorithm])', function() {
 			expected: 'f7021356e338f6d47a71dc85e4df150bfce921934ab7093b61c8ef59d5486ecd',
 		},
 		{
-			description: 'key is hex',
+			description: 'key is hex string',
 			args: {
 				data: 'data to be signed',
 				key: '5f3b9daa7772c83bf81a0758334f28898282c93bbbb994365fbbfb9489e45660',
 			},
 			expected: '6184adef27edba31fb58cef933fb8e569e15d647402663ab031b83e225227316',
+		},
+		{
+			description: 'key is buffer from hex string',
+			args: {
+				data: 'data to be signed',
+				key: Buffer.from('5f3b9daa7772c83bf81a0758334f28898282c93bbbb994365fbbfb9489e45660', 'hex'),
+			},
+			expected: '6184adef27edba31fb58cef933fb8e569e15d647402663ab031b83e225227316',
+		},
+		{
+			description: 'key is buffer from base64 string',
+			args: {
+				data: 'data to be signed',
+				key: Buffer.from('ClxH16XPA26IJPXuUMyVCeLpVq6cges21dBltssRz/M=', 'base64'),
+			},
+			expected: 'b40b8b67bdca4f7c0fb7f9b4b8f019bf1b31ee8e425800d9baa39d6a36b9ac35',
 		},
 		{
 			description: 'algorithm = sha512',

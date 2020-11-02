@@ -41,9 +41,11 @@ describe('generateApiKey([options[, defaultOptions]])', function() {
 				expect(result).to.be.an('object');
 				expect(result.id).to.be.a('string');
 				expect(result.key).to.be.a('string');
-				const { id, key } = result;
+				expect(result.encoding).to.be.a('string');
+				const { id, key, encoding } = result;
 				expect(id).to.have.length(16);
 				expect(key).to.have.length(64);
+				expect(encoding).to.equal('hex');
 				expect(isHex(id)).to.equal(true);
 				expect(isHex(key)).to.equal(true);
 			},
@@ -64,9 +66,11 @@ describe('generateApiKey([options[, defaultOptions]])', function() {
 				expect(result).to.be.an('object');
 				expect(result.id).to.be.a('string');
 				expect(result.key).to.be.a('string');
-				const { id, key } = result;
+				expect(result.encoding).to.be.a('string');
+				const { id, key, encoding } = result;
 				expect(id).to.have.length(14);
 				expect(key).to.have.length(80);
+				expect(encoding).to.equal('hex');
 				expect(isHex(id)).to.equal(true);
 				expect(isHex(key)).to.equal(true);
 			},
@@ -88,12 +92,14 @@ describe('generateApiKey([options[, defaultOptions]])', function() {
 				expect(result).to.be.an('object');
 				expect(result.id).to.be.a('string');
 				expect(result.key).to.be.a('string');
+				expect(result.encoding).to.be.a('string');
 				expect(isHex(result.id)).to.equal(false);
 				expect(isHex(result.key)).to.equal(false);
 				const id = Buffer.from(result.id, 'base64').toString('hex');
 				const key = Buffer.from(result.key, 'base64').toString('hex');
 				expect(id).to.have.length(16);
 				expect(key).to.have.length(64);
+				expect(result.encoding).to.equal('base64');
 				expect(isHex(id)).to.equal(true);
 				expect(isHex(key)).to.equal(true);
 			},

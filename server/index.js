@@ -513,7 +513,11 @@ Server.prototype.prepareHook = function(name) {
 Server.prototype.isValidSignature = function(payload, signature, id) {
 	return this.getApiKey(id).then(apiKey => {
 		if (!apiKey) return false;
-		const { key } = apiKey;
+		let { key } = apiKey;
+		const { encoding } = apiKey;
+		if (encoding) {
+			key = Buffer.from(key, encoding);
+		}
 		const expected = createSignature(payload, key);
 		return signature === expected;
 	});

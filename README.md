@@ -202,7 +202,8 @@ Example output:
 ```json
 {
 	"id": "46f8cab814de07a8a65f",
-	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
+	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
+	"encoding": "hex"
 }
 ```
 For a list of available options:
@@ -218,7 +219,7 @@ Start an lnurl application server:
 lnurl server \
 	--host "localhost" \
 	--port "3000" \
-	--auth.apiKeys '[{"id:"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"}]' \
+	--auth.apiKeys '[{"id:"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67","encoding":"hex"}]' \
 	--lightning.backend "lnd" \
 	--lightning.config '{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
 ```
@@ -344,6 +345,7 @@ const server = lnurl.createServer({
 			{
 				id: '46f8cab814de07a8a65f',
 				key: 'ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67',
+				encoding: 'hex',
 			},
 		],
 	},
@@ -599,22 +601,22 @@ It is also possible to generate lnurls in other ways:
 
 ### generateApiKey
 
-`generateApiKey()`
+`generateApiKey([options[, defaultOptions]])`
 
 Generate a new API key for your lnurl server.
 
 Usage:
 ```js
 const lnurl = require('lnurl');
-const { id, key } = lnurl.generateApiKey();
-console.log({ id, key });
+const { id, key, encoding } = lnurl.generateApiKey();
+console.log({ id, key, encoding });
 ````
-
 Expected output:
 ```json
 {
 	"id": "46f8cab814de07a8a65f",
-	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67"
+	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
+	"encoding": "hex"
 }
 ```
 Available options:
@@ -681,6 +683,7 @@ It is possible to create signed LNURLs in a separate (or even offline) applicati
 const apiKey = {
 	id: 'b6cb8e81e3',
 	key: '74a8f70391e48b7a35c676e5e448eda034db88c654213feff7b80228dcad7fa0',
+	encoding: 'hex',
 };
 const tag = 'withdrawRequest';
 const params = {
