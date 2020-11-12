@@ -158,6 +158,43 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 		},
 	];
 
+	_.each([
+		{
+			id: '0f9f1a95b6',
+			key: 'ed732a8d99cd154fe276dc0b66b912521164d1f82fc31b4e5ccf2c6988f1b739',
+			encoding: 'hex',
+		},
+		{
+			id: 'fHfzU0I=',
+			key: 'jqiNkv9yoYBZUqwo5EJqspgxy6MNSgPtHxf8ZogKZ4g=',
+			encoding: 'base64',
+		},
+		{
+			id: 'some-id',
+			key: 'super-secret-key',
+			encoding: 'utf8',
+		},
+	], function(apiKey) {
+		const args = _.extend({}, validArgs, { apiKey });
+		tests.push({
+			description: `apiKey.encoding = ${apiKey.encoding}`,
+			args,
+			expected: function(result) {
+				const payload = querystring.stringify({
+					id: apiKey.id,
+					nonce: result.nonce,
+					tag: args.tag,
+					minWithdrawable: args.params.minWithdrawable,
+					maxWithdrawable: args.params.maxWithdrawable,
+					defaultDescription: args.params.defaultDescription,
+				});
+				const key = Buffer.from(apiKey.key, apiKey.encoding);
+				const signature = createSignature(payload, key, args.options.algorithm);
+				expect(result.signature).to.equal(signature);
+			},
+		});
+	});
+
 	_.each(['apiKey', 'tag'], function(argName) {
 		tests.push({
 			description: `missing required argument "${argName}"`,
