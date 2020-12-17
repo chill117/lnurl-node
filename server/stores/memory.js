@@ -85,6 +85,26 @@ Store.prototype.use = function(hash) {
 	return Promise.resolve(ok);
 };
 
+Store.prototype.unuse = function(hash) {
+	try {
+		data = this.map.get(hash) || null;
+		if (data) {
+			data = this.deepClone(data);
+		}
+		if (data.initialUses === 0) {
+			// Unlimited uses.
+			// Do nothing.
+		} else if (!_.isUndefined(data.remainingUses)) {
+			data.remainingUses++;
+			data.updatedAt = new Date(Date.now()).toISOString();
+			this.map.set(hash, data);
+		}
+	} catch (error) {
+		return Promise.reject(error);
+	}
+	return Promise.resolve(true);
+};
+
 Store.prototype.deepClone = function(data) {
 	return JSON.parse(JSON.stringify(data));
 };

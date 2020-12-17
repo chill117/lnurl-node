@@ -150,6 +150,43 @@ Store.prototype.use = function(hash) {
 	});
 };
 
+Store.prototype.unuse = function(hash) {
+	return this.onReady().then(() => {
+		return this.db.select('initialUses').from('urls').where({ hash }).then(selectResults => {
+			const exists = !!selectResults[0];
+			if (!exists) {
+				// URL not found. Cannot unuse.
+				return false;
+			}
+			const { initialUses } = selectResults[0];
+			if (initialUses === 0) {
+				// Unlimited uses.
+				// Nothing to update.
+				return true;
+			}
+			// Try to increase the number of remaining uses.
+			let dbQuery = this.db('urls')
+				.where({ hash })
+				.increment('remainingUses', 1);
+			switch (this.options.client) {
+				case 'postgres':
+				case 'pg':
+					dbQuery.returning('hash');
+			}
+			return dbQuery.then(updateResults => {
+					switch (this.options.client) {
+						case 'sqlite3':
+						case 'mysql':
+						case 'mysql2':
+							return updateResults === 1;
+						default:
+							return updateResults.length === 1;
+					}
+				});
+		});
+	});
+};
+
 Store.prototype.deepClone = function(data) {
 	return JSON.parse(JSON.stringify(data));
 };

@@ -4,6 +4,7 @@ const bolt11 = require('bolt11');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
+const path = require('path');
 const querystring = require('querystring');
 const {
 	createAuthorizationSignature,
@@ -912,6 +913,57 @@ describe('Server: HTTP API', function() {
 			});
 
 			describe('uses', function() {
+
+				describe('failed payment to LN backend', function() {
+
+					let server;
+					before(function(done) {
+						server = helpers.createServer({
+							port: 3001,
+							lightning: {
+								backend: {
+									path: path.join(__dirname, '..', '..', 'backends', 'custom.js'),
+								},
+								config: {},
+							},
+						});
+						server.once('error', done);
+						server.once('listening', done);
+					});
+
+					const uses = 1;
+					let tag = 'withdrawRequest';
+					let secret;
+					before(function() {
+						const params = prepareValidParams('create', tag);
+						return server.generateNewUrl(tag, params, { uses }).then(result => {
+							secret = result.secret;
+						});
+					});
+
+					after(function() {
+						return server.close();
+					});
+
+					it('should record a "use" in case of error response from LN backend', function() {
+						const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
+							k1: secret,
+						});
+						return helpers.request('get', {
+							url: server.getCallbackUrl(),
+							ca: server.ca,
+							qs: query,
+							json: true,
+						}).then(result => {
+							const hash = createHash(secret);
+							return server.fetchUrl(hash).then(fetchedUrl => {
+								expect(fetchedUrl).to.be.an('object');
+								expect(fetchedUrl.initialUses).to.equal(uses);
+								expect(fetchedUrl.remainingUses).to.equal(uses);
+							});
+						});
+					});
+				});
 
 				describe('signed URL', function() {
 

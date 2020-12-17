@@ -431,7 +431,19 @@ Server.prototype.middleware = function() {
 			}).then(fetchedUrl => {
 				const { tag, apiKeyId } = fetchedUrl;
 				const params = _.extend({}, req.query, fetchedUrl.params);
-				return this.runSubProtocol(tag, method, secret, params, apiKeyId);
+				return this.runSubProtocol(tag, method, secret, params, apiKeyId).catch(error => {
+					// An error occurred while running the sub-protocol.
+					// Un-use the URL so that the request can be retried.
+					return this.unuseUrl(hash).then(() => {
+						// Re-throw the error.
+						throw error;
+					}).catch(error2 => {
+						// Log the second error.
+						debug.error(error2);
+						// Re-throw the original error.
+						throw error;
+					});
+				});
 			}).then(result => {
 				this.emit('request:processed', { hash, method, req });
 				if (method === 'action' && !result) {
@@ -688,6 +700,10 @@ Server.prototype.fetchUrl = function(hash) {
 
 Server.prototype.useUrl = function(hash) {
 	return this.store.use(hash);
+};
+
+Server.prototype.unuseUrl = function(hash) {
+	return this.store.unuse(hash);
 };
 
 Server.prototype.generateSecret = function() {
