@@ -700,7 +700,7 @@ console.log(signedUrl);
 ```
 Sample expected output:
 ```
-https://localhost:3000/lnurl?id=b6cb8e81e3&nonce=c58731a56c317082fe1c&tag=withdrawRequest&minWithdrawable=50000&maxWithdrawable=60000&defaultDescription=&signature=d3d23b8a629670c6fe260b26e2384f6f54b14e6d507024aee4bc2ac6383fdf6c
+https://localhost:3000/lnurl?id=b6cb8e81e3&nonce=3e7122d5832794a2b2fa&tag=withdrawRequest&minWithdrawable=50000&maxWithdrawable=60000&defaultDescription=&signature=81efac1f69001be4e976796d99ff0572b865b5f1c51bdc1c5e7898a7ca30a9c8
 ```
 
 List of options:
@@ -724,13 +724,13 @@ List of options:
 ```
 With `shorten: true` the querystring parameters will be shortened:
 ```
-https://localhost:3000/lnurl?id=b6cb8e81e3&n=f13ee060477a68651c81&s=e461ebcc73286495eb29f0373835b386ce1aedb2abda187a28e26bf5caa46e2f&t=w&pn=5e4&px=6e4&pd=
+https://localhost:3000/lnurl?id=b6cb8e81e3&n=d585674cf991dbbab42b&s=9229449b0426d6ae97b2c4e2e92ef670e958980c89759ed0c8edcbd36d2a3de9&t=w&pn=5e4&px=6e4&pd=
 ```
 This helps with the scannability of QR codes.
 
 With `encode: true` the output will be lnurl encoded:
 ```
-lnurl1dp68gurn8ghj7mr0vdskc6r0wd6r5vesxqcz7mrww4exc0mfvs7kydnrvgux2wp3v5ejvm3avccnxet9xqmrqdphxasnvwpkx5ckxwp3yeen6ef5xcck2cnrvvmnxv3cxc6rjdt9vgerje3sxvmnxwpnx43rxwpkvdjnzct9v33ryctzv3snzwphvyersefjxe3xvdtrv9sngdn9xfnzvapawun8qm3ax4jngfns0q7nvef5yecxg0g6zs8hq
+lnurl1dp68gurn8ghj7mr0vdskc6r0wd6r5vesxqcz7mrww4exc0mfvs7kydnrvgux2wp3v5ejvm3avgcnxenzxumnvvr9ve3kgwp4v3nx2d3eyeen6d3nv9snqdecx5unywf5xc6ryerzvyukgd3nxdsnzctxx4snjdmrxcex2dmxxfsnsetpxcmryenpxcexgcenxpjrxcfevd3rgcfc8qmzvapawun8qm3ax4jngfns0q7nvef5yecxg0gfrylx6
 ```
 
 

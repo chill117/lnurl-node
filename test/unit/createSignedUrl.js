@@ -2,7 +2,8 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const {
 	createSignature,
-	createSignedUrl
+	createSignedUrl,
+	prepareQueryPayloadString
 } = require('../../lib');
 const helpers = require('../helpers');
 const lnurl = require('../../');
@@ -52,7 +53,7 @@ describe('createSignedUrl(apiKey, tag, params[, options])', function() {
 				expect(query.defaultDescription).to.equal(params.defaultDescription);
 				expect(query.nonce).to.have.length(20);
 				expect(query.signature).to.have.length(64);
-				const payload = querystring.stringify({
+				const payload = prepareQueryPayloadString({
 					id,
 					nonce: query.nonce,
 					tag,

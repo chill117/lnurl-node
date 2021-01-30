@@ -18,6 +18,7 @@ const {
 	generateApiKey,
 	generateRandomByteString,
 	isHex,
+	prepareQueryPayloadString,
 	unshortenQuery
 } = require('../lib');
 const path = require('path');
@@ -342,7 +343,7 @@ Server.prototype.middleware = function() {
 					}
 				});
 				// Payload is everything in the querystring less the signature itself.
-				const payload = querystring.stringify(_.omit(req.originalQuery, 's', 'signature'));
+				const payload = prepareQueryPayloadString(_.omit(req.originalQuery, 's', 'signature'));
 				const { signature, id } = req.query;
 				// Check that the query string is signed by an authorized API key.
 				return this.isValidSignature(payload, signature, id).then(isValid => {

@@ -1,6 +1,7 @@
 # Changelog
 
 * TBD:
+  * Standardize query object stringification to ensure consistent signature generation on device and server. Query object should be sorted by key alphabetically then stringified. The resulting "payload" can then be signed.
   * Fixed [issue #28](https://github.com/chill117/lnurl-node/issues/28) - will no longer mark a URL as used in the case of LN backend request failure.
 * v0.11.1:
   * `prepareSignedQuery` which is used by `createSignedUrl` will now use the value of `apiKey.encoding` to create a buffer instance from `apiKey.key`.

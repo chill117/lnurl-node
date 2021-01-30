@@ -2,10 +2,10 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const {
 	createSignature,
+	prepareQueryPayloadString,
 	prepareSignedQuery
 } = require('../../../lib');
 const helpers = require('../../helpers');
-const querystring = require('querystring');
 
 describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 
@@ -47,7 +47,7 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 				expect(result.defaultDescription).to.equal(params.defaultDescription);
 				expect(result.nonce).to.have.length(20);
 				expect(result.signature).to.have.length(64);
-				const payload = querystring.stringify({
+				const payload = prepareQueryPayloadString({
 					id,
 					nonce: result.nonce,
 					tag,
@@ -71,7 +71,7 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 				const { tag, params } = validArgs;
 				expect(result).to.be.an('object');
 				expect(result.signature).to.have.length(128);
-				const payload = querystring.stringify({
+				const payload = prepareQueryPayloadString({
 					id,
 					nonce: result.nonce,
 					tag,
@@ -180,7 +180,7 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 			description: `apiKey.encoding = ${apiKey.encoding}`,
 			args,
 			expected: function(result) {
-				const payload = querystring.stringify({
+				const payload = prepareQueryPayloadString({
 					id: apiKey.id,
 					nonce: result.nonce,
 					tag: args.tag,
