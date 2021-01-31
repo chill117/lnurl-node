@@ -108,8 +108,8 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 				expect(result).to.be.an('object');
 				expect(result.id).to.equal(id);
 				expect(result.t).to.equal('w');
-				expect(result.pn).to.equal('5e4');
-				expect(result.px).to.equal('6e4');
+				expect(result.pn).to.equal(50000);
+				expect(result.px).to.equal(60000);
 				expect(result.pd).to.equal(params.defaultDescription);
 				expect(result.n).to.have.length(20);
 				expect(result.s).to.have.length(64);

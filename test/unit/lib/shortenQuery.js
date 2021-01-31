@@ -22,7 +22,7 @@ describe('shortenQuery(unshortened)', function() {
 			},
 			expected: {
 				t: 'c',
-				pl: '1e3',
+				pl: 1000,
 				pp: 500,
 			},
 		},
@@ -36,7 +36,7 @@ describe('shortenQuery(unshortened)', function() {
 			},
 			expected: {
 				t: 'c',
-				pl: '1e3',
+				pl: 1000,
 				pp: 500,
 			},
 		},
@@ -84,7 +84,7 @@ describe('shortenQuery(unshortened)', function() {
 			expected: {
 				t: 'w',
 				pn: 1,
-				px: '5e3',
+				px: 5000,
 				pd: 'default memo',
 			},
 		},
@@ -106,7 +106,7 @@ describe('shortenQuery(unshortened)', function() {
 				s: 'b11135b4d2cf4dc3a3cc4ae52dea627a8cbae2f6eb37ce3d08e5692e4a705614',
 				t: 'w',
 				pn: 1,
-				px: '5e3',
+				px: 5000,
 				pd: 'default memo',
 			},
 		},
@@ -121,8 +121,8 @@ describe('shortenQuery(unshortened)', function() {
 			},
 			expected: {
 				t: 'p',
-				pn: '1e3',
-				px: '5e3',
+				pn: 1000,
+				px: 5000,
 				pm: '[["text/plain","example metadata"]]',
 			},
 		},
@@ -137,8 +137,8 @@ describe('shortenQuery(unshortened)', function() {
 			},
 			expected: {
 				t: 'p',
-				pn: '1e6',
-				px: '5e6',
+				pn: 1000000,
+				px: 5000000,
 				pm: '[["text/plain","example metadata"]]',
 			},
 		},

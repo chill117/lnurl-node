@@ -724,7 +724,7 @@ List of options:
 ```
 With `shorten: true` the querystring parameters will be shortened:
 ```
-https://localhost:3000/lnurl?id=b6cb8e81e3&n=d585674cf991dbbab42b&s=9229449b0426d6ae97b2c4e2e92ef670e958980c89759ed0c8edcbd36d2a3de9&t=w&pn=5e4&px=6e4&pd=
+https://localhost:3000/lnurl?id=b6cb8e81e3&n=d585674cf991dbbab42b&s=9229449b0426d6ae97b2c4e2e92ef670e958980c89759ed0c8edcbd36d2a3de9&t=w&pn=50000&px=60000&pd=
 ```
 This helps with the scannability of QR codes.
 

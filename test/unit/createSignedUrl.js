@@ -81,8 +81,8 @@ describe('createSignedUrl(apiKey, tag, params[, options])', function() {
 				const query = querystring.parse(parsedUrl.query);
 				expect(query.id).to.equal(id);
 				expect(query.t).to.equal('w');
-				expect(query.pn).to.equal('5e4');
-				expect(query.px).to.equal('6e4');
+				expect(query.pn).to.equal('50000');
+				expect(query.px).to.equal('60000');
 				expect(query.pd).to.equal(params.defaultDescription);
 				expect(query.n).to.have.length(20);
 				expect(query.s).to.have.length(64);
