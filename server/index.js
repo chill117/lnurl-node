@@ -343,7 +343,8 @@ Server.prototype.middleware = function() {
 					}
 				});
 				// Payload is everything in the querystring less the signature itself.
-				const payload = prepareQueryPayloadString(_.omit(req.originalQuery, 's', 'signature'));
+				// Use the unshortened query - signature should have been created before shortening.
+				const payload = prepareQueryPayloadString(_.omit(req.query, 'signature'));
 				const { signature, id } = req.query;
 				// Check that the query string is signed by an authorized API key.
 				return this.isValidSignature(payload, signature, id).then(isValid => {

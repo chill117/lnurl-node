@@ -9,6 +9,7 @@ const querystring = require('querystring');
 const {
 	createAuthorizationSignature,
 	createHash,
+	createSignedUrl,
 	generatePaymentRequest,
 	generateRandomByteString,
 	generateRandomLinkingKey,
@@ -218,14 +219,17 @@ describe('Server: HTTP API', function() {
 			});
 
 			it('shortened query', function() {
-				const tag = 'channelRequest';
+				const tag = 'withdrawRequest';
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
-				const query = prepareSignedQuery(apiKey, tag, params);
+				const signedUrl = createSignedUrl(apiKey, tag, params, {
+					baseUrl: server.getCallbackUrl(),
+					encode: false,
+					shorten: true,
+				});
 				return helpers.request('get', {
-					url: server.getCallbackUrl(),
+					url: signedUrl,
 					ca: server.ca,
-					qs: query,
 					json: true,
 				}).then(result => {
 					const { response, body } = result;
