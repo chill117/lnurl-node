@@ -32,6 +32,7 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
     * [middleware:signedLnurl:afterCheckSignature](#middlewaresignedLnurlafterCheckSignature)
 * [Signed LNURLs](#signed-lnurls)
   * [How to Implement URL Signing Scheme](#how-to-implement-url-signing-scheme)
+  	* [URL Signing Test Vectors](#url-signing-test-vectors)
 * [Configuring Data Store](#configuring-data-store)
   * [SQLite](#sqlite)
   * [MySQL](#mysql)
@@ -739,9 +740,88 @@ lnurl1dp68gurn8ghj7mr0vdskc6r0wd6r5vesxqcz7mrww4exc0mfvs7kydnrvgux2wp3v5ejvm3avg
 This section describes how to implement URL signing in your own application. The steps to generate your own signed URLs are as follows:
 1) Generate a unique (per API key), random nonce
 2) Build a query string with the `id`, `nonce`, `tag`, "Server parameters" (see [Subprotocols](#subprotocols) above), and any custom parameters. The `id` parameter should be equal to the API key's ID. Example: `id=b6cb8e81e3&nonce=d585674cf991dbbab42b&tag=withdrawRequest&minWithdrawable=5000&maxWithdrawable=7000&defaultDescription=example&custom1=CUSTOM1_PARAM_VALUE&custom2=CUSTOM2_PARAM_VALUE`. Note that both the keys and values for query parameters should be URL encoded. The following characters should be __unescaped__: `A-Z a-z 0-9 - _ . ! ~ * ' ( )`. See [encodeURIComponent](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent#description) for more details.
-3) Sort the query parameters by key (alphabetically). This is referred to as the "payload".
+3) Sort the query parameters by key (alphabetically). This is referred to as the "payload". Example: `custom1=CUSTOM1_PARAM_VALUE&custom2=CUSTOM2_PARAM_VALUE&defaultDescription=example&id=b6cb8e81e3&maxWithdrawable=7000&minWithdrawable=5000&nonce=d585674cf991dbbab42b&tag=withdrawRequest`
 4) Sign the payload (the sorted query string) using the API key secret. Signatures are generated using HMAC-SHA256, where the API key secret is the key.
-5) Append the signature to the payload as follows: `id=b6cb8e81e3&nonce=d585674cf991dbbab42b&tag=withdrawRequest&minWithdrawable=5000&maxWithdrawable=7000&defaultDescription=example&custom1=CUSTOM1_PARAM_VALUE&custom2=CUSTOM2_PARAM_VALUE&signature=HMAC_SHA256_SIGNATURE`.
+5) Append the signature to the payload as follows: `custom1=CUSTOM1_PARAM_VALUE&custom2=CUSTOM2_PARAM_VALUE&defaultDescription=example&id=b6cb8e81e3&maxWithdrawable=7000&minWithdrawable=5000&nonce=d585674cf991dbbab42b&tag=withdrawRequest&signature=HMAC_SHA256_SIGNATURE`.
+
+
+#### URL Signing Test Vectors
+
+The following test vectors are in JSON format where the input (query object) is written as a JSON object and the output (query string) is written as a string.
+
+```json
+[
+    [
+        {
+            "apiKey": {
+                "id": "046f6360583f64ed",
+                "key": "eb9fcfb7478aa4fc4d711f81abe7a34e550447ec",
+                "encoding": "hex"
+            },
+            "tag": "withdrawRequest",
+            "params": {
+                "minWithdrawable": 5000,
+                "maxWithdrawable": 7000,
+                "defaultDescription": ""
+            },
+            "nonce": "7273c244036fda16718f"
+        },
+        "defaultDescription=&id=046f6360583f64ed&maxWithdrawable=7000&minWithdrawable=5000&nonce=7273c244036fda16718f&tag=withdrawRequest&signature=59356186c8b025cb60b763fd177f56e03104ebd4a880782263013598ccf81136"
+    ],
+    [
+        {
+            "apiKey": {
+                "id": "41f2b6d635beac69",
+                "key": "9527769ddd8cb559374e7680523ef4d9706b63d4",
+                "encoding": "hex"
+            },
+            "tag": "withdrawRequest",
+            "params": {
+                "minWithdrawable": 100000,
+                "maxWithdrawable": 120000,
+                "defaultDescription": "",
+                "custom1": "custom parameter 1"
+            },
+            "nonce": "27c810224cf7d262705d"
+        },
+        "custom1=custom%20parameter%201&defaultDescription=&id=41f2b6d635beac69&maxWithdrawable=120000&minWithdrawable=100000&nonce=27c810224cf7d262705d&tag=withdrawRequest&signature=3436f581cdcbda58b69744ce6d7faf95800da984e55676c0b834c78e706406c8"
+    ],
+    [
+        {
+            "apiKey": {
+                "id": "i8dqN9SC6sU=",
+                "key": "j0YQJLoMn8jgqIFPe7GBA9WlLzM=",
+                "encoding": "base64"
+            },
+            "tag": "withdrawRequest",
+            "params": {
+                "minWithdrawable": 50000,
+                "maxWithdrawable": 50000,
+                "defaultDescription": "Example w/ description"
+            },
+            "nonce": "2c5903d7763ffe69cab2"
+        },
+        "defaultDescription=Example%20w%2F%20description&id=i8dqN9SC6sU%3D&maxWithdrawable=50000&minWithdrawable=50000&nonce=2c5903d7763ffe69cab2&tag=withdrawRequest&signature=a2bd0cac11fbf323ff094292fdbd9bf5280c83068b763d784c6beaee9efb7977"
+    ],
+    [
+        {
+            "apiKey": {
+                "id": "7f26b286fd9b04bb",
+                "key": "d64e1646ef56f3d5af7a0d1a796e2226cf4eeaed",
+                "encoding": "hex"
+            },
+            "tag": "withdrawRequest",
+            "params": {
+                "minWithdrawable": 50000,
+                "maxWithdrawable": 50000,
+                "defaultDescription": "abcABC0123 ESCAPED # UNESCAPED -_.!~*'() RESERVED ;,/?:@&=+$"
+            },
+            "nonce": "d0af14f87faad7fc59ec"
+        },
+        "defaultDescription=abcABC0123%20ESCAPED%20%23%20UNESCAPED%20-_.!~*'()%20RESERVED%20%3B%2C%2F%3F%3A%40%26%3D%2B%24&id=7f26b286fd9b04bb&maxWithdrawable=50000&minWithdrawable=50000&nonce=d0af14f87faad7fc59ec&tag=withdrawRequest&signature=777b5a3f5780410c44ebda1c865724b71ea83c180ee27d27ac84ac8e2c607f86"
+    ]
+]
+```
 
 
 ## Configuring Data Store
