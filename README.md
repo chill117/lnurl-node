@@ -31,6 +31,7 @@ Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc).
   * [Middleware Hooks](#middleware-hooks)
     * [middleware:signedLnurl:afterCheckSignature](#middlewaresignedLnurlafterCheckSignature)
 * [Signed LNURLs](#signed-lnurls)
+  * [How to Implement URL Signing Scheme](#how-to-implement-url-signing-scheme)
 * [Configuring Data Store](#configuring-data-store)
   * [SQLite](#sqlite)
   * [MySQL](#mysql)
@@ -732,6 +733,15 @@ With `encode: true` the output will be lnurl encoded:
 ```
 lnurl1dp68gurn8ghj7mr0vdskc6r0wd6r5vesxqcz7mrww4exc0mfvs7kydnrvgux2wp3v5ejvm3avgcnxenzxumnvvr9ve3kgwp4v3nx2d3eyeen6d3nv9snqdecx5unywf5xc6ryerzvyukgd3nxdsnzctxx4snjdmrxcex2dmxxfsnsetpxcmryenpxcexgcenxpjrxcfevd3rgcfc8qmzvapawun8qm3ax4jngfns0q7nvef5yecxg0gfrylx6
 ```
+
+### How to Implement URL Signing Scheme
+
+This section describes how to implement URL signing in your own application. The steps to generate your own signed URLs are as follows:
+1) Generate a unique (per API key), random nonce
+2) Build a query string with the `id`, `nonce`, `tag`, "Server parameters" (see [Subprotocols](#subprotocols) above), and any custom parameters. The `id` parameter should be equal to the API key's ID. Example: `id=b6cb8e81e3&nonce=d585674cf991dbbab42b&tag=withdrawRequest&minWithdrawable=5000&maxWithdrawable=7000&defaultDescription=example&custom1=CUSTOM1_PARAM_VALUE&custom2=CUSTOM2_PARAM_VALUE`. Note that both the keys and values for query parameters should be URL encoded. The following characters should be __unescaped__: `A-Z a-z 0-9 - _ . ! ~ * ' ( )`. See [encodeURIComponent](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURIComponent#description) for more details.
+3) Sort the query parameters by key (alphabetically). This is referred to as the "payload".
+4) Sign the payload (the sorted query string) using the API key secret. Signatures are generated using HMAC-SHA256, where the API key secret is the key.
+5) Append the signature to the payload as follows: `id=b6cb8e81e3&nonce=d585674cf991dbbab42b&tag=withdrawRequest&minWithdrawable=5000&maxWithdrawable=7000&defaultDescription=example&custom1=CUSTOM1_PARAM_VALUE&custom2=CUSTOM2_PARAM_VALUE&signature=HMAC_SHA256_SIGNATURE`.
 
 
 ## Configuring Data Store
