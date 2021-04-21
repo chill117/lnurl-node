@@ -221,7 +221,7 @@ Start an lnurl application server:
 lnurl server \
 	--host "localhost" \
 	--port "3000" \
-	--auth.apiKeys '[{"id:"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67","encoding":"hex"}]' \
+	--auth.apiKeys '[{"id":"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67","encoding":"hex"}]' \
 	--lightning.backend "lnd" \
 	--lightning.config '{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
 ```
