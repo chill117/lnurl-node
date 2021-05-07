@@ -43,7 +43,7 @@
     "express": "4.17.1",
     "pem": "1.14.4",
     "secp256k1": "4.0.2",
-    "underscore": "1.11.0"
+    "underscore": "1.12.1"
   },
   "devDependencies": {
     "body-parser": "1.19.0",
