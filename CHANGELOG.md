@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.12.2:
+  * Upgraded dependencies
 * v0.12.1:
   * Use unshortened query as payload when verifying signatures. Signatures should be created before shortening.
 * v0.12.0:
