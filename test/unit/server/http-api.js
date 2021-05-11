@@ -62,6 +62,24 @@ describe('Server: HTTP API', function() {
 		if (server) return server.close();
 	});
 
+	describe('GET /status', function() {
+
+		it('responds with status OK', function() {
+			return helpers.request('get', {
+				url: server.getUrl('/status'),
+				ca: server.ca,
+				qs: {},
+				json: true,
+			}).then(result => {
+				const { response, body } = result;
+				expect(response.statusCode).to.equal(200);
+				expect(body).to.deep.equal({
+					status: 'OK',
+				});
+			});
+		});
+	});
+
 	describe('GET /lnurl', function() {
 
 		const validParams = {

@@ -232,6 +232,9 @@ Server.prototype.createWebServer = function() {
 	const middleware = _.result(this, 'middleware');
 	app.use(middleware.stripHeaders);
 	app.use(middleware.logRequests);
+	app.get('/status', (req, res, next) => {
+		res.json({ status: 'OK'});
+	});
 	app.get([endpoint, `${endpoint}/:k1`],
 		middleware.signedLnurl.unshortenQuery,
 		middleware.signedLnurl.checkSignature,
