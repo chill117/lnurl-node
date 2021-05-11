@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.13.0:
+  * Added GET HTTP /status end-point. Response is HTTP 200 and JSON object `{ status: 'OK' }` when server is up.
 * v0.12.2:
   * Upgraded dependencies
 * v0.12.1:
