@@ -1,5 +1,9 @@
 # Changelog
 
+* TBD:
+  * Fix for SafeEventEmitter: It is now safe to throw an error inside of an event listener callback. Thrown error will be written to the debug stream.
+  * Removed previously deprecated methods from Server prototype: `deepClone`, `generateRandomKey`, `hash`, `isHex`.
+  * Deprecated the following methods/prototypes on the Server prototype: `generateApiKey`, `HttpError`.
 * v0.13.0:
   * Added GET HTTP /status end-point. Response is HTTP 200 and JSON object `{ status: 'OK' }` when server is up.
 * v0.12.2:

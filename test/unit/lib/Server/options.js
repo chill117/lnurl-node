@@ -1,8 +1,8 @@
 const _ = require('underscore');
 const async = require('async');
 const { expect } = require('chai');
-const helpers = require('../../helpers');
-const { prepareSignedQuery } = require('../../../lib');
+const helpers = require('../../../helpers');
+const { prepareSignedQuery } = require('../../../../lib');
 const path = require('path');
 
 describe('Server: options', function() {
@@ -39,7 +39,7 @@ describe('Server: options', function() {
 				protocol: 'http',
 				lightning: {
 					backend: {
-						path: path.join(__dirname, '..', '..', 'backends', 'custom.js'),
+						path: path.join(__dirname, '..', '..', '..', 'backends', 'custom.js'),
 					},
 					config: {
 						nodeUri: '000000000010101@127.0.0.1:9735',

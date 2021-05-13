@@ -1,13 +1,13 @@
 const _ = require('underscore');
 const { expect } = require('chai');
-const helpers = require('../../helpers');
-const lnurl = require('../../../');
+const helpers = require('../../../helpers');
+const lnurl = require('../../../../');
 const { HttpError } = lnurl.Server;
 const {
 	createAuthorizationSignature,
 	generateRandomLinkingKey,
 	prepareSignedQuery
-} = require('../../../lib');
+} = require('../../../../lib');
 
 describe('Server: hooks', function() {
 

@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const fs = require('fs');
-const helpers = require('../../../helpers');
-const { generateNodeKey } = require('../../../../lib');
+const helpers = require('../../../../helpers');
+const { generateNodeKey } = require('../../../../../lib');
 
 describe('backends.lnd', function() {
 

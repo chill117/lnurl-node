@@ -1,7 +1,7 @@
 const _ = require('underscore');
 const { expect } = require('chai');
-const lnurl = require('../../../');
-const helpers = require('../../helpers');
+const lnurl = require('../../../../');
+const helpers = require('../../../helpers');
 
 describe('isValidSignature(payload, signature, id)', function() {
 

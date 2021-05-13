@@ -1,7 +1,7 @@
 const _ = require('underscore');
 const { expect } = require('chai');
-const helpers = require('../../helpers');
-const lnurl = require('../../../');
+const helpers = require('../../../helpers');
+const lnurl = require('../../../../');
 
 describe('prepareOptions([options[, defaultOptions]])', function() {
 

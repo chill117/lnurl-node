@@ -2,6 +2,7 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
+const { isHex } = require('../../../lib');
 
 describe('CLI: generateApiKey [options]', function() {
 
@@ -20,8 +21,8 @@ describe('CLI: generateApiKey [options]', function() {
 					const { numBytes } = lnurl.Server.prototype.defaultOptions.apiKey;
 					expect(id).to.have.length(numBytes.id * 2);
 					expect(key).to.have.length(numBytes.key * 2);
-					expect(lnurl.Server.prototype.isHex(result.id)).to.equal(true);
-					expect(lnurl.Server.prototype.isHex(result.key)).to.equal(true);
+					expect(isHex(result.id)).to.equal(true);
+					expect(isHex(result.key)).to.equal(true);
 				},
 			},
 		},
@@ -43,8 +44,8 @@ describe('CLI: generateApiKey [options]', function() {
 					const { numBytes } = lnurl.Server.prototype.defaultOptions.apiKey;
 					expect(id).to.have.length(numBytes.id * 2);
 					expect(key).to.have.length(numBytes.key * 2);
-					expect(lnurl.Server.prototype.isHex(id)).to.equal(true);
-					expect(lnurl.Server.prototype.isHex(key)).to.equal(true);
+					expect(isHex(id)).to.equal(true);
+					expect(isHex(key)).to.equal(true);
 				},
 			},
 		},
@@ -65,8 +66,8 @@ describe('CLI: generateApiKey [options]', function() {
 					const { id, key } = result;
 					expect(id).to.have.length(14);
 					expect(key).to.have.length(80);
-					expect(lnurl.Server.prototype.isHex(id)).to.equal(true);
-					expect(lnurl.Server.prototype.isHex(key)).to.equal(true);
+					expect(isHex(id)).to.equal(true);
+					expect(isHex(key)).to.equal(true);
 				},
 			},
 		},

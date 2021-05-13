@@ -3,6 +3,7 @@ const { expect } = require('chai');
 const fs = require('fs');
 const helpers = require('../../helpers');
 const lnurl = require('../../../');
+const { createHash } = require('../../../lib');
 const path = require('path');
 
 describe('CLI: generateNewUrl [options]', function() {
@@ -164,7 +165,7 @@ describe('CLI: generateNewUrl [options]', function() {
 					expect(result.secret).to.be.a('string');
 					expect(result.url).to.be.a('string');
 					expect(result.url.substr(0, 'http://localhost:3000'.length)).to.equal('http://localhost:3000');
-					const hash = server.hash(result.secret);
+					const hash = createHash(result.secret);
 					return server.fetchUrl(hash).then(fromStore => {
 						expect(fromStore).to.not.equal(null);
 						expect(fromStore).to.be.an('object');
@@ -202,7 +203,7 @@ describe('CLI: generateNewUrl [options]', function() {
 					expect(result.secret).to.be.a('string');
 					expect(result.url).to.be.a('string');
 					expect(result.url.substr(0, 'http://localhost:3000'.length)).to.equal('http://localhost:3000');
-					const hash = server.hash(result.secret);
+					const hash = createHash(result.secret);
 					return server.fetchUrl(hash).then(fromStore => {
 						expect(fromStore).to.not.equal(null);
 						expect(fromStore).to.be.an('object');

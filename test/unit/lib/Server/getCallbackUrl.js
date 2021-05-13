@@ -1,5 +1,5 @@
 const { expect } = require('chai');
-const lnurl = require('../../../');
+const lnurl = require('../../../../');
 const querystring = require('querystring');
 
 describe('getCallbackUrl([params])', function() {

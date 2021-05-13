@@ -14,7 +14,7 @@ before(function(done) {
 });
 
 if (process.env.LNURL_STORE_BACKEND === 'knex') {
-	const Store = require('../../server/stores/knex');
+	const Store = require('../../lib/stores/knex');
 	after(function() {
 		const config = process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG) || {};
 		const store = new Store(config);

@@ -2,8 +2,8 @@ const _ = require('underscore');
 const async = require('async');
 const bolt11 = require('bolt11');
 const { expect } = require('chai');
-const helpers = require('../../helpers');
-const lnurl = require('../../../');
+const helpers = require('../../../helpers');
+const lnurl = require('../../../../');
 const path = require('path');
 const querystring = require('querystring');
 const {
@@ -15,7 +15,7 @@ const {
 	generateRandomLinkingKey,
 	getTagDataFromPaymentRequest,
 	prepareSignedQuery
-} = require('../../../lib');
+} = require('../../../../lib');
 
 describe('Server: HTTP API', function() {
 
@@ -448,7 +448,7 @@ describe('Server: HTTP API', function() {
 							expect(body).to.be.an('object');
 							expect(body.tag).to.equal('payRequest');
 							const { id, signature } = query;
-							const secret = lnurl.Server.prototype.hash(`${id}-${signature}`);
+							const secret = createHash(`${id}-${signature}`);
 							expect(body.callback).to.equal(server.getCallbackUrl() + '/' + secret);
 							const params = prepareValidParams('create', 'payRequest');
 							_.each(params, function(value, key) {
@@ -566,10 +566,10 @@ describe('Server: HTTP API', function() {
 											break;
 										default:
 											const { id, signature } = query;
-											secret = server.hash(`${id}-${signature}`);
+											secret = createHash(`${id}-${signature}`);
 											break;
 									}
-									const hash = server.hash(secret);
+									const hash = createHash(secret);
 									return server.fetchUrl(hash).then(fetchedUrl => {
 										if (body.status === 'ERROR' && tag !== 'login') {
 											expect(fetchedUrl).to.equal(null);
