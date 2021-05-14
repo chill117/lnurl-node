@@ -1,6 +1,13 @@
 # Changelog
 
 * TBD:
+  * Added new hooks for inserting validation and other logic at important points in each subprotocol's execution:
+    * `channelRequest:validate`, `payRequest:validate`, `withdrawRequest:validate` - After default validations have passed while creating a new URL for for the specified subprotocol.
+    * `channelRequest:info`, `payRequest:info`, `withdrawRequest:info` - Before the specified subprotocol's informational JSON response object is sent.
+    * `channelRequest:action`, `payRequest:action`, `withdrawRequest:action` - Before the specified subprotocol's LN backend action is executed.
+  * Added new events after execution of LN backend actions:
+    * `channelRequest:action:processed`, `payRequest:action:processed`, `withdrawRequest:action:processed` - After successful execution.
+    * `channelRequest:action:failed`, `payRequest:action:failed`, `withdrawRequest:action:failed` - After failed execution.
   * Fix for SafeEventEmitter: It is now safe to throw an error inside of an event listener callback. Thrown error will be written to the debug stream.
   * Removed previously deprecated methods from Server prototype: `deepClone`, `generateRandomKey`, `hash`, `isHex`.
   * Deprecated the following methods/prototypes on the Server prototype: `generateApiKey`, `HttpError`.

@@ -24,6 +24,10 @@ class Backend extends LightningBackend {
 	addInvoice(amount, extra) {
 		return Promise.reject(new Error('addInvoice failure'));
 	}
+
+	getInvoiceStatus(paymentHash) {
+		return Promise.reject(new Error('getInvoiceStatus failure'));
+	}
 }
 
 module.exports = Backend;

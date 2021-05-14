@@ -26,6 +26,10 @@ class Backend extends LightningBackend {
 	addInvoice(amount, extra) {
 		return Promise.resolve();
 	}
+
+	getInvoiceStatus(paymentHash) {
+		return Promise.resolve();
+	}
 }
 
 module.exports = Backend;

@@ -20,6 +20,7 @@ const lightningBackendRequestTypes = {
 };
 
 module.exports = {
+	fixtures: require('./fixtures'),
 	tmpDir,
 	createServer: function(options) {
 		options = _.defaults(options || {}, {

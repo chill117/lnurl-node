@@ -82,47 +82,7 @@ describe('Server: HTTP API', function() {
 
 	describe('GET /lnurl', function() {
 
-		const validParams = {
-			create: {
-				'channelRequest': {
-					localAmt: 1000,
-					pushAmt: 0,
-				},
-				'withdrawRequest': {
-					minWithdrawable: 1000000,
-					maxWithdrawable: 2000000,
-					defaultDescription: 'service.com: withdrawRequest',
-				},
-				'payRequest': {
-					minSendable: 100000,
-					maxSendable: 200000,
-					metadata: '[["text/plain", "service.com: payRequest"]]',
-				},
-				'login': {},
-			},
-			action: {
-				'channelRequest': {
-					remoteid: 'PUBKEY@HOST:PORT',
-					private: 1,
-				},
-				'withdrawRequest': {
-					pr: generatePaymentRequest(1000000),
-				},
-				'payRequest': {
-					amount: 150000,
-				},
-				'login': function(secret) {
-					const { pubKey, privKey } = generateRandomLinkingKey();
-					const k1 = Buffer.from(secret, 'hex');
-					const sig = createAuthorizationSignature(k1, privKey);
-					const params = {
-						sig: sig.toString('hex'),
-						key: pubKey.toString('hex'),
-					};
-					return params;
-				},
-			},
-		};
+		const { validParams } = helpers.fixtures;
 
 		const prepareValidParams = function(step, tag, secret) {
 			const params = validParams[step] && validParams[step][tag];
@@ -732,9 +692,9 @@ describe('Server: HTTP API', function() {
 							generatePaymentRequest(400000),
 						].join(','),
 					},
-					expected: function(body) {
-						expect(body).to.deep.equal({ status: 'OK' });
-						mock.expectNumRequestsToEqual('payinvoice', 3);
+					expected: {
+						status: 'ERROR',
+						reason: 'Invalid parameter ("pr"): Comma-separated payment requests no longer supported',
 					},
 				},
 				{
@@ -744,20 +704,7 @@ describe('Server: HTTP API', function() {
 					},
 					expected: {
 						status: 'ERROR',
-						reason: 'Amount in invoice(s) must be greater than or equal to "minWithdrawable"',
-					},
-				},
-				{
-					description: 'multiple payment requests (total < minWithdrawable)',
-					params: {
-						pr: [
-							generatePaymentRequest(300000),
-							generatePaymentRequest(500000),
-						].join(','),
-					},
-					expected: {
-						status: 'ERROR',
-						reason: 'Amount in invoice(s) must be greater than or equal to "minWithdrawable"',
+						reason: 'Amount in invoice must be greater than or equal to "minWithdrawable"',
 					},
 				},
 				{
@@ -768,24 +715,7 @@ describe('Server: HTTP API', function() {
 					expected: function(body) {
 						expect(body).to.deep.equal({
 							status: 'ERROR',
-							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
-						});
-						mock.expectNumRequestsToEqual('payinvoice', 0);
-					},
-				},
-				{
-					description: 'multiple payment requests (total > maxWithdrawable)',
-					params: {
-						pr: [
-							generatePaymentRequest(700000),
-							generatePaymentRequest(800000),
-							generatePaymentRequest(800000),
-						].join(','),
-					},
-					expected: function(body) {
-						expect(body).to.deep.equal({
-							status: 'ERROR',
-							reason: 'Amount in invoice(s) must be less than or equal to "maxWithdrawable"',
+							reason: 'Amount in invoice must be less than or equal to "maxWithdrawable"',
 						});
 						mock.expectNumRequestsToEqual('payinvoice', 0);
 					},

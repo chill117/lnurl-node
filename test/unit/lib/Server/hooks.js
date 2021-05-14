@@ -2,23 +2,36 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const helpers = require('../../../helpers');
 const lnurl = require('../../../../');
-const { HttpError } = lnurl.Server;
 const {
-	createAuthorizationSignature,
-	generateRandomLinkingKey,
+	HttpError,
 	prepareSignedQuery
 } = require('../../../../lib');
 
 describe('Server: hooks', function() {
 
-	describe('login', function() {
+	describe('subprotocols', function() {
+
+		const { validParams } = helpers.fixtures;
+
+		let mock;
+		before(function(done) {
+			mock = helpers.prepareMockLightningNode(done);
+		});
+
+		after(function(done) {
+			if (!mock) return done();
+			mock.close(done);
+		});
 
 		let server;
 		beforeEach(function() {
 			server = helpers.createServer({
 				protocol: 'http',
 				listen: false,
-				lightning: null,
+				lightning: {
+					backend: mock.backend,
+					config: mock.config,
+				},
 			});
 		});
 
@@ -26,44 +39,177 @@ describe('Server: hooks', function() {
 			if (server) return server.close();
 		});
 
-		let secret;
-		beforeEach(function() {
-			secret = null;
-			return server.generateNewUrl('login', {}).then(result => {
-				secret = result.secret;
+		describe('login', function() {
+
+			let secret;
+			beforeEach(function() {
+				secret = null;
+				return server.generateNewUrl('login', {}).then(result => {
+					secret = result.secret;
+				});
+			});
+
+			it('successful login', function() {
+				const params = validParams.action.login(secret);
+				let calls = 0;
+				server.bindToHook('login', function(key, next) {
+					try {
+						expect(key).to.be.a('string');
+						expect(next).to.be.a('function');
+						expect(++calls).to.equal(1);
+						next();
+					} catch (error) {
+						return next(error);
+					}
+				});
+				server.bindToHook('login', function(key, next) {
+					try {
+						expect(++calls).to.equal(2);
+						next();
+					} catch (error) {
+						return next(error);
+					}
+				});
+				return server.runSubProtocol('login', 'action', secret, params).then(() => {
+					expect(calls).to.equal(2);
+				});
 			});
 		});
 
-		it('successful login', function(done) {
-			const { pubKey, privKey } = generateRandomLinkingKey();
-			const k1 = Buffer.from(secret, 'hex');
-			const sig = createAuthorizationSignature(k1, privKey);
-			const params = {
-				sig: sig.toString('hex'),
-				key: pubKey.toString('hex'),
-			};
-			let calls = 0;
-			server.bindToHook('login', function(key, next) {
-				calls++;
-				try {
-					expect(key).to.be.a('string');
-					expect(next).to.be.a('function');
-					next();
-				} catch (error) {
-					return done(error);
-				}
+		_.each(['channelRequest', 'payRequest', 'withdrawRequest'], function(tag) {
+
+			describe(`${tag}:validate`, function() {
+
+				it('pass', function() {
+					let calls = 0;
+					server.bindToHook(`${tag}:validate`, function(params, next) {
+						expect(params).to.be.an('object');
+						expect(params).to.deep.equal(validParams.create[tag]);
+						expect(next).to.be.a('function');
+						expect(++calls).to.equal(1);
+						next();
+					});
+					return server.validateSubProtocolParameters(tag, validParams.create[tag]).then(() => {
+						expect(calls).to.equal(1);
+					});
+				});
+
+				it('fail', function() {
+					let calls = 0;
+					const thrownError = new Error('A thrown error');
+					server.bindToHook(`${tag}:validate`, function(params, next) {
+						expect(++calls).to.equal(1);
+						next(thrownError);
+					});
+					server.bindToHook(`${tag}:validate`, function(params, next) {
+						++calls;
+						next(new Error('Should not have been executed'));
+					});
+					return server.validateSubProtocolParameters(tag, validParams.create[tag]).then(() => {
+						throw new Error('Should not have been executed');
+					}).catch(error => {
+						expect(error).to.deep.equal(thrownError);
+						expect(calls).to.equal(1);
+					});
+				});
 			});
-			server.bindToHook('login', function(key, next) {
-				calls++;
-				try {
-					expect(calls).to.equal(2);
-					next();
-				} catch (error) {
-					return done(error);
-				}
-				done();
+
+			describe(`${tag}:info`, function() {
+
+				let newUrl, createParams;
+				beforeEach(function() {
+					newUrl = null;
+					createParams = validParams.create[tag];
+					return server.generateNewUrl(tag, createParams).then(result => {
+						newUrl = result;
+					});
+				});
+
+				it('pass', function() {
+					let calls = 0;
+					server.bindToHook(`${tag}:info`, function(secret, params, next) {
+						expect(secret).to.be.a('string');
+						expect(secret).to.equal(newUrl.secret);
+						expect(params).to.be.an('object');
+						expect(next).to.be.a('function');
+						expect(++calls).to.equal(1);
+						next();
+					});
+					return server.runSubProtocol(tag, 'info', newUrl.secret, createParams).then(() => {
+						expect(calls).to.equal(1);
+					});
+				});
+
+				it('fail', function() {
+					let calls = 0;
+					const thrownError = new Error('A thrown error');
+					server.bindToHook(`${tag}:info`, function(secret, params, next) {
+						expect(++calls).to.equal(1);
+						next(thrownError);
+					});
+					server.bindToHook(`${tag}:info`, function(secret, params, next) {
+						++calls;
+						next(new Error('Should not have been executed'));
+					});
+					return server.runSubProtocol(tag, 'info', newUrl.secret, createParams).then(() => {
+						throw new Error('Should not have been executed');
+					}).catch(error => {
+						expect(error).to.deep.equal(thrownError);
+						expect(calls).to.equal(1);
+					});
+				});
 			});
-			server.runSubProtocol('login', 'action', secret, params).catch(done);
+
+			describe(`${tag}:action`, function() {
+
+				let newUrl, createParams;
+				beforeEach(function() {
+					newUrl = null;
+					createParams = validParams.create[tag];
+					return server.generateNewUrl(tag, createParams).then(result => {
+						newUrl = result;
+					});
+				});
+
+				it('pass', function() {
+					let calls = 0;
+					const actionParams = validParams.action[tag];
+					const combinedParams = _.extend({}, actionParams, createParams);
+					server.bindToHook(`${tag}:action`, function(secret, params, next) {
+						expect(secret).to.be.a('string');
+						expect(secret).to.equal(newUrl.secret);
+						expect(params).to.be.an('object');
+						expect(params).to.deep.equal(combinedParams);
+						expect(next).to.be.a('function');
+						expect(++calls).to.equal(1);
+						next();
+					});
+					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams).then(() => {
+						expect(calls).to.equal(1);
+					});
+				});
+
+				it('fail', function() {
+					let calls = 0;
+					const actionParams = validParams.action[tag];
+					const combinedParams = _.extend({}, actionParams, createParams);
+					const thrownError = new Error('A thrown error');
+					server.bindToHook(`${tag}:action`, function(secret, params, next) {
+						expect(++calls).to.equal(1);
+						next(thrownError);
+					});
+					server.bindToHook(`${tag}:action`, function(secret, params, next) {
+						++calls;
+						next(new Error('Should not have been executed'));
+					});
+					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams).then(() => {
+						throw new Error('Should not have been executed');
+					}).catch(error => {
+						expect(error).to.deep.equal(thrownError);
+						expect(calls).to.equal(1);
+					});
+				});
+			});
 		});
 	});
 
@@ -94,9 +240,9 @@ describe('Server: hooks', function() {
 			pushAmt: 0,
 		};
 
-		it('invalid authorization signature', function(done) {
+		it('invalid API key signature', function(done) {
 			done = _.once(done);
-			const unknownApiKey = lnurl.Server.prototype.generateApiKey();
+			const unknownApiKey = lnurl.generateApiKey();
 			const query = prepareSignedQuery(unknownApiKey, tag, params);
 			helpers.request('get', {
 				url: server.getCallbackUrl(),
@@ -115,7 +261,7 @@ describe('Server: hooks', function() {
 			});
 		});
 
-		it('valid authorization signature', function(done) {
+		it('valid API key signature', function(done) {
 			done = _.once(done);
 			const query = prepareSignedQuery(apiKey, tag, params);
 			helpers.request('get', {
