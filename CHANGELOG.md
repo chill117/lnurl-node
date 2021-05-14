@@ -1,6 +1,6 @@
 # Changelog
 
-* TBD:
+* v0.14.0:
   * Added new hooks for inserting validation and other logic at important points in each subprotocol's execution:
     * `channelRequest:validate`, `payRequest:validate`, `withdrawRequest:validate` - After default validations have passed while creating a new URL for for the specified subprotocol.
     * `channelRequest:info`, `payRequest:info`, `withdrawRequest:info` - Before the specified subprotocol's informational JSON response object is sent.
