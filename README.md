@@ -517,6 +517,10 @@ class Backend extends LightningBackend {
 	addInvoice(amount, extra) {
 		return Promise.reject('Not implemented');
 	}
+
+	getInvoiceStatus(paymentHash) {
+		return Promise.reject('Not implemented');
+	}
 }
 
 module.exports = Backend;
@@ -922,7 +926,7 @@ DEBUG=lnurl* node your-app.js
 ```
 Or if using the CLI interface:
 ```bash
-DEBUG=lnurl* lnurl server ...
+DEBUG=lnurl* lnurl server
 ```
 
 
