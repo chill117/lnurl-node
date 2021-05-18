@@ -41,16 +41,13 @@
     "colorette": "1.2.1",
     "commander": "6.2.0",
     "express": "4.17.1",
-    "pem": "1.14.4",
     "secp256k1": "4.0.2",
     "underscore": "1.13.1"
   },
   "devDependencies": {
-    "body-parser": "1.19.0",
-    "chai": "4.2.0",
+    "chai": "4.3.4",
     "debug": "4.2.0",
-    "fs-extra": "9.0.1",
-    "mocha": "8.2.1"
+    "mocha": "8.4.0"
   },
   "readmeFilename": "README.md"
 }

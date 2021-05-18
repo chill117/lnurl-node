@@ -12,7 +12,6 @@ describe('isValidSignature(payload, signature, id)', function() {
 	let server;
 	before(function() {
 		server = helpers.createServer({
-			protocol: 'http',
 			listen: false,
 			lightning: null,
 			auth: {

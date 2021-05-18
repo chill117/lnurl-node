@@ -172,7 +172,6 @@ program
 			}
 			options.listen = false
 			options.lightning = null;
-			options.tls = { generate: false };
 			const server = lnurl.createServer(options);
 			return server.generateNewUrl(tag, params, { uses }).then(result => {
 				process.stdout.write(JSON.stringify(result, null, 2));
@@ -251,36 +250,6 @@ program
 		lnurl.Server.prototype.defaultOptions.lightning.config
 	)
 	.option(
-		'--tls.certPath [value]',
-		'The full file path to the TLS certificate',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.tls.certPath
-	)
-	.option(
-		'--tls.keyPath [value]',
-		'The full file path to the TLS certificate key',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.tls.keyPath
-	)
-	.option(
-		'--no-tls.generate',
-		'Do NOT create TLS cert/key pair when does not already exist',
-		_.identity,
-		!lnurl.Server.prototype.defaultOptions.tls.generate
-	)
-	.option(
-		'--no-tls.selfSigned',
-		'Do NOT self-sign the certificate',
-		_.identity,
-		!lnurl.Server.prototype.defaultOptions.tls.selfSigned
-	)
-	.option(
-		'--tls.days [value]',
-		'The length of validity of the self-signed certificate',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.tls.days
-	)
-	.option(
 		'--store.backend [value]',
 		'Which data store backend to use',
 		_.identity,
@@ -299,7 +268,7 @@ program
 		} else {
 			options = _.pick(this, 'host', 'port', 'protocol', 'url', 'endpoint');
 		}
-		_.each(['auth', 'lightning', 'tls', 'store'], group => {
+		_.each(['auth', 'lightning', 'store'], group => {
 			options[group] = prepareGroupOptions(this, options, group);
 		});
 		lnurl.createServer(options);
@@ -319,6 +288,9 @@ const prepareGroupOptions = function(context, options, group) {
 			switch (group) {
 				case 'lightning':
 				case 'store':
+					if (key === 'backend' && _.isString(value) && value[0] === '{') {
+						value = JSON.parse(value);
+					}
 					if (key === 'config' && _.isString(value)) {
 						value = JSON.parse(value);
 					}

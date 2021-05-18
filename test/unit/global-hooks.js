@@ -1,4 +1,5 @@
-const fs = require('fs-extra');
+const async = require('async');
+const fs = require('fs');
 
 before(function() {
 	this.helpers = require('../helpers');
@@ -6,7 +7,7 @@ before(function() {
 });
 
 before(function(done) {
-	fs.remove(this.tmpDir, done);
+	this.helpers.removeDir(this.tmpDir, done);
 });
 
 before(function(done) {
@@ -28,5 +29,5 @@ if (process.env.LNURL_STORE_BACKEND === 'knex') {
 }
 
 after(function(done) {
-	fs.remove(this.tmpDir, done);
+	this.helpers.removeDir(this.tmpDir, done);
 });

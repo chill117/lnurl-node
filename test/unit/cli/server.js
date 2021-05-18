@@ -25,92 +25,56 @@ describe('CLI: server [options]', function() {
 	});
 
 	let apiKeys;
-	let certPath, keyPath;
 	before(function() {
 		apiKeys = [ lnurl.generateApiKey() ];
-		certPath = path.join(this.tmpDir, 'tls.cert');
-		keyPath = path.join(this.tmpDir, 'tls.key');
-	});
-
-	let mock;
-	before(function(done) {
-		mock = helpers.prepareMockLightningNode(done);
-	});
-
-	after(function(done) {
-		if (!mock) return done();
-		mock.close(done);
-	});
-
-	beforeEach(function() {
-		mock.resetRequestCounters();
-	});
-
-	beforeEach(function(done) {
-		// Clean-up any existing TLS cert/key files.
-		const files = [ certPath, keyPath ];
-		async.each(files, (file, next) => {
-			fs.stat(file, error => {
-				if (error) return next();
-				fs.unlink(file, next);
-			});
-		}, done);
 	});
 
 	let tests = [
 		{
-			description: 'standard usage',
+			description: 'basic usage',
 			cmd: function() {
 				return [
 					'server',
 					'--host', 'localhost',
 					'--port', '3000',
-					'--endpoint', '/non-standard',
+					'--endpoint', '/lnurl',
 					'--auth.apiKeys', JSON.stringify(apiKeys),
-					'--lightning.backend', mock.backend,
-					'--lightning.config', JSON.stringify(mock.config),
-					'--tls.certPath', certPath,
-					'--tls.keyPath', keyPath,
+					'--lightning.backend', 'dummy',
+					'--lightning.config', '{}',
 					'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
-					'--store.config', JSON.stringify((process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {}),
+					'--store.config', process.env.LNURL_STORE_CONFIG || '{}',
 				];
 			},
 			expected: function() {
-				return waitForTlsFiles(certPath, keyPath).then(() => {
-					return getTlsCert(certPath).then(buffer => {
-						const ca = buffer.toString();
-						const tag = 'channelRequest';
-						const params = {
-							localAmt: 1000,
-							pushAmt: 1000,
-						};
-						const apiKey = apiKeys[0];
-						const query = prepareSignedQuery(apiKey, tag, params);
-						return new Promise((resolve, reject) => {
-							async.retry({
-								times: 50,
-								interval: 10,
-							}, next => {
-								const callbackUrl = 'https://localhost:3000/non-standard';
-								return helpers.request('get', {
-									url: callbackUrl,
-									ca,
-									qs: query,
-									json: true,
-								}).then(result => {
-									const { response, body } = result;
-									expect(body).to.be.an('object');
-									expect(body.status).to.not.equal('ERROR');
-									expect(body.k1).to.be.a('string');
-									expect(body.tag).to.equal(tag);
-									expect(body.callback).to.equal(callbackUrl);
-									expect(body.uri).to.equal(mock.config.nodeUri);
-								}).then(next).catch(next);
-							}, error => {
-								if (error) return reject(error);
-								resolve();
-							});
-						});
+				const tag = 'channelRequest';
+				const params = {
+					localAmt: 1000,
+					pushAmt: 1000,
+				};
+				const apiKey = apiKeys[0];
+				const query = prepareSignedQuery(apiKey, tag, params);
+				return new Promise((resolve, reject) => {
+					async.retry({
+						times: 50,
+						interval: 10,
+					}, next => {
+						const callbackUrl = 'http://localhost:3000/lnurl';
+						return helpers.request('get', {
+							url: callbackUrl,
+							qs: query,
+							json: true,
+						}).then(result => {
+							const { response, body } = result;
+							expect(body).to.be.an('object');
+							expect(body.status).to.not.equal('ERROR');
+							expect(body.k1).to.be.a('string');
+							expect(body.tag).to.equal(tag);
+							expect(body.callback).to.equal(callbackUrl);
+							expect(body.uri).to.be.a('string');
+						}).then(next).catch(next);
+					}, error => {
+						if (error) return reject(error);
+						resolve();
 					});
 				});
 			},
@@ -122,17 +86,16 @@ describe('CLI: server [options]', function() {
 				fs.writeFileSync(configFilePath, JSON.stringify({
 					host: 'localhost',
 					port: 3000,
-					protocol: 'http',
 					auth: {
 						apiKeys,
 					},
 					lightning: {
-						backend: mock.backend,
-						config: mock.config,
+						backend: 'dummy',
+						config: {},
 					},
 					store: {
 						backend: process.env.LNURL_STORE_BACKEND || 'memory',
-						config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || {},
+						config: JSON.parse(process.env.LNURL_STORE_CONFIG || '{}'),
 					},
 				}));
 				return [
@@ -183,37 +146,3 @@ describe('CLI: server [options]', function() {
 		});
 	});
 });
-
-const waitForTlsFiles = function(certPath, keyPath) {
-	return new Promise((resolve, reject) => {
-		const startTime = Date.now();
-		const maxWaitTime = 1500;
-		async.until(next => {
-			const files = [ certPath, keyPath ];
-			async.map(files, (file, nextFile) => {
-				fs.stat(file, error => {
-					nextFile(null, !error);
-				});
-			}, (error, results) => {
-				next(null, !error && _.every(results));
-			});
-		}, next => {
-			if (Date.now() - startTime > maxWaitTime) {
-				return next(new Error('Timed-out while waiting for existence of TLS files'));
-			}
-			_.delay(next, 10);
-		}, error => {
-			if (error) return reject(error);
-			resolve();
-		});
-	});
-};
-
-const getTlsCert = function(certPath) {
-	return new Promise((resolve, reject) => {
-		fs.readFile(certPath, (error, buffer) => {
-			if (error) return reject(error);
-			resolve(buffer);
-		});
-	});
-};

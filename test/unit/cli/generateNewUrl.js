@@ -8,31 +8,15 @@ const path = require('path');
 
 describe('CLI: generateNewUrl [options]', function() {
 
-	let mock;
-	before(function(done) {
-		mock = helpers.prepareMockLightningNode(done);
-	});
-
-	after(function(done) {
-		if (!mock) return done();
-		mock.close(done);
-	});
-
 	let server;
-	before(function(done) {
+	before(function() {
 		server = helpers.createServer({
-			protocol: 'http',
-			lightning: {
-				backend: mock.backend,
-				config: mock.config,
-			},
+			listen: false,
+			lightning: null,
 		});
-		server.once('error', done);
-		server.once('listening', done);
 	});
 
 	const config = _.pick(lnurl.Server.prototype.defaultOptions, 'host', 'port', 'protocol', 'url', 'endpoint');
-	config.protocol = 'http';
 	config.store = {
 		backend: process.env.LNURL_STORE_BACKEND || lnurl.Server.prototype.defaultOptions.store.backend,
 		config: process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG) || {},
@@ -40,10 +24,7 @@ describe('CLI: generateNewUrl [options]', function() {
 	let configFilePath;
 	before(function(done) {
 		configFilePath = path.join(this.tmpDir, 'cli-test-config.json');
-		fs.writeFile(configFilePath, JSON.stringify(config, null, 2), function(error) {
-			if (error) return done(error);
-			done();
-		});
+		fs.writeFile(configFilePath, JSON.stringify(config, null, 2), done);
 	});
 
 	after(function() {
@@ -236,10 +217,10 @@ describe('CLI: generateNewUrl [options]', function() {
 					expect(result).to.not.equal('');
 					expect(result.trim()).to.equal(result);
 					result = JSON.parse(result);
-					return helpers.testUrlNumberOfUses(result.url, {
-						uses: 1,
-						attempts: 2,
-						successes: 1,
+					const hash = createHash(result.secret);
+					return server.fetchUrl(hash).then(fromStore => {
+						expect(fromStore.initialUses).to.equal(1);
+						expect(fromStore.remainingUses).to.equal(1);
 					});
 				},
 			},
@@ -265,10 +246,10 @@ describe('CLI: generateNewUrl [options]', function() {
 					expect(result).to.not.equal('');
 					expect(result.trim()).to.equal(result);
 					result = JSON.parse(result);
-					return helpers.testUrlNumberOfUses(result.url, {
-						uses: 3,
-						attempts: 5,
-						successes: 3,
+					const hash = createHash(result.secret);
+					return server.fetchUrl(hash).then(fromStore => {
+						expect(fromStore.initialUses).to.equal(3);
+						expect(fromStore.remainingUses).to.equal(3);
 					});
 				},
 			},
@@ -294,10 +275,10 @@ describe('CLI: generateNewUrl [options]', function() {
 					expect(result).to.not.equal('');
 					expect(result.trim()).to.equal(result);
 					result = JSON.parse(result);
-					return helpers.testUrlNumberOfUses(result.url, {
-						uses: 0,
-						attempts: 5,
-						successes: 5,
+					const hash = createHash(result.secret);
+					return server.fetchUrl(hash).then(fromStore => {
+						expect(fromStore.initialUses).to.equal(0);
+						expect(fromStore.remainingUses).to.equal(0);
 					});
 				},
 			},

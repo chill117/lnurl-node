@@ -1,5 +1,9 @@
 # Changelog
 
+* v0.15.0:
+  * Removed previously deprecated methods/prototypes from Server prototype: `generateApiKey`, `HttpError`. These are available in lnurl/lib.
+  * Removed lightning node API mocks
+  * The "https" protocol is no longer supported by the server. The server should be run behind a proxy (e.g nginx) that handles TLS termination and request proxying to the HTTP server of lnurl-node.
 * v0.14.0:
   * Added new hooks for inserting validation and other logic at important points in each subprotocol's execution:
     * `channelRequest:validate`, `payRequest:validate`, `withdrawRequest:validate` - After default validations have passed while creating a new URL for for the specified subprotocol.

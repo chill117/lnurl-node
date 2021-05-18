@@ -1,7 +1,7 @@
 const _ = require('underscore');
-const { createHash, generateRandomByteString } = require('../../../../../lib');
+const { createHash, generateRandomByteString } = require('../../../../lib');
 const { expect } = require('chai');
-const helpers = require('../../../../helpers');
+const helpers = require('../../../helpers');
 
 describe('stores.knex', function() {
 
@@ -11,7 +11,7 @@ describe('stores.knex', function() {
 		if (process.env.LNURL_STORE_BACKEND !== 'knex') {
 			this.skip();
 		} else {
-			Store = require('../../../../../lib/stores/knex');
+			Store = require('../../../../lib/stores/knex');
 		}
 	});
 

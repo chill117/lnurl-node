@@ -17,21 +17,13 @@ const {
 	prepareSignedQuery
 } = require('../../../../lib');
 
+const tagToLightningBackendMethod = {
+	'channelRequest': 'openChannel',
+	'payRequest': 'addInvoice',
+	'withdrawRequest': 'payInvoice',
+};
+
 describe('Server: HTTP API', function() {
-
-	let mock;
-	before(function(done) {
-		mock = this.helpers.prepareMockLightningNode(done);
-	});
-
-	after(function(done) {
-		if (!mock) return done();
-		mock.close(done);
-	});
-
-	beforeEach(function() {
-		mock.resetRequestCounters();
-	});
 
 	let server, apiKeys;
 	before(function(done) {
@@ -47,8 +39,8 @@ describe('Server: HTTP API', function() {
 					apiKeys: apiKeys,
 				},
 				lightning: {
-					backend: mock.backend,
-					config: mock.config,
+					backend: 'dummy',
+					config: {},
 				},
 			});
 			server.once('error', done);
@@ -111,7 +103,7 @@ describe('Server: HTTP API', function() {
 		describe('?s=SIGNATURE&id=API_KEY_ID&n=NONCE&..', function() {
 
 			it('invalid authorization signature: unknown API key', function() {
-				const unknownApiKey = lnurl.Server.prototype.generateApiKey();
+				const unknownApiKey = lnurl.generateApiKey();
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const query = prepareSignedQuery(unknownApiKey, tag, params);
@@ -266,7 +258,7 @@ describe('Server: HTTP API', function() {
 							expect(body.k1).to.be.a('string');
 							expect(body.tag).to.equal('channelRequest');
 							expect(body.callback).to.equal(server.getCallbackUrl());
-							expect(body.uri).to.equal(mock.config.nodeUri);
+							expect(body.uri).to.be.a('string');
 						},
 					},
 				];
@@ -574,7 +566,7 @@ describe('Server: HTTP API', function() {
 							k1: this.secret,
 							tag: 'channelRequest',
 							callback: server.getCallbackUrl(),
-							uri: mock.config.nodeUri,
+							uri: 'PUBKEY@127.0.0.1:9735',
 						});
 					},
 				},
@@ -680,7 +672,7 @@ describe('Server: HTTP API', function() {
 						expect(body).to.deep.equal({
 							status: 'OK',
 						});
-						mock.expectNumRequestsToEqual('payinvoice', 1);
+						expect(server.ln.getRequestCount('payInvoice')).to.equal(1);
 					},
 				},
 				{
@@ -717,7 +709,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount in invoice must be less than or equal to "maxWithdrawable"',
 						});
-						mock.expectNumRequestsToEqual('payinvoice', 0);
+						expect(server.ln.getRequestCount('payInvoice')).to.equal(0);
 					},
 				},
 			];
@@ -732,7 +724,7 @@ describe('Server: HTTP API', function() {
 						const purposeCommitHashTagData = getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
 						const { metadata } = validParams.create.payRequest;
 						expect(purposeCommitHashTagData).to.equal(createHash(Buffer.from(metadata, 'utf8')));
-						mock.expectNumRequestsToEqual('addinvoice', 1);
+						expect(server.ln.getRequestCount('addInvoice')).to.equal(1);
 						expect(response.headers['cache-control']).to.equal('private');
 					},
 				},
@@ -746,7 +738,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount must be greater than or equal to "minSendable"',
 						});
-						mock.expectNumRequestsToEqual('addinvoice', 0);
+						expect(server.ln.getRequestCount('addInvoice')).to.equal(0);
 						expect(response.headers['cache-control']).to.be.undefined;
 					},
 				},
@@ -760,7 +752,7 @@ describe('Server: HTTP API', function() {
 							status: 'ERROR',
 							reason: 'Amount must be less than or equal to "maxSendable"',
 						});
-						mock.expectNumRequestsToEqual('addinvoice', 0);
+						expect(server.ln.getRequestCount('addInvoice')).to.equal(0);
 						expect(response.headers['cache-control']).to.be.undefined;
 					},
 				},
@@ -832,6 +824,10 @@ describe('Server: HTTP API', function() {
 							this.secret = result.secret;
 						});
 					});
+					beforeEach(function() {
+						server.ln.resetRequestCounters();
+						expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(0);
+					});
 					_.each(tests, function(test) {
 						let description = test.description || ('params: ' + JSON.stringify(test.params));
 						it(description, function() {
@@ -871,10 +867,8 @@ describe('Server: HTTP API', function() {
 						server = helpers.createServer({
 							port: 3001,
 							lightning: {
-								backend: {
-									path: path.join(__dirname, '..', '..', 'backends', 'custom.js'),
-								},
-								config: {},
+								backend: 'dummy',
+								config: { alwaysFail: true },
 							},
 						});
 						server.once('error', done);
@@ -895,7 +889,7 @@ describe('Server: HTTP API', function() {
 						return server.close();
 					});
 
-					it('should record a "use" in case of error response from LN backend', function() {
+					it('should not record a "use" in case of error response from LN backend', function() {
 						const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
 							k1: secret,
 						});
@@ -931,8 +925,8 @@ describe('Server: HTTP API', function() {
 					});
 
 					before(function() {
-						mock.resetRequestCounters();
-						mock.expectNumRequestsToEqual(tag, 0);
+						server.ln.resetRequestCounters();
+						expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(0);
 					});
 
 					it('can be used only once', function(done) {
@@ -971,14 +965,14 @@ describe('Server: HTTP API', function() {
 											// Expecting success.
 											expect(body).to.be.an('object');
 											expect(body.status).to.not.equal('ERROR');
-											mock.expectNumRequestsToEqual(tag, n);
+											expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(n);
 										} else {
 											// Expecting failure.
 											expect(body).to.deep.equal({
 												reason: 'Maximum number of uses already reached',
 												status: 'ERROR',
 											});
-											mock.expectNumRequestsToEqual(tag, success);
+											expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(success);
 										}
 									}).then(next).catch(next);
 								}, done);
@@ -1070,8 +1064,8 @@ describe('Server: HTTP API', function() {
 						});
 
 						before(function() {
-							mock.resetRequestCounters();
-							mock.expectNumRequestsToEqual(tag, 0);
+							server.ln.resetRequestCounters();
+							expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(0);
 						});
 
 						it('has expected number of successes and failures', function(done) {
@@ -1091,14 +1085,14 @@ describe('Server: HTTP API', function() {
 										// Expecting success.
 										expect(body).to.be.an('object');
 										expect(body.status).to.not.equal('ERROR');
-										mock.expectNumRequestsToEqual(tag, n);
+										expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(n);
 									} else {
 										// Expecting failure.
 										expect(body).to.deep.equal({
 											reason: 'Maximum number of uses already reached',
 											status: 'ERROR',
 										});
-										mock.expectNumRequestsToEqual(tag, test.expected.success);
+										expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(test.expected.success);
 									}
 								}).then(next).catch(next);
 							}, done);

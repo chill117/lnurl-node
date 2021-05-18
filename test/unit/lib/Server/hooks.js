@@ -2,10 +2,8 @@ const _ = require('underscore');
 const { expect } = require('chai');
 const helpers = require('../../../helpers');
 const lnurl = require('../../../../');
-const {
-	HttpError,
-	prepareSignedQuery
-} = require('../../../../lib');
+const { HttpError, prepareSignedQuery } = require('../../../../lib');
+const path = require('path');
 
 describe('Server: hooks', function() {
 
@@ -13,24 +11,13 @@ describe('Server: hooks', function() {
 
 		const { validParams } = helpers.fixtures;
 
-		let mock;
-		before(function(done) {
-			mock = helpers.prepareMockLightningNode(done);
-		});
-
-		after(function(done) {
-			if (!mock) return done();
-			mock.close(done);
-		});
-
 		let server;
 		beforeEach(function() {
 			server = helpers.createServer({
-				protocol: 'http',
 				listen: false,
 				lightning: {
-					backend: mock.backend,
-					config: mock.config,
+					backend: 'dummy',
+					config: {},
 				},
 			});
 		});

@@ -26,71 +26,14 @@ module.exports = {
 		options = _.defaults(options || {}, {
 			host: 'localhost',
 			port: 3000,
-			lightning: {
-				backend: process.env.LNURL_LIGHTNING_BACKEND || 'lnd',
-				config: {},
-			},
-			tls: {
-				certPath: path.join(tmpDir, 'tls.cert'),
-				keyPath: path.join(tmpDir, 'tls.key'),
-			},
+			lightning: null,
 			store: {
 				backend: process.env.LNURL_STORE_BACKEND || 'memory',
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || { noWarning: true },
 			},
 		});
 		const server = lnurl.createServer(options);
-		server.once('listening', () => {
-			if (server.options.protocol === 'https') {
-				const { certPath } = server.options.tls;
-				server.ca = fs.readFileSync(certPath).toString();
-			}
-		});
 		return server;
-	},
-	prepareMockLightningNode: function(backend, options, done) {
-		if (_.isFunction(backend)) {
-			done = backend;
-			options = null;
-			backend = process.env.LNURL_LIGHTNING_BACKEND || 'lnd';
-		} else if (_.isFunction(options)) {
-			done = options;
-			options = null;
-		}
-		options = options || {};
-		switch (backend) {
-			case 'lnd':
-				options = _.defaults(options || {}, {
-					certPath: path.join(tmpDir, 'lnd-tls.cert'),
-					keyPath: path.join(tmpDir, 'lnd-tls.key'),
-					macaroonPath: path.join(tmpDir, 'lnd-admin.macaroon'),
-				});
-				break;
-		}
-		const mock = lnurl.Server.prototype.prepareMockLightningNode(backend, options, done);
-		mock.backend = backend;
-		mock.requestCounters = _.chain([
-			'getinfo',
-			'openchannel',
-			'payinvoice',
-			'addinvoice',
-		]).map(function(key) {
-			return [key, 0];
-		}).object().value();
-		mock.resetRequestCounters = function() {
-			this.requestCounters = _.mapObject(this.requestCounters, () => {
-				return 0;
-			});
-		};
-		mock.expectNumRequestsToEqual = function(tag, total) {
-			const type = lightningBackendRequestTypes[tag];
-			if (!_.isUndefined(mock.requestCounters[type])) {
-				if (mock.requestCounters[type] !== total) {
-					throw new Error(`Expected ${total} requests of type: "${type}"`);
-				}
-			}
-		};
-		return mock;
 	},
 	request: function(method, requestOptions) {
 		return new Promise((resolve, reject) => {
@@ -334,5 +277,36 @@ module.exports = {
 		let sources = {};
 		sources[key] = undefined;
 		return _.assign(_.clone(obj), sources);
+	},
+	removeDir: function(dirPath, done) {
+		fs.stat(dirPath, error => {
+			if (error) {
+				if (/no such file or directory/i.test(error.message)) {
+					// Directory doesn't exist.
+					return done();
+				}
+				// Unexpected error.
+				return done(error);
+			}
+			// Directory exists.
+			// List files and delete each one.
+			fs.readdir(dirPath, (error, files) => {
+				if (error) return done(error);
+				async.each(files, (file, next) => {
+					const filePath = path.join(dirPath, file);
+					fs.stat(filePath, (error, stat) => {
+						if (error) return next(error);
+						if (stat.isDirectory()) {
+							return this.removeDir(filePath, next);
+						}
+						fs.unlink(filePath, next);
+					});
+				}, error => {
+					if (error) return done(error);
+					// Finally delete the directory itself.
+					fs.rmdir(dirPath, done);
+				});
+			});
+		});
 	},
 };

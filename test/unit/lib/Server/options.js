@@ -10,25 +10,13 @@ describe('Server: options', function() {
 	const testGroups = [
 		{
 			options: {
-				protocol: 'http',
 				lightning: null,
 			},
 			tests: [
 				{
-					description: 'server responds to HTTP requests',
+					description: 'no lightning backend',
 					expected: function() {
-						const callbackUrl = this.server.getCallbackUrl();
-						expect(callbackUrl.substr(0, 'http:'.length)).to.equal('http:');
-						return helpers.request('get', {
-							url: callbackUrl,
-							json: true,
-						}).then(result => {
-							const { response, body } = result;
-							expect(body).to.deep.equal({
-								status: 'ERROR',
-								reason: 'Missing secret',
-							});
-						});
+						expect(this.server.ln).to.be.undefined;
 					},
 				},
 			],
@@ -36,11 +24,8 @@ describe('Server: options', function() {
 		{
 			description: '{ "lightning": { "backend": { "path": "/path/to/custom/backend.js" } } }',
 			options: {
-				protocol: 'http',
 				lightning: {
-					backend: {
-						path: path.join(__dirname, '..', '..', '..', 'backends', 'custom.js'),
-					},
+					backend: 'dummy',
 					config: {
 						nodeUri: '000000000010101@127.0.0.1:9735',
 					},
@@ -70,7 +55,6 @@ describe('Server: options', function() {
 		{
 			description: '{"auth": {"apiKeys": [{ "lightning": { .. } }]}}',
 			options: {
-				protocol: 'http',
 				lightning: null,
 				auth: {
 					apiKeys: [
@@ -78,24 +62,20 @@ describe('Server: options', function() {
 							id: 'tzLWF0c=',
 							key: 'nOtf6XbGnMVZJ51GKDIrmd9B4ltvO0C1xSUBivlN4cQ=',
 							lightning: {
-								backend: 'c-lightning',
+								backend: 'dummy',
 								config: {
-									port: 9736,
-									socket: path.join(helpers.tmpDir, 'clightning1.sock'),
+									nodeUri: '000001101110101@127.0.0.1:9736',
 								},
-								mock: true,
 							},
 						},
 						{
 							id: 'ooGwzJM=',
 							key: 'FSgM6S1xIs8hfof1zlW8m2YYugRHdn80rJqNXTdp3OE=',
 							lightning: {
-								backend: 'c-lightning',
+								backend: 'dummy',
 								config: {
-									port: 9737,
-									socket: path.join(helpers.tmpDir, 'clightning2.sock'),
+									nodeUri: '000001101110101@127.0.0.1:9737',
 								},
-								mock: true,
 							},
 						},
 					],
@@ -103,7 +83,7 @@ describe('Server: options', function() {
 			},
 			tests: [
 				{
-					description: 'each API key uses the correct lightning backend',
+					description: 'different lightning backend per API key',
 					expected: function() {
 						return new Promise((resolve, reject) => {
 							async.each(this.server.options.auth.apiKeys, (apiKey, next) => {
@@ -119,9 +99,8 @@ describe('Server: options', function() {
 									json: true,
 								}).then(result => {
 									const { response, body } = result;
-									const { port } = apiKey.lightning.config;
 									expect(body.status).to.not.equal('ERROR');
-									expect(body.uri.substr(-5)).to.equal(':' + port);
+									expect(body.uri).to.equal(apiKey.lightning.config.nodeUri);
 								}).then(next).catch(next);
 							}, error => {
 								if (error) return reject(error);

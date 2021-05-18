@@ -268,7 +268,7 @@ Example output:
 {
 	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
 	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
-	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
+	"url": "http://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
 It is possible to set the number of uses allowed for the new URL:
@@ -375,7 +375,7 @@ const server = lnurl.createServer({
 	// The port for the web server:
 	port: 3000,
 	// The protocol to use for the web server:
-	protocol: 'https',
+	protocol: 'http',
 	// Whether or not to start listening when the server is created:
 	listen: true,
 	// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
@@ -406,20 +406,6 @@ const server = lnurl.createServer({
 		config: {
 			// Defaults here depend on the LN backend used.
 		},
-		// Whether or not to create a mock instance of the LN backend.
-		mock: false,
-	},
-	tls: {
-		// The full file path to the TLS certificate:
-		certPath: path.join(process.cwd(), 'tls.cert'),
-		// The full file path to the TLS certificate key:
-		keyPath: path.join(process.cwd(), 'tls.key'),
-		// Whether to create TLS cert/key pair if does not already exist:
-		generate: true,
-		// Whether to self-sign the certificate:
-		selfSigned: true,
-		// The length of validity of the self-signed certificate:
-		days: 3650,
 	},
 	store: {
 		// Name of store backend ('knex', 'memory'):
@@ -574,7 +560,7 @@ Expected output:
 {
 	"encoded": "lnurl1dp68gup69uhkcmmrv9kxsmmnwsarxvpsxqhkcmn4wfkr7ufavvexxvpk893rswpjxcmnvctyvgexzen9xvmkycnxv33rvdtrvy6xzv3ex43xzve5vvexgwfj8yenxvm9xaskzdmpxuexywt9893nqvcly0lgs",
 	"secret": "c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03",
-	"url": "https://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
+	"url": "http://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
 It is possible to set the number of uses allowed for the new URL:
@@ -694,7 +680,7 @@ const params = {
 	defaultDescription: '',
 };
 const options = {
-	baseUrl: 'https://localhost:3000/lnurl',
+	baseUrl: 'http://localhost:3000/lnurl',
 	encode: false,
 };
 const signedUrl = lnurl.createSignedUrl(apiKey, tag, params, options);
@@ -702,7 +688,7 @@ console.log(signedUrl);
 ```
 Sample expected output:
 ```
-https://localhost:3000/lnurl?id=b6cb8e81e3&nonce=3e7122d5832794a2b2fa&tag=withdrawRequest&minWithdrawable=50000&maxWithdrawable=60000&defaultDescription=&signature=81efac1f69001be4e976796d99ff0572b865b5f1c51bdc1c5e7898a7ca30a9c8
+http://localhost:3000/lnurl?id=b6cb8e81e3&nonce=3e7122d5832794a2b2fa&tag=withdrawRequest&minWithdrawable=50000&maxWithdrawable=60000&defaultDescription=&signature=81efac1f69001be4e976796d99ff0572b865b5f1c51bdc1c5e7898a7ca30a9c8
 ```
 
 List of options:
@@ -710,7 +696,7 @@ List of options:
 {
 	// The algorithm to use when creating the signature via HMAC:
 	algorithm: 'sha256',
-	// The "protocol://host:port/endpoint" for your lnurl server (e.g "https://yourlnurlserver.com/lnurl").
+	// The "protocol://host:port/endpoint" for your lnurl server (e.g "http://yourlnurlserver.com/lnurl").
 	// You must provide a base URL.
 	baseUrl: null,
 	// Whether or not to lnurl encode the signed URL:
@@ -726,7 +712,7 @@ List of options:
 ```
 With `shorten: true` the querystring parameters will be shortened:
 ```
-https://localhost:3000/lnurl?id=b6cb8e81e3&n=d585674cf991dbbab42b&s=9229449b0426d6ae97b2c4e2e92ef670e958980c89759ed0c8edcbd36d2a3de9&t=w&pn=50000&px=60000&pd=
+http://localhost:3000/lnurl?id=b6cb8e81e3&n=d585674cf991dbbab42b&s=9229449b0426d6ae97b2c4e2e92ef670e958980c89759ed0c8edcbd36d2a3de9&t=w&pn=50000&px=60000&pd=
 ```
 This helps with the scannability of QR codes.
 

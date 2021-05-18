@@ -15,17 +15,13 @@ describe('Server: events', function() {
 		beforeEach(function() {
 			apiKeyAlwaysFail = _.extend({}, generateApiKey(), {
 				lightning: {
-					backend: {
-						path: path.join(__dirname, '..', '..', '..', 'backends', 'always-fail'),
-					},
-					config: {},
+					backend: 'dummy',
+					config: { alwaysFail: true },
 				},
 			});
 			apiKeyAlwaysSucceed = _.extend({}, generateApiKey(), {
 				lightning: {
-					backend: {
-						path: path.join(__dirname, '..', '..', '..', 'backends', 'always-succeed'),
-					},
+					backend: 'dummy',
 					config: {},
 				},
 			});

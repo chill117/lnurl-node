@@ -30,7 +30,7 @@ describe('createSignedUrl(apiKey, tag, params[, options])', function() {
 			defaultDescription: '',
 		},
 		options: {
-			baseUrl: 'https://localhost:3000/lnurl',
+			baseUrl: 'http://localhost:3000/lnurl',
 			encode: false,
 		},
 	};
