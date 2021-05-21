@@ -144,6 +144,7 @@ program
 	.action(function(options) {
 		try {
 			let { tag, params, uses } = options;
+			options = _.omit(options, ['tag', 'params', 'uses']);
 			if (!tag) {
 				throw new Error('--tag is required');
 			}
