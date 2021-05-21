@@ -19,7 +19,6 @@ describe('generatePaymentRequest(amount[, extra[, options]])', function() {
 				expect(result.substr(0, 'lnbc'.length)).to.equal('lnbc');
 				const decoded = bolt11.decode(result);
 				expect(decoded.millisatoshis).to.equal('1');
-				expect(decoded.coinType).to.equal('bitcoin');
 			},
 		},
 		{
@@ -34,7 +33,6 @@ describe('generatePaymentRequest(amount[, extra[, options]])', function() {
 				expect(result.substr(0, 'lntb'.length)).to.equal('lntb');
 				const decoded = bolt11.decode(result);
 				expect(decoded.millisatoshis).to.equal('7000');
-				expect(decoded.coinType).to.equal('testnet');
 			},
 		},
 		{
@@ -49,7 +47,6 @@ describe('generatePaymentRequest(amount[, extra[, options]])', function() {
 				expect(result.substr(0, 'lntb'.length)).to.equal('lntb');
 				const decoded = bolt11.decode(result);
 				expect(decoded.millisatoshis).to.equal('7000');
-				expect(decoded.coinType).to.equal('testnet');
 			},
 		},
 		(function() {
