@@ -60,11 +60,11 @@ program
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.apiKey.numBytes.key,
 	)
-	.action(function() {
-		let options = _.pick(this, 'encoding');
+	.action(function(options) {
 		options.numBytes = {};
-		options.numBytes.id = parseInt(this['numBytes.id']);
-		options.numBytes.key = parseInt(this['numBytes.key']);
+		options.numBytes.id = parseInt(options['numBytes.id']);
+		options.numBytes.key = parseInt(options['numBytes.key']);
+		options = _.pick(options, 'encoding', 'numBytes');
 		process.stdout.write(JSON.stringify(lnurl.generateApiKey(options), null, 2));
 	});
 
@@ -141,16 +141,9 @@ program
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.store.config
 	)
-	.action(function() {
+	.action(function(options) {
 		try {
-			let options;
-			if (this.configFile) {
-				options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
-			} else {
-				options = _.pick(this, 'host', 'port', 'protocol', 'url', 'endpoint');
-				options.store = prepareGroupOptions(this, options, 'store');
-			}
-			let { tag, params, uses } = this;
+			let { tag, params, uses } = options;
 			if (!tag) {
 				throw new Error('--tag is required');
 			}
@@ -167,6 +160,11 @@ program
 			if (_.isNaN(uses)) {
 				throw new Error('--uses must be an integer');
 			}
+			if (options.configFile) {
+				options = JSON.parse(fs.readFileSync(options.configFile, 'utf8'));
+			}
+			options = _.omit(options, 'configFile');
+			prepareGroupOptions(options, ['store']);
 			if (options.store && options.store.backend === 'memory') {
 				throw new Error('This command does not work with `--store.backend` set to "memory"');
 			}
@@ -261,51 +259,52 @@ program
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.store.config
 	)
-	.action(function() {
-		let options;
-		if (this.configFile) {
-			options = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
-		} else {
-			options = _.pick(this, 'host', 'port', 'protocol', 'url', 'endpoint');
+	.action(function(options) {
+		if (options.configFile) {
+			options = JSON.parse(fs.readFileSync(options.configFile, 'utf8'));
 		}
-		_.each(['auth', 'lightning', 'store'], group => {
-			options[group] = prepareGroupOptions(this, options, group);
-		});
+		options = _.omit(options, 'configFile');
+		prepareGroupOptions(options, ['auth', 'lightning', 'store']);
 		lnurl.createServer(options);
 	});
 
-const prepareGroupOptions = function(context, options, group) {
-	return _.chain(lnurl.Server.prototype.defaultOptions[group])
-		.keys()
-		.map(key => {
-			let value;
-			if (!_.isUndefined(options[group])) {
-				value = options[group][key];
-			} else {
-				value = context[`${group}.${key}`];
-			}
-			if (_.isUndefined(value)) return null;
-			switch (group) {
-				case 'lightning':
-				case 'store':
-					if (key === 'backend' && _.isString(value) && value[0] === '{') {
-						value = JSON.parse(value);
+const prepareGroupOptions = function(options, groups) {
+	_.each(groups, group => {
+		options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
+			.keys()
+			.map(key => {
+				let value;
+				if (!_.isUndefined(options[group])) {
+					value = options[group][key];
+				} else {
+					value = options[`${group}.${key}`];
+					if (!_.isUndefined(options[`${group}.${key}`])) {
+						delete options[`${group}.${key}`];
 					}
-					if (key === 'config' && _.isString(value)) {
-						value = JSON.parse(value);
-					}
-					break;
-				case 'auth':
-					if (key === 'apiKeys' && _.isString(value)) {
-						value = JSON.parse(value);
-					}
-					break;
-			}
-			return [key, value];
-		})
-		.compact()
-		.object()
-		.value();
+				}
+				if (_.isUndefined(value)) return null;
+				switch (group) {
+					case 'lightning':
+					case 'store':
+						if (key === 'backend' && _.isString(value) && value[0] === '{') {
+							value = JSON.parse(value);
+						}
+						if (key === 'config' && _.isString(value)) {
+							value = JSON.parse(value);
+						}
+						break;
+					case 'auth':
+						if (key === 'apiKeys' && _.isString(value)) {
+							value = JSON.parse(value);
+						}
+						break;
+				}
+				return [key, value];
+			})
+			.compact()
+			.object()
+			.value();
+	});
 };
 
 if (process.stdin.isTTY) {
