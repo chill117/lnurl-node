@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.16.1:
+  * Fix sqlite3 unique index for urls.hash
+  * Fix CLI generateNewUrl unknown options error
 * v0.16.0:
   * Upgraded dependencies
   * LN backends:
