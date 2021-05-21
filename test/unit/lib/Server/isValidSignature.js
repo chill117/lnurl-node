@@ -5,10 +5,6 @@ const helpers = require('../../../helpers');
 
 describe('isValidSignature(payload, signature, id)', function() {
 
-	it('is a function', function() {
-		expect(lnurl.Server.prototype.isValidSignature).to.be.a('function');
-	});
-
 	let server;
 	before(function() {
 		server = helpers.createServer({

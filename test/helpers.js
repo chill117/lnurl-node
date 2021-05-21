@@ -12,6 +12,11 @@ const { spawn } = require('child_process');
 const tmpDir = path.join(__dirname, 'tmp');
 const url = require('url');
 
+process.env = _.defaults(process.env, {
+	LNURL_LIGHTNING_BACKEND: 'dummy',
+	LNURL_LIGHTNING_CONFIG: '{}',
+});
+
 const lightningBackendRequestTypes = {
 	channelRequest: 'openchannel',
 	login: null,
