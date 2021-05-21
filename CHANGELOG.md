@@ -1,5 +1,15 @@
 # Changelog
 
+* v0.16.0:
+  * Upgraded dependencies
+  * LN backends:
+    * openChannel now returns complete non-normalized result
+    * addInvoice now returns { id: NULL or 'STRING', invoice: 'STRING' } on success
+    * payInvoice now returns { id: NULL or 'STRING' } on success
+    * getInvoiceStatus should be used to check if an invoice was settled
+    * dummy: More customization
+  * events:
+    * ``withdrawRequest:action:processed` now passes thru the result from successful subprotocol action
 * v0.15.0:
   * Removed previously deprecated methods/prototypes from Server prototype: `generateApiKey`, `HttpError`. These are available in lnurl/lib.
   * Removed lightning node API mocks
