@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Added "useIdentifier" option to dummy lightning backend
 * v0.16.1:
   * Fix sqlite3 unique index for urls.hash
   * Fix CLI generateNewUrl unknown options error
