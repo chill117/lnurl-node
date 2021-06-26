@@ -4,6 +4,7 @@ const fs = require('fs');
 const helpers = require('../../../helpers');
 const path = require('path');
 const { createHash, generateNodeKey, generatePaymentRequest, Server } = require('../../../../lib');
+const DummyLightningBackend = require('../../../../lib/lightning/dummy');
 
 const backends = (function() {
 	const files = fs.readdirSync(path.join(__dirname, '..', '..', '..', '..', 'lib', 'lightning'));
@@ -24,6 +25,73 @@ describe('lightning', function() {
 					this.skip();
 				}
 			});
+
+			if (backend === 'dummy') {
+				describe('{ alwaysFail: true }', function() {
+					let dummyBackend;
+					before(function() {
+						dummyBackend = new DummyLightningBackend({ alwaysFail: true });
+					});
+					_.each(['getNodeUri', 'openChannel', 'payInvoice', 'addInvoice'], method => {
+						it(`${method} should fail`, function() {
+							return dummyBackend[method]().then(() => {
+								throw new Error(`Expected ${method} to fail`);
+							}).catch(error => {
+								expect(error.message).to.equal(`${method} failure`);
+							});
+						});
+					});
+				});
+				describe('{ alwaysFail: false }', function() {
+					let dummyBackend;
+					before(function() {
+						dummyBackend = new DummyLightningBackend({ alwaysFail: false });
+					});
+					_.each(['getNodeUri', 'openChannel', 'payInvoice', 'addInvoice'], method => {
+						it(`${method} should not fail`, function() {
+							return dummyBackend[method]();
+						});
+					});
+				});
+				describe('{ useIdentifier: true }', function() {
+					let dummyBackend;
+					before(function() {
+						dummyBackend = new DummyLightningBackend({ useIdentifier: true });
+					});
+					it('payInvoice result should include an identifier', function() {
+						return dummyBackend.payInvoice().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.id).to.not.equal(null);
+							expect(result.id).to.be.a('string');
+						});
+					});
+					it('addInvoice result should include an identifier', function() {
+						return dummyBackend.payInvoice().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.id).to.not.equal(null);
+							expect(result.id).to.be.a('string');
+						});
+					});
+				});
+				describe('{ useIdentifier: false }', function() {
+					let dummyBackend;
+					before(function() {
+						dummyBackend = new DummyLightningBackend({ useIdentifier: false });
+					});
+					it('payInvoice result should not include an identifier', function() {
+						return dummyBackend.payInvoice().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.id).to.equal(null);
+						});
+					});
+					it('addInvoice result should not include an identifier', function() {
+						return dummyBackend.payInvoice().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.id).to.equal(null);
+						});
+					});
+				});
+			}
 
 			describe('methods', function() {
 
@@ -82,7 +150,7 @@ describe('lightning', function() {
 						expect(result).to.be.an('object');
 						expect(result).to.have.property('preimage');
 						expect(result).to.have.property('settled');
-					});;
+					});
 				});
 			});
 		});
