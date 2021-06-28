@@ -1,9 +1,10 @@
 const _ = require('underscore');
+const crypto = require('crypto');
 const { expect } = require('chai');
 const fs = require('fs');
 const helpers = require('../../../helpers');
 const path = require('path');
-const { createHash, generateNodeKey, generatePaymentRequest, Server } = require('../../../../lib');
+const { createHash, generateNodeKey, generatePaymentRequest, getTagDataFromPaymentRequest, Server } = require('../../../../lib');
 const DummyLightningBackend = require('../../../../lib/lightning/dummy');
 
 const backends = (function() {
@@ -53,19 +54,40 @@ describe('lightning', function() {
 						});
 					});
 				});
+				describe('{ preimage: "KNOWN_PREIMAGE" }', function() {
+					let preimage;
+					let dummyBackend;
+					before(function() {
+						preimage = crypto.randomBytes(32).toString('hex');
+						dummyBackend = new DummyLightningBackend({ preimage });
+					});
+					it('addInvoice returns invoice with payment hash of preimage', function() {
+						return dummyBackend.addInvoice().then(result => {
+							expect(result).to.be.an('object');
+							const paymentHash = getTagDataFromPaymentRequest(result.invoice, 'payment_hash');
+							expect(paymentHash).to.equal(createHash(preimage));
+						});
+					});
+					it('getInvoiceStatus returns { preimage: "KNOWN_PREIMAGE" }', function() {
+						return dummyBackend.getInvoiceStatus().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.preimage).to.equal(preimage);
+						});
+					});
+				});
 				describe('{ useIdentifier: true }', function() {
 					let dummyBackend;
 					before(function() {
 						dummyBackend = new DummyLightningBackend({ useIdentifier: true });
 					});
-					it('payInvoice result should include an identifier', function() {
+					it('payInvoice returns { id: "IDENTIFIER" }', function() {
 						return dummyBackend.payInvoice().then(result => {
 							expect(result).to.be.an('object');
 							expect(result.id).to.not.equal(null);
 							expect(result.id).to.be.a('string');
 						});
 					});
-					it('addInvoice result should include an identifier', function() {
+					it('addInvoice returns { id: "IDENTIFIER" }', function() {
 						return dummyBackend.payInvoice().then(result => {
 							expect(result).to.be.an('object');
 							expect(result.id).to.not.equal(null);
@@ -78,16 +100,40 @@ describe('lightning', function() {
 					before(function() {
 						dummyBackend = new DummyLightningBackend({ useIdentifier: false });
 					});
-					it('payInvoice result should not include an identifier', function() {
+					it('payInvoice returns { id: null }', function() {
 						return dummyBackend.payInvoice().then(result => {
 							expect(result).to.be.an('object');
 							expect(result.id).to.equal(null);
 						});
 					});
-					it('addInvoice result should not include an identifier', function() {
+					it('addInvoice returns { id: null }', function() {
 						return dummyBackend.payInvoice().then(result => {
 							expect(result).to.be.an('object');
 							expect(result.id).to.equal(null);
+						});
+					});
+				});
+				describe('{ settled: true }', function() {
+					let dummyBackend;
+					before(function() {
+						dummyBackend = new DummyLightningBackend({ settled: true });
+					});
+					it('getInvoiceStatus returns { settled: true }', function() {
+						return dummyBackend.getInvoiceStatus().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.settled).to.equal(true);
+						});
+					});
+				});
+				describe('{ settled: false }', function() {
+					let dummyBackend;
+					before(function() {
+						dummyBackend = new DummyLightningBackend({ settled: false });
+					});
+					it('getInvoiceStatus returns { settled: false }', function() {
+						return dummyBackend.getInvoiceStatus().then(result => {
+							expect(result).to.be.an('object');
+							expect(result.settled).to.equal(false);
 						});
 					});
 				});
