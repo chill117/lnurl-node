@@ -1,6 +1,6 @@
 # Changelog
 
-* TBD:
+* v0.17.0:
   * Added "useIdentifier", "settled" options to dummy lightning backend
 * v0.16.1:
   * Fix sqlite3 unique index for urls.hash
