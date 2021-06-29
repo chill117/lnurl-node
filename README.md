@@ -418,7 +418,7 @@ const server = lnurl.createServer({
 
 #### Lightning Backend Configuration Options
 
-This module supports lnd, eclair, and c-lightning as Lightning Network backends.
+This module has built-in support for lnd as a Lightning Network backend.
 
 Configuration options for __lnd__ backend:
 ```js
@@ -446,41 +446,10 @@ Configuration options for __lnd__ backend:
 }
 ```
 
-Configuration options for __eclair__ backend:
-```js
-{
-	// ...
-	lightning: {
-		backend: 'eclair',
-		config: {
-			hostname: '127.0.0.1:8080',
-			password: 'API_PW_FOR_ECLAIR_NODE',
-			protocol: 'http',
-		},
-	},
-	// ...
-}
-```
-
-Configuration options for __c-lightning__ backend:
-```js
-{
-	// ...
-	lightning: {
-		backend: 'c-lightning',
-		config: {
-			nodeUri: 'PUBKEY@127.0.0.1:9735',
-			socket: '/path/to/c-lightning/unix/sock',
-		},
-	},
-	// ...
-}
-```
-
 
 #### Custom Lightning Backend
 
-It is possible to define your own custom lightning backend as follows:
+It is also possible to define your own custom Lightning Network backend as follows:
 ```js
 // ./backends/custom.js
 

@@ -4,7 +4,8 @@
   "description": "Node.js implementation of lnurl",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:unit",
+    "test": "npm run test:unit ; npm run test:integration",
+    "test:integration": "./node_modules/.bin/mocha --timeout 10000 --recursive ./test/integration",
     "test:unit": "./node_modules/.bin/mocha --recursive ./test/unit"
   },
   "bin": {
@@ -47,6 +48,7 @@
   "devDependencies": {
     "chai": "4.3.4",
     "debug": "4.3.1",
+    "dotenv": "10.0.0",
     "mocha": "9.0.1"
   },
   "readmeFilename": "README.md"

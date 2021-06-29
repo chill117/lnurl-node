@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Dropped support for Eclair and C-Lightning LN backends
 * v0.17.0:
   * Added "useIdentifier", "settled" options to dummy lightning backend
 * v0.16.1:
