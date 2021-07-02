@@ -1,7 +1,8 @@
 # Changelog
 
-* TBD:
+* v0.18.0:
   * Dropped support for Eclair and C-Lightning LN backends
+  * New HttpLightningBackend class for creating custom HTTP LN backends
 * v0.17.0:
   * Added "useIdentifier", "settled" options to dummy lightning backend
 * v0.16.1:
