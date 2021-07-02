@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/chill117/lnurl-node.svg?branch=master)](https://travis-ci.org/chill117/lnurl-node)
 
-Node.js implementation of [lnurl](https://github.com/btcontract/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API). Optionally, your lnurl server can authorize other applications (offline or otherwise). Possible use-cases include offline Lightning Network ATMs (e.g [Bleskomat](https://www.bleskomat.com/)), static QR codes for receiving donations online or offline, authentication mechanism for web sites or web services (login / registration / 2FA).
+Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API). Optionally, your lnurl server can authorize other applications (offline or otherwise). Possible use-cases include offline Lightning Network ATMs (e.g [Bleskomat](https://www.bleskomat.com/)), static QR codes for receiving donations online or offline, authentication mechanism for web sites or web services (login / registration / 2FA).
 
 * [Installation](#installation)
 * [Subprotocols](#subprotocols)
@@ -67,7 +67,7 @@ Each subprotocol has two tables of parameters - server and client. The server pa
 
 ### channelRequest
 
-[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-channel.md)
+[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-channel.md)
 
 Allows a user to request that your service open a channel with their node.
 
@@ -88,7 +88,7 @@ Client parameters:
 
 ### login
 
-[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-auth.md)
+[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-auth.md)
 
 Allows a user to login/authorize with your service. This subprotocol does not require the Lightning Network, but instead uses what it calls "linking keys" to uniquely identify and authorize a user. Linking keys are derived from a combination of a hierarchical, deterministically generated private key (BIP 44) and your service's host (or domain name).
 
@@ -106,7 +106,7 @@ Client parameters:
 
 ### payRequest
 
-[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-pay.md)
+[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-pay.md)
 
 Users can pay your service via a static payment QR code.
 
@@ -127,7 +127,7 @@ Client parameters:
 
 ### withdrawRequest
 
-[specification](https://github.com/btcontract/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-withdraw.md)
+[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-withdraw.md)
 
 Users can request a payment from your service.
 
