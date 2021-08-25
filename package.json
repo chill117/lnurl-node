@@ -43,6 +43,7 @@
     "debug": "4.3.2",
     "express": "4.17.1",
     "secp256k1": "4.0.2",
+    "socks-proxy-agent": "6.0.0",
     "underscore": "1.13.1"
   },
   "devDependencies": {
