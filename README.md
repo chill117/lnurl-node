@@ -1,6 +1,6 @@
 # lnurl-node
 
-[![Build Status](https://travis-ci.org/chill117/lnurl-node.svg?branch=master)](https://travis-ci.org/chill117/lnurl-node)
+![Build Status](https://github.com/chill117/lnurl-node/actions/workflows/ci.yml/badge.svg)
 
 Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API). Optionally, your lnurl server can authorize other applications (offline or otherwise). Possible use-cases include offline Lightning Network ATMs (e.g [Bleskomat](https://www.bleskomat.com/)), static QR codes for receiving donations online or offline, authentication mechanism for web sites or web services (login / registration / 2FA).
 

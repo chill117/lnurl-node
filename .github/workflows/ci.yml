@@ -1,0 +1,102 @@
+name: CI
+env:
+  DB_USER: lnurl_test
+  DB_PASS: lnurl_test
+  DB_NAME: lnurl_test
+on:
+  push:
+jobs:
+  mysql:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [12, 14, 16]
+    services:
+      mysql:
+        image: mysql:5.7
+        ports:
+          - 3306
+        env:
+          MYSQL_DATABASE: ${{ env.DB_NAME }}
+          MYSQL_USER: ${{ env.DB_USER }}
+          MYSQL_PASSWORD: ${{ env.DB_PASS }}
+          MYSQL_RANDOM_ROOT_PASSWORD: 1
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v2
+      - name: Setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Install data store dependencies
+        run: npm install knex@0.95.x mysql@2.18.x
+      - name: Run Tests
+        env:
+          LNURL_STORE_BACKEND: knex
+          LNURL_STORE_CONFIG: '{"client":"mysql","connection":{"host":"localhost","port":"${{ job.services.mysql.ports[3306] }}","user":"${{ env.DB_USER }}","password":"${{ env.DB_PASS }}","database":"${{ env.DB_NAME }}"}}'
+        run: npm run test
+  postgres:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [12, 14, 16]
+    services:
+      postgres:
+        image: postgres:10
+        ports:
+          - 5432
+        env:
+          POSTGRES_DB: ${{ env.DB_NAME }}
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASS }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v2
+      - name: Setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Install data store dependencies
+        run: npm install knex@0.95.x pg@8.6.x
+      - name: Run Tests
+        env:
+          LNURL_STORE_BACKEND: knex
+          LNURL_STORE_CONFIG: '{"client":"pg","connection":{"host":"localhost","port":"${{ job.services.postgres.ports[5432] }}","user":"${{ env.DB_USER }}","password":"${{ env.DB_PASS }}","database":"${{ env.DB_NAME }}"}}'
+        run: npm run test
+  sqlite3:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [12, 14, 16]
+    steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v2
+      - name: Setup node
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Install data store dependencies
+        run: npm install knex@0.95.x sqlite3@5.0.x
+      - name: Run Tests
+        env:
+          LNURL_STORE_BACKEND: knex
+          LNURL_STORE_CONFIG: '{"client":"sqlite3","connection":{"filename":"./test/tmp/db.sqlite3"},"useNullAsDefault":true}'
+        run: npm run test
+
+

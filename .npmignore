@@ -1,7 +1,4 @@
-/examples/
-/test/
+test/
+.github/workflows/
 .gitignore
 .npmignore
-.travis.yml
-tls.cert
-tls.key
