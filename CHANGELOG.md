@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.18.1:
+  * Upgraded dependencies
 * v0.18.0:
   * Dropped support for Eclair and C-Lightning LN backends
   * New HttpLightningBackend class for creating custom HTTP LN backends
