@@ -13,7 +13,7 @@ describe('isHex(value)', function() {
 
 	const tests = [];
 
-	_.each(['01', '74657374', '353073693f9ecf3de3e76dbbfc1422fb44674902348740651fca4acd23e488fb'], function(value) {
+	_.each(['01', '74657374', '353073693f9ecf3de3e76dbbfc1422fb44674902348740651fca4acd23e488fb', '01FFAB077F'], function(value) {
 		tests.push({
 			args: {
 				value
@@ -22,7 +22,7 @@ describe('isHex(value)', function() {
 		});
 	});
 
-	_.each(['0', 'z', 'zz', '012ezzz'], function(value) {
+	_.each(['0', '0z', 'z', 'zz', '012ezzz', '12345'], function(value) {
 		tests.push({
 			args: {
 				value
