@@ -283,7 +283,9 @@ const prepareGroupOptions = function(options, groups) {
 						delete options[`${group}.${key}`];
 					}
 				}
-				if (_.isUndefined(value)) return null;
+				if (_.isUndefined(value)) {
+					value = lnurl.Server.prototype.defaultOptions[group][key];
+				}
 				switch (group) {
 					case 'lightning':
 					case 'store':

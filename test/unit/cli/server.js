@@ -29,21 +29,39 @@ describe('CLI: server [options]', function() {
 		apiKeys = [ lnurl.generateApiKey() ];
 	});
 
+	const validConfigs = {
+		host: 'localhost',
+		port: 3000,
+		protocol: 'http',
+		endpoint: '/lnurl',
+		auth: {
+			apiKeys,
+		},
+		lightning: {
+			backend: 'dummy',
+			config: {},
+		},
+		store: {
+			backend: process.env.LNURL_STORE_BACKEND || 'memory',
+			config: JSON.parse(process.env.LNURL_STORE_CONFIG || '{}'),
+		},
+	};
+
 	let tests = [
 		{
 			description: 'basic usage',
 			cmd: function() {
 				return [
 					'server',
-					'--host', 'localhost',
-					'--port', '3000',
-					'--protocol', 'http',
-					'--endpoint', '/lnurl',
+					'--host', validConfigs.host,
+					'--port', validConfigs.port,
+					'--protocol', validConfigs.protocol,
+					'--endpoint', validConfigs.endpoint,
 					'--auth.apiKeys', JSON.stringify(apiKeys),
-					'--lightning.backend', 'dummy',
-					'--lightning.config', '{}',
-					'--store.backend', process.env.LNURL_STORE_BACKEND || 'memory',
-					'--store.config', process.env.LNURL_STORE_CONFIG || '{}',
+					'--lightning.backend', validConfigs.lightning.backend,
+					'--lightning.config', JSON.stringify(validConfigs.lightning.config),
+					'--store.backend', validConfigs.store.backend,
+					'--store.config', JSON.stringify(validConfigs.store.config),
 				];
 			},
 			expected: function() {
@@ -54,29 +72,21 @@ describe('CLI: server [options]', function() {
 				};
 				const apiKey = apiKeys[0];
 				const query = prepareSignedQuery(apiKey, tag, params);
-				return new Promise((resolve, reject) => {
-					async.retry({
-						times: 50,
-						interval: 10,
-					}, next => {
-						const callbackUrl = 'http://localhost:3000/lnurl';
-						return helpers.request('get', {
-							url: callbackUrl,
-							qs: query,
-							json: true,
-						}).then(result => {
-							const { response, body } = result;
-							expect(body).to.be.an('object');
-							expect(body.status).to.not.equal('ERROR');
-							expect(body.k1).to.be.a('string');
-							expect(body.tag).to.equal(tag);
-							expect(body.callback).to.equal(callbackUrl);
-							expect(body.uri).to.be.a('string');
-						}).then(next).catch(next);
-					}, error => {
-						if (error) return reject(error);
-						resolve();
-					});
+				return serverIsUp(`${validConfigs.host}:${validConfigs.port}`).then(() => {
+					const callbackUrl = `http://${validConfigs.host}:${validConfigs.port}${validConfigs.endpoint}`;
+					return helpers.request('get', {
+						url: callbackUrl,
+						qs: query,
+						json: true,
+					}).then(result => {
+						const { response, body } = result;
+						expect(body).to.be.an('object');
+						expect(body.status).to.not.equal('ERROR');
+						expect(body.k1).to.be.a('string');
+						expect(body.tag).to.equal(tag);
+						expect(body.callback).to.equal(callbackUrl);
+						expect(body.uri).to.be.a('string');
+					})
 				});
 			},
 		},
@@ -84,47 +94,28 @@ describe('CLI: server [options]', function() {
 			description: '--configFile',
 			cmd: function() {
 				const configFilePath = path.join(this.tmpDir, 'config.json');
-				fs.writeFileSync(configFilePath, JSON.stringify({
-					host: 'localhost',
-					port: 3000,
-					auth: {
-						apiKeys,
-					},
-					lightning: {
-						backend: 'dummy',
-						config: {},
-					},
-					store: {
-						backend: process.env.LNURL_STORE_BACKEND || 'memory',
-						config: JSON.parse(process.env.LNURL_STORE_CONFIG || '{}'),
-					},
-				}));
+				fs.writeFileSync(configFilePath, JSON.stringify(validConfigs));
 				return [
 					'server',
 					'--configFile', configFilePath,
 				];
 			},
 			expected: function() {
-				return new Promise((resolve, reject) => {
-					async.retry({
-						times: 50,
-						interval: 10,
-					}, next => {
-						return helpers.request('get', {
-							url: 'http://localhost:3000/lnurl',
-							json: true,
-						}).then(result => {
-							const { response, body } = result;
-							expect(body).to.deep.equal({
-								status: 'ERROR',
-								reason: 'Missing secret',
-							});
-						}).then(next).catch(next);
-					}, error => {
-						if (error) return reject(error);
-						resolve();
-					});
-				});
+				return serverIsUp(`${validConfigs.host}:${validConfigs.port}`);
+			},
+		},
+		{
+			description: '--configFile (missing "store" configuration)',
+			cmd: function() {
+				const configFilePath = path.join(this.tmpDir, 'config.json');
+				fs.writeFileSync(configFilePath, JSON.stringify(_.omit(validConfigs, 'store')));
+				return [
+					'server',
+					'--configFile', configFilePath,
+				];
+			},
+			expected: function() {
+				return serverIsUp(`${validConfigs.host}:${validConfigs.port}`);
 			},
 		},
 	];
@@ -147,3 +138,23 @@ describe('CLI: server [options]', function() {
 		});
 	});
 });
+
+const serverIsUp = function(host) {
+	return new Promise((resolve, reject) => {
+		async.retry({
+			times: 50,
+			interval: 10,
+		}, next => {
+			helpers.request('get', {
+				url: `http://${host}/status`,
+			}).then(result => {
+				const { response, body } = result;
+				expect(response.statusCode).to.equal(200);
+				expect(body).to.equal('{"status":"OK"}');
+			}).then(next).catch(next);
+		}, error => {
+			if (error) return reject(error);
+			resolve();
+		});
+	});
+};
