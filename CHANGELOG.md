@@ -1,6 +1,7 @@
 # Changelog
 
 * TBD:
+  * Fix bug in CLI command `lnurl server --configFile ./config.json` when missing "lightning" or "store" options in the configuration file. The default options will now correctly be used in this case.
   * Added support for LN backend behind TOR hidden service.
   * Deprecated "protocol" configuration option. Will be removed completely from CLI and API in a future release.
 * v0.18.1:
