@@ -249,7 +249,6 @@ To generate a new lnurl that a client application can then consume:
 lnurl generateNewUrl \
 	--host "localhost" \
 	--port "3000" \
-	--protocol "http" \
 	--endpoint "/lnurl" \
 	--store.backend "knex" \
 	--store.config '{"client":"postgres","connection":{"host":"127.0.0.1","user":"postgres","password":"example","database":"lnurl_example"}}' \
@@ -374,8 +373,6 @@ const server = lnurl.createServer({
 	host: 'localhost',
 	// The port for the web server:
 	port: 3000,
-	// The protocol to use for the web server:
-	protocol: 'http',
 	// Whether or not to start listening when the server is created:
 	listen: true,
 	// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
@@ -669,8 +666,7 @@ List of options:
 {
 	// The algorithm to use when creating the signature via HMAC:
 	algorithm: 'sha256',
-	// The "protocol://host:port/endpoint" for your lnurl server (e.g "http://yourlnurlserver.com/lnurl").
-	// You must provide a base URL.
+	// The externally reachable URL w/ endpoint for your server (e.g "https://example.com/lnurl"):
 	baseUrl: null,
 	// Whether or not to lnurl encode the signed URL:
 	encode: false,

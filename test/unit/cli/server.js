@@ -37,6 +37,7 @@ describe('CLI: server [options]', function() {
 					'server',
 					'--host', 'localhost',
 					'--port', '3000',
+					'--protocol', 'http',
 					'--endpoint', '/lnurl',
 					'--auth.apiKeys', JSON.stringify(apiKeys),
 					'--lightning.backend', 'dummy',

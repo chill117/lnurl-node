@@ -16,7 +16,7 @@ describe('CLI: generateNewUrl [options]', function() {
 		});
 	});
 
-	const config = _.pick(lnurl.Server.prototype.defaultOptions, 'host', 'port', 'protocol', 'url', 'endpoint');
+	const config = _.pick(lnurl.Server.prototype.defaultOptions, 'host', 'port', 'url', 'endpoint');
 	config.store = {
 		backend: process.env.LNURL_STORE_BACKEND || lnurl.Server.prototype.defaultOptions.store.backend,
 		config: process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG) || {},
@@ -60,7 +60,6 @@ describe('CLI: generateNewUrl [options]', function() {
 				'generateNewUrl',
 				'--host', config.host || '',
 				'--port', config.port || '',
-				'--protocol', config.protocol || '',
 				'--url', config.url || '',
 				'--endpoint', config.endpoint || '',
 				'--store.backend', config.store.backend || '',
@@ -82,7 +81,6 @@ describe('CLI: generateNewUrl [options]', function() {
 				'generateNewUrl',
 				'--host', config.host || '',
 				'--port', config.port || '',
-				'--protocol', config.protocol || '',
 				'--url', config.url || '',
 				'--endpoint', config.endpoint || '',
 				'--store.backend', config.store.backend || '',
@@ -101,7 +99,6 @@ describe('CLI: generateNewUrl [options]', function() {
 				'generateNewUrl',
 				'--host', config.host || '',
 				'--port', config.port || '',
-				'--protocol', config.protocol || '',
 				'--url', config.url || '',
 				'--endpoint', config.endpoint || '',
 				'--store.backend', config.store.backend || '',
@@ -124,7 +121,6 @@ describe('CLI: generateNewUrl [options]', function() {
 				'generateNewUrl',
 				'--host', config.host || '',
 				'--port', config.port || '',
-				'--protocol', config.protocol || '',
 				'--url', config.url || '',
 				'--endpoint', config.endpoint || '',
 				'--store.backend', config.store.backend || '',

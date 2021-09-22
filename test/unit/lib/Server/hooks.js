@@ -207,7 +207,6 @@ describe('Server: hooks', function() {
 			done = _.once(done);
 			apiKey = lnurl.generateApiKey();
 			server = helpers.createServer({
-				protocol: 'http',
 				auth: {
 					apiKeys: [ apiKey ],
 				},

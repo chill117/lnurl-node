@@ -26,7 +26,6 @@ describe('Server: events', function() {
 				},
 			});
 			server = helpers.createServer({
-				protocol: 'http',
 				listen: false,
 				auth: {
 					apiKeys: [

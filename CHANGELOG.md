@@ -1,7 +1,8 @@
 # Changelog
 
 * TBD:
-  * Support for LN backend behind TOR hidden service
+  * Added support for LN backend behind TOR hidden service.
+  * Deprecated "protocol" configuration option. Will be removed completely from CLI and API in a future release.
 * v0.18.1:
   * Upgraded dependencies
 * v0.18.0:

@@ -113,7 +113,7 @@ program
 	)
 	.option(
 		'--protocol [value]',
-		'The protocol to use for the web server',
+		'DEPRECATED - to be removed in a future release',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.protocol
 	)
@@ -214,7 +214,7 @@ program
 	)
 	.option(
 		'--protocol [value]',
-		'The protocol to use for the web server',
+		'DEPRECATED - to be removed in a future release',
 		_.identity,
 		lnurl.Server.prototype.defaultOptions.protocol
 	)
