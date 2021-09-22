@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Support for LN backend behind TOR hidden service
 * v0.18.1:
   * Upgraded dependencies
 * v0.18.0:
