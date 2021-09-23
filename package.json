@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npm run test:unit ; npm run test:integration",
-    "test:integration": "./node_modules/.bin/mocha --timeout 10000 --recursive ./test/integration",
+    "test:integration": "./node_modules/.bin/mocha --timeout 10000 --recursive ./test/integration --exit",
     "test:unit": "./node_modules/.bin/mocha --recursive ./test/unit"
   },
   "bin": {
