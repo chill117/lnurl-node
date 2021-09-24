@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const { createHash } = require('../../lib');
 const { expect } = require('chai');
 const fs = require('fs');
 const path = require('path');
@@ -31,16 +32,17 @@ describe('lightning', function() {
 				const config = JSON.parse(process.env[`TEST_${BACKEND}_CONFIG`]);
 				const LightningBackend = require(filePath);
 				ln = new LightningBackend(config);
-				tests.getNodeUri = JSON.parse(process.env[`TEST_${BACKEND}_GETNODEURI`] || '{}');
-				tests.openChannel = JSON.parse(process.env[`TEST_${BACKEND}_OPENCHANNEL`] || '{}');
-				tests.payInvoice = JSON.parse(process.env[`TEST_${BACKEND}_PAYINVOICE`] || '{}');
-				tests.addInvoice = JSON.parse(process.env[`TEST_${BACKEND}_ADDINVOICE`] || '{}');
-				tests.getInvoiceStatus = JSON.parse(process.env[`TEST_${BACKEND}_GETINVOICESTATUS`] || '{}');
+				tests.getNodeUri = JSON.parse(process.env[`TEST_${BACKEND}_GETNODEURI`] || '{"skip":true}');
+				tests.openChannel = JSON.parse(process.env[`TEST_${BACKEND}_OPENCHANNEL`] || '{"skip":true}');
+				tests.payInvoice = JSON.parse(process.env[`TEST_${BACKEND}_PAYINVOICE`] || '{"skip":true}');
+				tests.addInvoice = JSON.parse(process.env[`TEST_${BACKEND}_ADDINVOICE`] || '{"skip":true}');
+				tests.getInvoiceStatus = JSON.parse(process.env[`TEST_${BACKEND}_GETINVOICESTATUS`] || '{"skip":true}');
 			});
 
 			describe('methods', function() {
 
 				it('getNodeUri()', function() {
+					if (tests.getNodeUri.skip) return this.skip();
 					return ln.getNodeUri().then(result => {
 						if (!_.isUndefined(tests.getNodeUri.result)) {
 							expect(result).to.equal(tests.getNodeUri.result);
@@ -51,6 +53,7 @@ describe('lightning', function() {
 				});
 
 				it('openChannel(remoteId, localAmt, pushAmt, makePrivate)', function() {
+					if (tests.getNodeUri.skip) return this.skip();
 					this.timeout(60000);
 					let { remoteId, localAmt, pushAmt, makePrivate } = tests.openChannel;
 					if (!remoteId) {
@@ -69,6 +72,7 @@ describe('lightning', function() {
 				});
 
 				it('payInvoice(invoice)', function() {
+					if (tests.payInvoice.skip) return this.skip();
 					this.timeout(20000);
 					let { invoice } = tests.payInvoice;
 					if (!invoice) {
@@ -81,12 +85,15 @@ describe('lightning', function() {
 				});
 
 				it('addInvoice(amount, extra)', function() {
+					if (tests.addInvoice.skip) return this.skip();
 					let { amount } = tests.addInvoice;
 					if (_.isUndefined(amount)) {
 						amount = 5000;
 					}
+					const description = 'test addInvoice';
 					const extra = {
-						description: 'test addInvoice',
+						description,
+						descriptionHash: createHash(description),
 					};
 					return ln.addInvoice(amount, extra).then(result => {
 						expect(result).to.be.an('object');
@@ -98,6 +105,7 @@ describe('lightning', function() {
 				});
 
 				it('getInvoiceStatus(paymentHash)', function() {
+					if (tests.getInvoiceStatus.skip) return this.skip();
 					let { paymentHash, preimage, settled } = tests.getInvoiceStatus;
 					if (!paymentHash) {
 						throw new Error('Missing required "paymentHash" test parameter');
