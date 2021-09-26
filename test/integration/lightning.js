@@ -1,5 +1,5 @@
 const _ = require('underscore');
-const { createHash } = require('../../lib');
+const { createHash, getTagDataFromPaymentRequest } = require('../../lib');
 const { expect } = require('chai');
 const fs = require('fs');
 const path = require('path');
@@ -99,8 +99,10 @@ describe('lightning', function() {
 						expect(result).to.be.an('object');
 						expect(result).to.have.property('id');
 						expect(result).to.have.property('invoice');
-						expect(result.invoice).to.be.a('string');
-						expect(result.invoice.length > 0).to.equal(true);
+						const { id, invoice } = result;
+						const paymentHash = getTagDataFromPaymentRequest(invoice, 'payment_hash');
+						expect(paymentHash).to.be.a('string');
+						expect(paymentHash.length > 0).to.equal(true);
 					});
 				});
 
