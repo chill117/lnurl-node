@@ -22,7 +22,6 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
   * [decode](#decode)
   * [createServer](#createServer)
     * [options](#options-for-createserver-method)
-    * [Lightning Backend Configuration Options](#lightning-backend-configuration-options)
     * [Custom Lightning Backend](#custom-lightning-backend)
   * [generateApiKey](#generateapikey)
   * [generateNewUrl](#generatenewurl)
@@ -33,6 +32,14 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
 * [Signed LNURLs](#signed-lnurls)
   * [How to Implement URL Signing Scheme](#how-to-implement-url-signing-scheme)
   	* [URL Signing Test Vectors](#url-signing-test-vectors)
+* [Supported Lightning Network Backends](#supported-lightning-network-backends)
+	* [lnd](#lightning-network-daemon-lnd)
+	* [coinos](#coinos)
+	* [lnbits](#lnbits)
+	* [lndhub](#lndhub)
+	* [lnpay](#lnpay)
+	* [lntxbot](#lntxbot)
+	* [opennode](#opennode)
 * [Configuring Data Store](#configuring-data-store)
   * [SQLite](#sqlite)
   * [MySQL](#mysql)
@@ -67,7 +74,8 @@ Each subprotocol has two tables of parameters - server and client. The server pa
 
 ### channelRequest
 
-[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-channel.md)
+Specification:
+* [LUD-02](https://github.com/fiatjaf/lnurl-rfc/blob/luds/02.md)
 
 Allows a user to request that your service open a channel with their node.
 
@@ -88,7 +96,8 @@ Client parameters:
 
 ### login
 
-[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-auth.md)
+Specification:
+* [LUD-04](https://github.com/fiatjaf/lnurl-rfc/blob/luds/04.md)
 
 Allows a user to login/authorize with your service. This subprotocol does not require the Lightning Network, but instead uses what it calls "linking keys" to uniquely identify and authorize a user. Linking keys are derived from a combination of a hierarchical, deterministically generated private key (BIP 44) and your service's host (or domain name).
 
@@ -131,7 +140,8 @@ Client parameters:
 
 ### withdrawRequest
 
-[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-withdraw.md)
+Specification:
+* [LUD-03](https://github.com/fiatjaf/lnurl-rfc/blob/luds/03.md)
 
 Users can request a payment from your service.
 
@@ -147,10 +157,7 @@ Client parameters:
 
 | name       | type      | notes                     |
 | ---------- | --------- | ------------------------- |
-| `pr`       | `string`  | lightning payment request |
-
-* Note that `pr` can contain multiple payment requests (separated by commas)
-
+| `pr`       | `string`  | bolt11 invoice            |
 
 
 ## Command-line interface
@@ -226,8 +233,8 @@ lnurl server \
 	--host "localhost" \
 	--port "3000" \
 	--auth.apiKeys '[{"id":"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67","encoding":"hex"}]' \
-	--lightning.backend "lnd" \
-	--lightning.config '{"hostname": "127.0.0.1:8080", "cert": "/path/to/tls.cert", "macaroon": "/path/to/admin.macaroon"}'
+	--lightning.backend "dummy" \
+	--lightning.config '{}'
 ```
 * To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
@@ -355,12 +362,8 @@ const server = lnurl.createServer({
 		],
 	},
 	lightning: {
-		backend: 'lnd',
-		config: {
-			hostname: '127.0.0.1:8080',
-			cert: '/path/to/tls.cert',
-			macaroon: '/path/to/admin.macaroon',
-		},
+		backend: 'dummy',
+		config: {},
 	},
 });
 ```
@@ -397,16 +400,13 @@ const server = lnurl.createServer({
 			key: 32,
 		},
 	},
-	/*
-		Set equal to NULL to not configure LN backend at the server-wide level.
-	*/
+	// See list of possible LN backends here:
+	// https://github.com/chill117/lnurl-node#supported-lightning-network-backends
 	lightning: {
-		// Which LN backend to use (only lnd supported currently):
-		backend: 'lnd',
-		// The configuration object to connect to the LN backend:
-		config: {
-			// Defaults here depend on the LN backend used.
-		},
+		// The name of the LN backend to use:
+		backend: 'dummy',
+		// Configuration options to pass to LN backend:
+		config: {},
 	},
 	store: {
 		// Name of store backend ('knex', 'memory'):
@@ -414,36 +414,6 @@ const server = lnurl.createServer({
 		// Configuration options to pass to store:
 		config: {},
 	},
-}
-```
-
-#### Lightning Backend Configuration Options
-
-This module has built-in support for lnd as a Lightning Network backend.
-
-Configuration options for __lnd__ backend:
-```js
-{
-	// ...
-	lightning: {
-		backend: 'lnd',
-		config: {
-			hostname: '127.0.0.1:8080',
-			/*
-				Can alternatively provide cert as Buffer or String:
-					cert: { data: 'STRING_UTF8_ENCODED' },
-					cert: { data: Buffer.from('STRING_UTF8_ENCODED', 'utf8') },
-			*/
-			cert: '/path/to/lnd/tls.cert',
-			/*
-				Can alternatively provide macaroon as Buffer or String:
-					macaroon: { data: 'STRING_HEX_ENCODED' },
-					macaroon: { data: Buffer.from('STRING_HEX_ENCODED', 'hex') },
-			*/
-			macaroon: '/path/to/lnd/admin.macaroon',
-		},
-	},
-	// ...
 }
 ```
 
@@ -780,6 +750,157 @@ The following test vectors are in JSON format where the input (query object) is 
         "defaultDescription=abcABC0123%20ESCAPED%20%23%20UNESCAPED%20-_.!~*'()%20RESERVED%20%3B%2C%2F%3F%3A%40%26%3D%2B%24&id=7f26b286fd9b04bb&maxWithdrawable=50000&minWithdrawable=50000&nonce=d0af14f87faad7fc59ec&tag=withdrawRequest&signature=777b5a3f5780410c44ebda1c865724b71ea83c180ee27d27ac84ac8e2c607f86"
     ]
 ]
+```
+
+
+## Supported Lightning Network Backends
+
+This project supports various LN backends - both LN service providers as well LN node software.
+
+* [lnd](#lightning-network-daemon-lnd)
+* [coinos](#coinos)
+* [lnbits](#lnbits)
+* [lndhub](#lndhub)
+* [lnpay](#lnpay)
+* [lntxbot](#lntxbot)
+* [opennode](#opennode)
+
+
+### Lightning Network Daemon (lnd)
+
+The following are server configuration options to use the `lnd` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lnd',
+		config: {
+			hostname: '127.0.0.1:8080',
+			/*
+				Can alternatively provide cert as Buffer or String:
+					cert: { data: 'STRING_UTF8_ENCODED' },
+					cert: { data: Buffer.from('STRING_UTF8_ENCODED', 'utf8') },
+			*/
+			cert: '/path/to/lnd/tls.cert',
+			/*
+				Can alternatively provide macaroon as Buffer or String:
+					macaroon: { data: 'STRING_HEX_ENCODED' },
+					macaroon: { data: Buffer.from('STRING_HEX_ENCODED', 'hex') },
+			*/
+			macaroon: '/path/to/lnd/admin.macaroon',
+			// Protocol of HTTP request (can be "http" or "https"):
+			protocol: 'https',
+			// If hostname contains an onion address, the backend will try
+			// to connect to it using the following TOR socks proxy:
+			torSocksProxy: '127.0.0.1:9050',
+		},
+	},
+}
+```
+Note that you can provide the `cert` and `macaroon` options as a string or buffer instead of file path.
+
+Onion addresses are supported. Provide the onion address using the `hostname` option and the LN backend will automatically attempt to use `torSocksProxy` to connect to the hidden service.
+
+
+### Coinos
+
+The following are example server configuration options to use the `coinos` LN backend:
+```js
+{
+	lightning: {
+		backend: 'coinos',
+		config: {
+			hostname: 'coinos.io',
+			protocol: 'https',
+			// From your coinos wallet, go to "Settings" -> "Auth keys" to view the "JWT Auth Token".
+			jwt: '',
+		},
+	},
+}
+```
+
+
+### lnbits
+
+The following are example server configuration options to use the `lnbits` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lnbits',
+		config: {
+			hostname: 'lnbits.com',
+			protocol: 'https',
+			// From an account page, open "API info" to view the "Admin key".
+			adminKey: '',
+		},
+	},
+}
+```
+
+
+### lndhub
+
+The following are example server configuration options to use the `lndhub` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lndhub',
+		config: {
+			// If using BlueWallet, go to wallet then "Export/Backup" to view the secret.
+			// Example: "lndhub://login:password@baseurl"
+			secret: '',
+		},
+	},
+}
+```
+
+
+### lnpay
+
+The following are example server configuration options to use the `lnpay` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lnpay',
+		config: {
+			apiKey: '',
+			walletKey: '',
+		},
+	},
+}
+```
+
+
+### lntxbot
+
+The following are example server configuration options to use the `lntxbot` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lntxbot',
+		config: {
+			// Open Telegram, open the chat with LNTXBOT, send message to the bot "/api_full".
+			adminKey: '',
+		},
+	},
+}
+```
+
+
+### opennode
+
+The following are example server configuration options to use the `opennode` LN backend:
+```js
+{
+	lightning: {
+		backend: 'opennode',
+		config: {
+			// Development => dev-api.opennode.co
+			// Production => api.opennode.co
+			hostname: 'api.opennode.co',
+			apiKey: '',
+		},
+	},
+}
 ```
 
 
