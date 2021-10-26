@@ -395,6 +395,18 @@ describe('Server: HTTP API', function() {
 						},
 					},
 					{
+						params: {
+							minSendable: 100000,
+							maxSendable: 200000,
+							metadata: '[["text/plain", "test commentAllowed max."]]',
+							commentAllowed: 1000,
+						},
+						expected: {
+							status: 'ERROR',
+							reason: '"commentAllowed" must be less than or equal to 500',
+						},
+					},
+					{
 						params: prepareValidParams('create', 'payRequest'),
 						expected: function(body, response, query) {
 							expect(body).to.be.an('object');
@@ -469,7 +481,7 @@ describe('Server: HTTP API', function() {
 				var integerParameters = {
 					channelRequest: ['localAmt', 'pushAmt'],
 					withdrawRequest: ['minWithdrawable', 'maxWithdrawable'],
-					payRequest: ['minSendable', 'maxSendable'],
+					payRequest: ['minSendable', 'maxSendable', 'commentAllowed'],
 				};
 				_.each(['string', 0.1, true], function(nonIntegerValue) {
 					_.each(integerParameters, function(paramNames, tag) {
@@ -729,6 +741,21 @@ describe('Server: HTTP API', function() {
 					},
 				},
 				{
+					description: 'comment too long',
+					params: _.extend({}, validParams.action.payRequest, {
+						comment: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+					}),
+					expected: function(body, response) {
+						const { commentAllowed } = validParams.create.payRequest;
+						expect(body).to.deep.equal({
+							status: 'ERROR',
+							reason: `"comment" length must be less than or equal to ${commentAllowed}`,
+						});
+						expect(server.ln.getRequestCount('addInvoice')).to.equal(0);
+						expect(response.headers['cache-control']).to.be.undefined;
+					},
+				},
+				{
 					description: 'amount < minSendable',
 					params: {
 						amount: 99999,
@@ -803,14 +830,19 @@ describe('Server: HTTP API', function() {
 					},
 				},
 			];
-			_.each(validParams.action, function(params, tag) {
-				_.chain(params).keys().each(function(key) {
-					testsByTag[tag] = testsByTag[tag] || [];
+			_.each({
+				channelRequest: ['remoteid'],
+				withdrawRequest: ['pr'],
+				payRequest: ['amount'],
+			}, function(paramNames, tag) {
+				_.each(paramNames, function(name) {
+					let params = prepareValidParams('action', tag);
+					delete params[name];
 					testsByTag[tag].push({
-						params: _.omit(params, key),
+						params,
 						expected: {
 							status: 'ERROR',
-							reason: `Missing required parameter: "${key}"`,
+							reason: `Missing required parameter: "${name}"`,
 						},
 					});
 				});

@@ -106,23 +106,27 @@ Client parameters:
 
 ### payRequest
 
-[specification](https://github.com/fiatjaf/lnurl-rfc/blob/b14f570d7bc09e6860803139a614551d9fe9b4e0/lnurl-pay.md)
+Specification:
+* [LUD-06](https://github.com/fiatjaf/lnurl-rfc/blob/luds/06.md)
+* [LUD-12](https://github.com/fiatjaf/lnurl-rfc/blob/luds/12.md)
 
 Users can pay your service via a static payment QR code.
 
 Server parameters:
 
-| name           | type              | notes            |
-| -------------- | ----------------- | ---------------- |
-| `minSendable`  | `integer` (msats) | > 0              |
-| `maxSendable`  | `integer` (msats) | >= `minSendable` |
-| `metadata`     | `string`          | stringified JSON |
+| name             | type              | notes                                                         |
+| ---------------- | ----------------- | ------------------------------------------------------------- |
+| `minSendable`    | `integer` (msats) | > 0                                                           |
+| `maxSendable`    | `integer` (msats) | >= `minSendable`                                              |
+| `metadata`       | `string`          | stringified JSON                                              |
+| `commentAllowed` | `integer`         | character limit for comments (max. 500), set to 0 to disallow |
 
 Client parameters:
 
-| name       | type              | notes                              |
-| ---------- | ----------------- | ---------------------------------- |
-| `amount`   | `integer` (msats) | >= `minSendable`, <= `maxSendable` |
+| name       | type              | notes                                                 |
+| ---------- | ----------------- | ----------------------------------------------------- |
+| `amount`   | `integer` (msats) | >= `minSendable`, <= `maxSendable`                    |
+| `comment`  | `string`          | length must be less than or equal to `commentAllowed` |
 
 
 ### withdrawRequest

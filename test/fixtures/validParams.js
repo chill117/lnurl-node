@@ -19,6 +19,7 @@ module.exports = {
 			minSendable: 100000,
 			maxSendable: 200000,
 			metadata: '[["text/plain", "service.com: payRequest"]]',
+			commentAllowed: 300,
 		},
 		'login': {},
 	},
@@ -32,6 +33,7 @@ module.exports = {
 		},
 		'payRequest': {
 			amount: 150000,
+			comment: '',
 		},
 		'login': function(secret) {
 			const { pubKey, privKey } = generateRandomLinkingKey();

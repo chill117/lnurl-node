@@ -83,15 +83,30 @@ describe('Server: events', function() {
 					let calls = 0;
 					const actionParams = validParams.action[tag];
 					const combinedParams = _.extend({}, actionParams, createParams);
+					let events = [];
 					server.on(`${tag}:action:processed`, function(event) {
-						calls++;
-						expect(event).to.be.an('object');
-						expect(event.secret).to.be.a('string');
-						expect(event.params).to.be.an('object');
-						expect(event.result).to.be.an('object');
+						events.push(event);
 					});
 					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams, apiKeyAlwaysSucceed.id).then(() => {
-						expect(calls).to.equal(1);
+						expect(events).to.have.length(1);
+						_.each(events, event => {
+							expect(event).to.be.an('object');
+							expect(event.secret).to.equal(newUrl.secret);
+							expect(event.params).to.deep.equal(combinedParams);
+							expect(event.result).to.be.an('object');
+							switch (tag) {
+								case 'channelRequest':
+									expect(event.result).to.deep.equal({});
+									break;
+								case 'payRequest':
+									expect(event.result.id).to.equal(null);
+									expect(event.result.invoice).to.be.a('string');
+									break;
+								case 'withdrawRequest':
+									expect(event.result.id).to.equal(null);
+									break;
+							}
+						});
 					});
 				});
 
@@ -106,19 +121,21 @@ describe('Server: events', function() {
 					const actionParams = validParams.action[tag];
 					const combinedParams = _.extend({}, actionParams, createParams);
 					const backendMethod = tagToLightningBackendMethod[tag];
+					let events = [];
 					server.on(`${tag}:action:failed`, function(event) {
-						calls++;
-						expect(event).to.be.an('object');
-						expect(event.secret).to.be.a('string');
-						expect(event.params).to.be.an('object');
-						expect(event.error).to.be.an('object');
-						expect(event.error.message).to.equal(`${backendMethod} failure`);
+						events.push(event);
 					});
 					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams, apiKeyAlwaysFail.id).then(() => {
 						throw new Error('Should not have been executed');
 					}).catch(error => {
 						expect(error.message).to.equal(`${backendMethod} failure`);
-						expect(calls).to.equal(1);
+						_.each(events, event => {
+							expect(event).to.be.an('object');
+							expect(event.secret).to.be.a('string');
+							expect(event.params).to.be.an('object');
+							expect(event.error instanceof Error).to.equal(true);
+							expect(event.error.message).to.equal(`${backendMethod} failure`);
+						});
 					});
 				});
 			});
