@@ -7,18 +7,17 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
 * [Specification Support](#specification-support)
 * [Installation](#installation)
 * [Command-line interface](#command-line-interface)
-  * [Help menu](#help-menu)
-  * [Encoding a URL](#encoding-a-url)
-  * [Decoding an lnurl-encoded string](#decoding-an-lnurl-encoded-string)
-  * [Generating a new API key](#generating-a-new-api-key)
-  * [Running an lnurl server](#running-an-lnurl-server)
-  * [Generate a new URL](#generate-a-new-url)
+  * [help](#cli-help)
+  * [encode](#cli-encode)
+  * [decode](#cli-decode)
+  * [server](#cli-server)
+  * [generateNewUrl](#cli-generatenewurl)
+  * [generateApiKey](#cli-generateapikey)
 * [API](#api)
   * [encode](#encode)
   * [decode](#decode)
-  * [createServer](#createServer)
-    * [options](#options-for-createserver-method)
-    * [Custom Lightning Backend](#custom-lightning-backend)
+  * [createServer](#createserver)
+    * [options](#createserver-options)
   * [generateApiKey](#generateapikey)
   * [generateNewUrl](#generatenewurl)
 * [Tags and Parameters](#tags-and-parameters)
@@ -37,6 +36,7 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
 	* [lnpay](#lnpay)
 	* [lntxbot](#lntxbot)
 	* [opennode](#opennode)
+* [Custom Lightning Network Backend](#custom-lightning-network-backend)
 * [Configuring Data Store](#configuring-data-store)
   * [SQLite](#sqlite)
   * [MySQL](#mysql)
@@ -86,14 +86,14 @@ This will install `lnurl` and add it to your application's `package.json` file.
 
 This section assumes that you have `lnurl` installed globally and that it is available on your current user's PATH.
 
-### Help menu
+### CLI: help
 
-To view the help screen for the CLI tool:
+To view the help menu:
 ```bash
 lnurl --help
 ```
 
-### Encoding a URL
+### CLI: encode
 
 Encode a URL:
 ```bash
@@ -110,7 +110,7 @@ echo -n "https://service.com/api?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693a
 ```
 
 
-### Decoding an lnurl-encoded string
+### CLI: decode
 
 Decode an lnurl:
 ```bash
@@ -126,56 +126,10 @@ echo -n "lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv
 	| lnurl decode
 ```
 
-### Generating a new API key
 
-To generate a new API key for your lnurl server:
-```bash
-lnurl generateApiKey
-```
-Example output:
-```json
-{
-	"id": "46f8cab814de07a8a65f",
-	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
-	"encoding": "hex"
-}
-```
-For a list of available options:
-```bash
-lnurl generateApiKey --help
-```
+### CLI: generateNewUrl
 
-
-### Running an lnurl server
-
-Start an lnurl application server:
-```bash
-lnurl server \
-	--host "localhost" \
-	--port "3000" \
-	--auth.apiKeys '[{"id":"46f8cab814de07a8a65f","key":"ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67","encoding":"hex"}]' \
-	--lightning.backend "dummy" \
-	--lightning.config '{}'
-```
-* To enable debugging messages, see the [Debugging](#debugging) section of this readme.
-* By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
-* To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
-* To use a custom lightning backend with your server see [Custom Lightning Backend](#custom-lightning-backend).
-
-Alternatively, a configuration file can be used:
-```bash
-lnurl server --configFile ./config.json
-```
-
-To print all available options for the server command:
-```bash
-lnurl server --help
-```
-
-
-### Generate a new URL
-
-To generate a new lnurl that a client application can then consume:
+To generate a new lnurl that a client application can then use:
 ```bash
 lnurl generateNewUrl \
 	--host "localhost" \
@@ -221,6 +175,54 @@ lnurl generateNewUrl --help
 It is also possible to generate lnurls in other ways:
 * [generateNewUrl](#generateNewUrl) - API method
 * [Signed LNURLs](#signed-lnurls) - For separate (or even offline) applications
+
+
+### CLI: server
+
+Start an lnurl application server with the following command:
+```bash
+lnurl server \
+	--host "localhost" \
+	--port "3000" \
+	--lightning.backend "dummy" \
+	--lightning.config '{}'
+```
+* The example above uses the "dummy" LN backend. For details about how to connect to a real LN backend, see [Supported Lightning Network Backends](#supported-lightning-network-backends)
+* By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
+* To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
+* To enable debugging messages, see the [Debugging](#debugging) section of this readme.
+
+Alternatively, a configuration file can be used:
+```bash
+lnurl server --configFile ./config.json
+```
+
+To print all available options for the server command:
+```bash
+lnurl server --help
+```
+
+
+### CLI: generateApiKey
+
+API keys are used to authorize offline applications or devices to create signed URLs for your server.
+
+To generate a new API key for your lnurl server:
+```bash
+lnurl generateApiKey
+```
+Example output:
+```json
+{
+	"id": "46f8cab814de07a8a65f",
+	"key": "ee7678f6fa5ab9cf3aa23148ef06553edd858a09639b3687113a5d5cdb5a2a67",
+	"encoding": "hex"
+}
+```
+For a list of available options:
+```bash
+lnurl generateApiKey --help
+```
 
 
 ## API
@@ -290,12 +292,15 @@ const server = lnurl.createServer({
 	},
 });
 ```
-* To enable debugging messages, see the [Debugging](#debugging) section of this readme.
+* The example above uses the "dummy" LN backend. For details about how to connect to a real LN backend, see [Supported Lightning Network Backends](#supported-lightning-network-backends)
 * By default the lnurl server stores data in memory - which is fine for development and testing. But once you plan to run it in production, it is recommended that you use a proper data store - see [Configuring Data Store](#configuring-data-store).
-* To use a custom lightning backend with your server see [Custom Lightning Backend](#custom-lightning-backend).
+* To generate lnurls in a separate (or even offline) application see [Signed LNURLs](#signed-lnurls).
+* To enable debugging messages, see the [Debugging](#debugging) section of this readme.
 
 
-#### Options for createServer method
+#### createServer: options
+
+Below is the full list of options that can be passed to the `createServer` method.
 
 ```js
 {
@@ -353,76 +358,14 @@ const server = lnurl.createServer({
 	},
 }
 ```
-
-
-#### Custom Lightning Backend
-
-It is also possible to define your own custom Lightning Network backend as follows:
-```js
-// ./backends/custom.js
-
-const { LightningBackend } = require('lnurl');
-
-class Backend extends LightningBackend {
-
-	constructor(options) {
-		super('custom', options, {
-			defaultOptions: {
-				nodeUri: null,
-			},
-			requiredOptions: ['nodeUri'],
-		});
-	}
-
-	checkOptions(options) {
-		// This is called by the constructor.
-		// Throw an error if any problems are found with the given options.
-	}
-
-	getNodeUri() {
-		return Promise.resolve(this.options.nodeUri);
-	}
-
-	openChannel(remoteId, localAmt, pushAmt, makePrivate) {
-		return Promise.reject('Not implemented');
-	}
-
-	payInvoice(invoice) {
-		return Promise.reject('Not implemented');
-	}
-
-	addInvoice(amount, extra) {
-		return Promise.reject('Not implemented');
-	}
-
-	getInvoiceStatus(paymentHash) {
-		return Promise.reject('Not implemented');
-	}
-}
-
-module.exports = Backend;
-```
-And to use your new custom backend:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	lightning: {
-		backend: {
-			path: '/full/path/to/backends/custom.js',
-		},
-		config: {
-			// Options to pass to your custom backend.
-		},
-	},
-});
-```
+* To use a custom lightning backend with your server see [Custom Lightning Network Backend](#custom-lightning-network-backend).
 
 
 ### generateNewUrl
 
 `generateNewUrl(tag, params)`
 
-To generate a new lnurl that a client application can then consume:
+To generate a new lnurl that a client application can then use:
 ```js
 const tag = 'payRequest';
 const params = {
@@ -477,6 +420,8 @@ It is also possible to generate lnurls in other ways:
 ### generateApiKey
 
 `generateApiKey([options[, defaultOptions]])`
+
+API keys are used to authorize offline applications or devices to create signed URLs for your server.
 
 Generate a new API key for your lnurl server.
 
@@ -878,6 +823,71 @@ The following are example server configuration options to use the `opennode` LN 
 	},
 }
 ```
+
+
+## Custom Lightning Network Backend
+
+It is also possible to define your own custom Lightning Network backend to use with this module. To do so, create a new file and save it in your project:
+```js
+// ./backends/custom.js
+
+const { LightningBackend } = require('lnurl');
+
+class Backend extends LightningBackend {
+
+	constructor(options) {
+		super('custom', options, {
+			defaultOptions: {
+				nodeUri: null,
+			},
+			requiredOptions: ['nodeUri'],
+		});
+	}
+
+	checkOptions(options) {
+		// This is called by the constructor.
+		// Throw an error if any problems are found with the given options.
+	}
+
+	getNodeUri() {
+		return Promise.resolve(this.options.nodeUri);
+	}
+
+	openChannel(remoteId, localAmt, pushAmt, makePrivate) {
+		return Promise.reject('Not implemented');
+	}
+
+	payInvoice(invoice) {
+		return Promise.reject('Not implemented');
+	}
+
+	addInvoice(amount, extra) {
+		return Promise.reject('Not implemented');
+	}
+
+	getInvoiceStatus(paymentHash) {
+		return Promise.reject('Not implemented');
+	}
+}
+
+module.exports = Backend;
+```
+Then to use your new custom backend:
+```js
+{
+	// ...
+	lightning: {
+		backend: {
+			path: '/full/path/to/backends/custom.js',
+		},
+		config: {
+			// Options to pass to your custom backend.
+		},
+	},
+	// ...
+}
+```
+
 
 
 ## Configuring Data Store
