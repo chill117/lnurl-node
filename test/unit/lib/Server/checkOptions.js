@@ -72,6 +72,19 @@ describe('checkOptions([options[, defaultOptions]])', function() {
 			expectThrownError: 'Invalid option ("endpoint"): Must begin with a forward slash (/)',
 		},
 		{
+			description: 'commentAllowed max length',
+			args: {
+				options: {
+					host: 'localhost',
+					port: 3000,
+					endpoint: '/lnurl',
+					commentAllowed: 1200,
+				},
+				defaultOptions: lnurl.Server.prototype.defaultOptions,
+			},
+			expectThrownError: 'Invalid option ("commentAllowed"): Should not be greater than 1000 due to accepted maximum URL length',
+		},
+		{
 			description: 'unknown key',
 			args: {
 				options: {

@@ -399,11 +399,11 @@ describe('Server: HTTP API', function() {
 							minSendable: 100000,
 							maxSendable: 200000,
 							metadata: '[["text/plain", "test commentAllowed max."]]',
-							commentAllowed: 1000,
+							commentAllowed: 1200,
 						},
 						expected: {
 							status: 'ERROR',
-							reason: '"commentAllowed" must be less than or equal to 500',
+							reason: '"commentAllowed" should not be greater than 1000 due to accepted maximum URL length',
 						},
 					},
 					{

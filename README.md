@@ -414,6 +414,20 @@ const server = lnurl.createServer({
 		// Configuration options to pass to store:
 		config: {},
 	},
+	payRequest: {
+		// A number greater than 0 indicates the maximum length of comments.
+		// Setting this to 0 ignores comments.
+		//
+		// Note that there is a generally accepted limit (2000 characters)
+		// to the length of URLs; see:
+		// https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers/417184#417184
+		//
+		// Since comments are sent as a query parameter to the callback URL,
+		// this limit should be set to a maximum of 1000 to be safe.
+		commentAllowed: 500,
+		// Default metadata to be sent in response object:
+		metadata: '[["text/plain", "lnurl-node"]]',
+	},
 }
 ```
 
