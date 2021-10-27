@@ -4,6 +4,7 @@
 
 Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API). Optionally, your lnurl server can authorize other applications (offline or otherwise). Possible use-cases include offline Lightning Network ATMs (e.g [Bleskomat](https://www.bleskomat.com/)), static QR codes for receiving donations online or offline, authentication mechanism for web sites or web services (login / registration / 2FA).
 
+* [Specification Support](#specification-support)
 * [Installation](#installation)
 * [Subprotocols](#subprotocols)
   * [channelRequest](#channelRequest)
@@ -49,6 +50,25 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
 * [Changelog](#changelog)
 * [License](#license)
 * [Funding](#funding)
+
+
+## Specification Support
+
+The LNURL specification is divided into separate documents called "LUDs". These documents can be found in the [lnurl-rfc repository](https://github.com/fiatjaf/lnurl-rfc).
+
+The following is a list of LUDs which this module already (or plans to) support:
+* [x] [LUD-01](https://github.com/fiatjaf/lnurl-rfc/blob/luds/01.md) - encode/decode
+* [x] [LUD-02](https://github.com/fiatjaf/lnurl-rfc/blob/luds/02.md) - channelRequest
+* [x] [LUD-03](https://github.com/fiatjaf/lnurl-rfc/blob/luds/03.md) - withdrawRequest
+* [x] [LUD-04](https://github.com/fiatjaf/lnurl-rfc/blob/luds/04.md) - auth
+* [x] [LUD-06](https://github.com/fiatjaf/lnurl-rfc/blob/luds/06.md) - payRequest
+* [ ] [LUD-08](https://github.com/fiatjaf/lnurl-rfc/blob/luds/08.md) - Fast withdrawRequest
+* [ ] [LUD-09](https://github.com/fiatjaf/lnurl-rfc/blob/luds/09.md) - successAction in payRequest
+* [ ] [LUD-10](https://github.com/fiatjaf/lnurl-rfc/blob/luds/10.md) - aes successAction in payRequest
+* [x] [LUD-12](https://github.com/fiatjaf/lnurl-rfc/blob/luds/12.md) - Comments in payRequest
+* [ ] [LUD-16](https://github.com/fiatjaf/lnurl-rfc/blob/luds/16.md) - Lightning Address
+* [ ] [LUD-17](https://github.com/fiatjaf/lnurl-rfc/blob/luds/17.md) - New URI schema prefixes
+* [x] [LUD-21](https://github.com/chill117/lnurl-rfc/blob/lud-21-signed-lnurls/21.md) - Signed URLs
 
 
 ## Installation
@@ -123,12 +143,12 @@ Users can pay your service via a static payment QR code.
 
 Server parameters:
 
-| name             | type              | notes                                                         |
-| ---------------- | ----------------- | ------------------------------------------------------------- |
-| `minSendable`    | `integer` (msats) | > 0                                                           |
-| `maxSendable`    | `integer` (msats) | >= `minSendable`                                              |
-| `metadata`       | `string`          | stringified JSON                                              |
-| `commentAllowed` | `integer`         | character limit for comments (max. 500), set to 0 to disallow |
+| name             | type              | notes                                                                   |
+| ---------------- | ----------------- | ----------------------------------------------------------------------- |
+| `minSendable`    | `integer` (msats) | > 0                                                                     |
+| `maxSendable`    | `integer` (msats) | >= `minSendable`                                                        |
+| `metadata`       | `string`          | stringified JSON                                                        |
+| `commentAllowed` | `integer`         | character limit for comments (max. 1000), set to 0 to disallow comments |
 
 Client parameters:
 
