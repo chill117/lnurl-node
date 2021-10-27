@@ -15,12 +15,16 @@ describe('prepareOptions([options[, defaultOptions]])', function() {
 		{
 			description: '{ endpoint: "noslash" }',
 			args: {
-				options: {
-					endpoint: 'noslash',
-				},
+				options: {},
 				defaultOptions: lnurl.Server.prototype.defaultOptions,
 			},
-			expectThrownError: 'Invalid option ("endpoint"): Must begin with a forward slash (/)',
+			expected: function(result) {
+				expect(result).to.be.an('object');
+				expect(result.host).to.equal('localhost');
+				expect(result.port).to.equal(3000);
+				expect(result).to.have.property('lightning');
+				expect(result).to.have.property('store');
+			},
 		},
 	];
 
