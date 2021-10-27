@@ -6,11 +6,6 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
 
 * [Specification Support](#specification-support)
 * [Installation](#installation)
-* [Subprotocols](#subprotocols)
-  * [channelRequest](#channelRequest)
-  * [login](#login)
-  * [payRequest](#payRequest)
-  * [withdrawRequest](#withdrawRequest)
 * [Command-line interface](#command-line-interface)
   * [Help menu](#help-menu)
   * [Encoding a URL](#encoding-a-url)
@@ -26,6 +21,7 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
     * [Custom Lightning Backend](#custom-lightning-backend)
   * [generateApiKey](#generateapikey)
   * [generateNewUrl](#generatenewurl)
+* [Tags and Parameters](#tags-and-parameters)
 * [Hooks](#hooks)
   * [Login Hook](#login-hook)
   * [Middleware Hooks](#middleware-hooks)
@@ -85,100 +81,6 @@ npm install lnurl --save
 This will install `lnurl` and add it to your application's `package.json` file.
 
 
-## Subprotocols
-
-The lnurl specification defines a few possible "subprotocols" that client and server software can implement. The subprotocols that are supported are described here in this section.
-
-Each subprotocol has two tables of parameters - server and client. The server parameters table details the parameters that you are required to provide when generating a new LNURL. The client parameters are to be provided by the user's wallet application during the process of executing the respective LNURL subprotocol.
-
-
-### channelRequest
-
-Specification:
-* [LUD-02](https://github.com/fiatjaf/lnurl-rfc/blob/luds/02.md)
-
-Allows a user to request that your service open a channel with their node.
-
-Server parameters:
-
-| name       | type             | notes         |
-| ---------- | ---------------- | ------------- |
-| `localAmt` | `integer` (sats) | > 0           |
-| `pushAmt`  | `integer` (sats) | <= `localAmt` |
-
-Client parameters:
-
-| name       | type      | notes           |
-| ---------- | --------- | --------------- |
-| `remoteid` | `hex`     | node public key |
-| `private`  | `boolean` | `0` or `1`      |
-
-
-### login
-
-Specification:
-* [LUD-04](https://github.com/fiatjaf/lnurl-rfc/blob/luds/04.md)
-
-Allows a user to login/authorize with your service. This subprotocol does not require the Lightning Network, but instead uses what it calls "linking keys" to uniquely identify and authorize a user. Linking keys are derived from a combination of a hierarchical, deterministically generated private key (BIP 44) and your service's host (or domain name).
-
-Server parameters:
-
-_None_
-
-Client parameters:
-
-| name  | type  | notes                             |
-| ------| ----- | --------------------------------- |
-| `sig` | `hex` | `sign(k1, <private linking key>)` |
-| `key` | `hex` | public linking key                |
-
-
-### payRequest
-
-Specification:
-* [LUD-06](https://github.com/fiatjaf/lnurl-rfc/blob/luds/06.md)
-* [LUD-12](https://github.com/fiatjaf/lnurl-rfc/blob/luds/12.md)
-
-Users can pay your service via a static payment QR code.
-
-Server parameters:
-
-| name             | type              | notes                                                                   |
-| ---------------- | ----------------- | ----------------------------------------------------------------------- |
-| `minSendable`    | `integer` (msats) | > 0                                                                     |
-| `maxSendable`    | `integer` (msats) | >= `minSendable`                                                        |
-| `metadata`       | `string`          | stringified JSON                                                        |
-| `commentAllowed` | `integer`         | character limit for comments (max. 1000), set to 0 to disallow comments |
-
-Client parameters:
-
-| name       | type              | notes                                                 |
-| ---------- | ----------------- | ----------------------------------------------------- |
-| `amount`   | `integer` (msats) | >= `minSendable`, <= `maxSendable`                    |
-| `comment`  | `string`          | length must be less than or equal to `commentAllowed` |
-
-
-### withdrawRequest
-
-Specification:
-* [LUD-03](https://github.com/fiatjaf/lnurl-rfc/blob/luds/03.md)
-
-Users can request a payment from your service.
-
-Server parameters:
-
-| name                 | type              | notes                |
-| -------------------- | ----------------- | -------------------- |
-| `minWithdrawable`    | `integer` (msats) | > 0                  |
-| `maxWithdrawable`    | `integer` (msats) | >= `minWithdrawable` |
-| `defaultDescription` | `string`          |                      |
-
-Client parameters:
-
-| name       | type      | notes                     |
-| ---------- | --------- | ------------------------- |
-| `pr`       | `string`  | bolt11 invoice            |
-
 
 ## Command-line interface
 
@@ -190,7 +92,6 @@ To view the help screen for the CLI tool:
 ```bash
 lnurl --help
 ```
-
 
 ### Encoding a URL
 
@@ -275,7 +176,6 @@ lnurl server --help
 ### Generate a new URL
 
 To generate a new lnurl that a client application can then consume:
-
 ```bash
 lnurl generateNewUrl \
 	--host "localhost" \
@@ -286,6 +186,8 @@ lnurl generateNewUrl \
 	--tag "withdrawRequest" \
 	--params '{"minWithdrawable":10000,"maxWithdrawable":10000,"defaultDescription":""}'
 ```
+See [Tags and Parameters](#tags-and-parameters) for a full list of possible tags and params.
+
 Alternatively, a configuration file can be used:
 ```bash
 lnurl generateNewUrl \
@@ -315,6 +217,7 @@ For a list of available options:
 ```bash
 lnurl generateNewUrl --help
 ```
+
 It is also possible to generate lnurls in other ways:
 * [generateNewUrl](#generateNewUrl) - API method
 * [Signed LNURLs](#signed-lnurls) - For separate (or even offline) applications
@@ -521,10 +424,12 @@ const server = lnurl.createServer({
 
 To generate a new lnurl that a client application can then consume:
 ```js
-const tag = 'channelRequest';
+const tag = 'payRequest';
 const params = {
-	localAmt: 2000,
-	pushAmt: 0,
+	minSendable: 10000,
+	maxSendable: 200000,
+	metadata: '[["text/plain", "lnurl-node"]]',
+	commentAllowed: 500,
 };
 server.generateNewUrl(tag, params).then(result => {
 	const { encoded, secret, url } = result;
@@ -541,12 +446,16 @@ Expected output:
 	"url": "http://localhost:3000/lnurl?q=c2c069b882676adb2afe37bbfdb65ca4a295ba34c2d929333e7aa7a72b9e9c03"
 }
 ```
+See [Tags and Parameters](#tags-and-parameters) for a full list of possible tags and params.
+
 It is possible to set the number of uses allowed for the new URL:
 ```js
-const tag = 'channelRequest';
+const tag = 'payRequest';
 const params = {
-	localAmt: 2000,
-	pushAmt: 0,
+	minSendable: 10000,
+	maxSendable: 200000,
+	metadata: '[["text/plain", "lnurl-node"]]',
+	commentAllowed: 500,
 };
 const options = {
 	uses: 3,
@@ -595,6 +504,39 @@ Available options:
 	}
 }
 ```
+
+
+## Tags and Parameters
+
+Below you will find all tags and their associated params.
+
+`channelRequest`:
+
+| name       | type             | notes         |
+| ---------- | ---------------- | ------------- |
+| `localAmt` | `integer` (sats) | > 0           |
+| `pushAmt`  | `integer` (sats) | <= `localAmt` |
+
+`login`:
+
+_none_
+
+`payRequest`:
+
+| name             | type              | notes                                                                   |
+| ---------------- | ----------------- | ----------------------------------------------------------------------- |
+| `minSendable`    | `integer` (msats) | > 0                                                                     |
+| `maxSendable`    | `integer` (msats) | >= `minSendable`                                                        |
+| `metadata`       | `string`          | stringified JSON                                                        |
+| `commentAllowed` | `integer`         | character limit for comments (max. 1000), set to 0 to disallow comments |
+
+`withdrawRequest`:
+
+| name                 | type              | notes                |
+| -------------------- | ----------------- | -------------------- |
+| `minWithdrawable`    | `integer` (msats) | > 0                  |
+| `maxWithdrawable`    | `integer` (msats) | >= `minWithdrawable` |
+| `defaultDescription` | `string`          |                      |
 
 
 ## Hooks
