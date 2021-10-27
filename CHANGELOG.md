@@ -1,6 +1,7 @@
 # Changelog
 
 * TBD:
+  * Remove `"successAction": null` from lnurl-pay response object due to problems with JSON parsing in some languages and libraries.
   * Added support for lnurl-pay comment (LUD-12)
   * New Lightning backends available: coinos, lnbits, lndhub (bluewallet), lnpay, lntxbot, opennode.
   * Fix bug in CLI command `lnurl server --configFile ./config.json` when missing "lightning" or "store" options in the configuration file. The default options will now correctly be used in this case.
