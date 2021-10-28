@@ -21,9 +21,10 @@ if (process.env.LNURL_STORE_BACKEND === 'knex') {
 		const store = new Store(config);
 		return store.onReady().then(() => {
 			// Rollback all migrations.
-			return store.db.migrate.rollback(null, true).then(() => {
-				return store.close();
-			});
+			return store.db.migrate.rollback(null, true);
+		}).finally(() => {
+			// Always close the data store.
+			return store.close();
 		});
 	});
 }
