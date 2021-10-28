@@ -1,6 +1,8 @@
 # Changelog
 
-* TBD:
+* v0.19.0:
+  * General documentation improvements, including information about previously un-documented events and hooks
+  * Added `url:signed` hook which should be used instead of the deprecated `middleware:signedLnurl:afterCheckSignature` hook.
   * Remove `"successAction": null` from lnurl-pay response object due to problems with JSON parsing in some languages and libraries.
   * Added support for lnurl-pay comment (LUD-12)
   * New Lightning backends available: coinos, lnbits, lndhub (bluewallet), lnpay, lntxbot, opennode.
