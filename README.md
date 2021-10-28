@@ -434,7 +434,7 @@ server.generateNewUrl(tag, params, options).then(result => {
 Set `uses` equal to `0` to allow the URL to be used an unlimited number of times.
 
 It is also possible to generate lnurls in other ways:
-* [Generate a new URL](#generate-a-new-url) - CLI command
+* [CLI: generateNewUrl](#cli-generatenewurl)
 * [Signed LNURLs](#signed-lnurls) - For separate (or even offline) applications
 
 
@@ -580,9 +580,9 @@ server.bindToHook('url:signed', function(req, res, next) {
 These hooks are called when validating the parameters provided when creating a new URL. For example, when calling `server.generateNewUrl(tag, params)` or before a signed URL is saved to the data store.
 ```js
 server.bindToHook('channelRequest:validate', function(params, next) {
-	// Throw an error to fail the request:
+	// Throw an error to prevent the creation of the new URL:
 	next(new Error('Invalid params!'));
-	// Call next() without any arguments to continue with the request:
+	// Call next() without any arguments to continue with the creation of the new URL:
 	next();
 });
 ```
