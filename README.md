@@ -2,7 +2,12 @@
 
 ![Build Status](https://github.com/chill117/lnurl-node/actions/workflows/ci.yml/badge.svg)
 
-Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API). Optionally, your lnurl server can authorize other applications (offline or otherwise). Possible use-cases include offline Lightning Network ATMs (e.g [Bleskomat](https://www.bleskomat.com/)), static QR codes for receiving donations online or offline, authentication mechanism for web sites or web services (login / registration / 2FA).
+Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API).
+
+Optionally, your lnurl server can authorize other applications (offline or otherwise). Possible use-cases include offline Lightning Network ATMs (e.g. [Bleskomat](https://www.bleskomat.com/)), static QR codes for receiving donations, authentication mechanism for web sites or web services (login / registration / 2FA).
+
+This project attempts to maintain backwards compatibility for any features, methods, options, hooks, and events which are documented here.
+
 
 * [Specification Support](#specification-support)
 * [Installation](#installation)
@@ -18,13 +23,29 @@ Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The pur
   * [decode](#decode)
   * [createServer](#createserver)
     * [options](#createserver-options)
-  * [generateApiKey](#generateapikey)
   * [generateNewUrl](#generatenewurl)
+  * [generateApiKey](#generateapikey)
 * [Tags and Parameters](#tags-and-parameters)
 * [Hooks](#hooks)
-  * [Login Hook](#login-hook)
-  * [Middleware Hooks](#middleware-hooks)
-    * [middleware:signedLnurl:afterCheckSignature](#middlewaresignedLnurlafterCheckSignature)
+	* [login](#hook-login)
+	* [url:signed](#hook-urlsigned)
+	* [channelRequest:validate](#hook-channelrequestvalidate)
+	* [channelRequest:info](#hook-channelrequestinfo)
+	* [channelRequest:action](#hook-channelrequestaction)
+	* [payRequest:validate](#hook-payrequestvalidate)
+	* [payRequest:info](#hook-payrequestinfo)
+	* [payRequest:action](#hook-payrequestaction)
+	* [withdrawRequest:validate](#hook-withdrawrequestvalidate)
+	* [withdrawRequest:info](#hook-withdrawrequestinfo)
+	* [withdrawRequest:action](#hook-withdrawrequestaction)
+* [Events](#events)
+	* [login](#event-login)
+	* [channelRequest:action:processed](#event-channelrequestactionprocessed)
+	* [channelRequest:action:failed](#event-channelrequestactionfailed)
+	* [payRequest:action:processed](#event-payrequestactionprocessed)
+	* [payRequest:action:failed](#event-payrequestactionfailed)
+	* [withdrawRequest:action:processed](#event-withdrawrequestactionprocessed)
+	* [withdrawRequest:action:failed](#event-withdrawrequestactionfailed)
 * [Signed LNURLs](#signed-lnurls)
   * [How to Implement URL Signing Scheme](#how-to-implement-url-signing-scheme)
   	* [URL Signing Test Vectors](#url-signing-test-vectors)
@@ -488,50 +509,240 @@ _none_
 
 It is possible to further customize your lnurl server by using hooks to run custom application code at key points in the server application flow.
 
-### Login Hook
+* [login](#hook-login)
+* [url:signed](#hook-urlsigned)
+* [channelRequest:validate](#hook-channelrequestvalidate)
+* [channelRequest:info](#hook-channelrequestinfo)
+* [channelRequest:action](#hook-channelrequestaction)
+* [payRequest:validate](#hook-payrequestvalidate)
+* [payRequest:info](#hook-payrequestinfo)
+* [payRequest:action](#hook-payrequestaction)
+* [withdrawRequest:validate](#hook-withdrawrequestvalidate)
+* [withdrawRequest:info](#hook-withdrawrequestinfo)
+* [withdrawRequest:action](#hook-withdrawrequestaction)
 
-The lnurl-auth subprotocol allows users to login/authenticate with your service. You can use the login hook as shown here to execute your own custom code whenever there is a successful login/authentication attempt for your server.
+How to use a hook:
 ```js
 const lnurl = require('lnurl');
 const server = lnurl.createServer();
-server.bindToHook('login', function(key, next) {
-	// This code is executed when the lnurl-auth checks have passed (e.g valid signature provided).
-	// `key` is the public linking key which has just authenticated.
+const { HttpError } = require('lnurl/lib');
+
+// The callback signature can vary depending upon the hook used:
+server.bindToHook('HOOK', function(arg1, arg2, arg3, next) {
 	// Fail the request by calling next with an error:
 	next(new Error('Your custom error message'));
-	// Or call next without any arguments to continue processing the request:
+	// Use the HttpError constructor to pass the error to the response object:
+	next(new HttpError('Custom error sent in the response object', 400/* status code */));
+	// Or call next without any arguments to continue with the request:
 	next();
 });
 ```
 
-### Middleware Hooks
 
-Special type of hook that allows you to add your own custom middleware functions to your lnurl server. The callback function you provide to this kind of hook is executed as [express middleware](https://expressjs.com/en/guide/using-middleware.html).
+### Hook: login
 
-#### middleware:signedLnurl:afterCheckSignature
+`login`
 
-After a request has passed the signed-lnurl authorization signature check.
+The lnurl-auth subprotocol allows users to login/authenticate with your service. You can use the login hook as shown here to execute your own custom code whenever there is a successful login/authentication attempt for your server.
+```js
+server.bindToHook('login', function(key, next) {
+	// This code is executed when the lnurl-auth checks have passed (e.g valid signature provided).
+	// `key` is the public linking key which has just authenticated.
+	// Perform asynchronous code such as database calls here.
+	// Call next() without any arguments to continue with the request:
+	next();
+});
+```
 
-Example usage:
+### Hook: url:signed
+
+`url:signed`
+
+This hook is called when a valid, signed request is made to the LNURL end-point. It is executed before a new URL is saved to the data store. So an error thrown here will prevent the URL from being saved.
+```js
+server.bindToHook('url:signed', function(req, res, next) {
+	// `req` and `res` are the request and response objects from expressjs; see:
+	// https://expressjs.com/en/4x/api.html#req
+	// https://expressjs.com/en/4x/api.html#res
+	// Call next() without any arguments to continue with the request:
+	next();
+});
+```
+
+### Hook: channelRequest:validate
+
+### Hook: payRequest:validate
+
+### Hook: withdrawRequest:validate
+
+`channelRequest:validate` `payRequest:validate` `withdrawRequest:validate`
+
+These hooks are called when validating the parameters provided when creating a new URL. For example, when calling `server.generateNewUrl(tag, params)` or before a signed URL is saved to the data store.
+```js
+server.bindToHook('channelRequest:validate', function(params, next) {
+	// Throw an error to fail the request:
+	next(new Error('Invalid params!'));
+	// Call next() without any arguments to continue with the request:
+	next();
+});
+```
+
+### Hook: channelRequest:info
+
+### Hook: payRequest:info
+
+### Hook: withdrawRequest:info
+
+`channelRequest:info` `payRequest:info` `withdrawRequest:info`
+
+These hooks are called when the initial request is made to the LNURL end-point. The initial request occurs when a wallet app first scans a QR code containing an LNURL. The wallet app makes the initial request for more information about the tag and other parameters associated with the LNURL it just scanned.
+```js
+server.bindToHook('channelRequest:info', function(secret, params, next) {
+	// `secret` is the k1 value that when hashed gives the unique `hash`
+	//  associated with an LNURL in the data store.
+	// `params` are the parameters provided when the URL was created.
+	// Throw an error to fail the request:
+	next(new HttpError('Custom error sent in the response object', 400/* status code */));
+	// Call next() without any arguments to continue with the request:
+	next();
+});
+```
+
+
+### Hook: channelRequest:action
+
+### Hook: payRequest:action
+
+### Hook: withdrawRequest:action
+
+`channelRequest:action` `payRequest:action` `withdrawRequest:action`
+
+These hooks are called when the second request is made to the LNURL end-point. This request occurs when the wallet app wants to complete the action associated with the LNURL it scanned and made an initial request for previously.
+
+* `channelRequest:action` - Wallet app sends its node ID and whether or not to make the channel private:
+	* `remoteid` - remote node ID (public key) to which the server should open a channel
+	* `private` - `0` or `1`
+* `payRequest:action` - Wallet sends the amount it wants to pay and an optional comment:
+	* `amount` - amount the server should use when generating a new invoice
+* `withdrawRequest:action` - Wallet sends a bolt11 invoice that the server should pay:
+	* `pr` - bolt11 invoice
+
+```js
+server.bindToHook('channelRequest:action', function(secret, params, next) {
+	// `secret` is the k1 value that when hashed gives the unique `hash`
+	//  associated with an LNURL in the data store.
+	// `params` are the parameters provided when the URL was created plus
+	// the parameters provided in the request to the server.
+	// Throw an error to fail the request:
+	next(new HttpError('Custom error sent in the response object', 400/* status code */));
+	// Call next() without any arguments to continue with the request:
+	next();
+});
+```
+Note that these hooks are executed before the server calls the LN backend method. So if an error is thrown here, a channel will not be opened; a new invoice will not be generated; the provided invoice will not be paid.
+
+
+## Events
+
+* [login](#event-login)
+* [channelRequest:action:processed](#event-channelrequestactionprocessed)
+* [channelRequest:action:failed](#event-channelrequestactionfailed)
+* [payRequest:action:processed](#event-payrequestactionprocessed)
+* [payRequest:action:failed](#event-payrequestactionfailed)
+* [withdrawRequest:action:processed](#event-withdrawrequestactionprocessed)
+* [withdrawRequest:action:failed](#event-withdrawrequestactionfailed)
+
+The `server` object extends from the [event emitter class](https://nodejs.org/api/events.html#class-eventemitter). It is possible to listen for events as follows:
 ```js
 const lnurl = require('lnurl');
 const server = lnurl.createServer();
-server.bindToHook('middleware:signedLnurl:afterCheckSignature', function(req, res, next) {
-	// Your custom middleware.
-	// It is possible to modify the req.query object, like this:
-	req.query.extra = 'example changing the query object';
-	// Fail the request by calling next with an error:
-	next(new Error('Your custom error message'));
-	// Or call next without any arguments to continue processing the request:
-	next();
+
+server.on('EVENT', function(event) {
+	// The event object varies depending upon the event type.
+});
+```
+
+### Event: login
+
+This event is emitted after a successful login attempt.
+```js
+server.on('login', function(event) {
+	const { key, hash } = event;
+	// `key` - the public key as provided by the LNURL wallet app
+	// `hash` - the hash of the secret for the LNURL used to login
+});
+```
+
+### Event: channelRequest:action:processed
+
+This event is emitted after a successful call to the LN backend's `openChannel` method.
+```js
+server.on('channelRequest:action:processed', function(event) {
+	const { secret, params, result } = event;
+	// `result` is the non-normalized response object from the LN backend
+	// So this will vary depending upon the backend used.
+});
+```
+
+### Event: payRequest:action:processed
+
+This event is emitted after a successful call to the LN backend's `addInvoice` method.
+```js
+server.on('payRequest:action:processed', function(event) {
+	const { secret, params, result } = event;
+	const { id, invoice } = result;
+	// `id` - non-standard reference ID for the new invoice, can be NULL if none provided
+	// `invoice` - bolt11 invoice
+});
+```
+
+### Event: withdrawRequest:action:processed
+
+This event is emitted after a successful call to the LN backend's `payInvoice` method.
+```js
+server.on('withdrawRequest:action:processed', function(event) {
+	const { secret, params, result } = event;
+	const { id } = result;
+	// `id` - non-standard reference ID for the payment, can be NULL if none provided
+});
+```
+
+### Event: channelRequest:action:failed
+
+This event is emitted after a failed call to the LN backend's `openChannel` method.
+```js
+server.on('channelRequest:action:failed', function(event) {
+	const { secret, params, error } = event;
+	// `error` - error from the LN backend
+});
+```
+
+### Event: payRequest:action:failed
+
+This event is emitted after a failed call to the LN backend's `addInvoice` method.
+```js
+server.on('payRequest:action:failed', function(event) {
+	const { secret, params, error } = event;
+	// `error` - error from the LN backend
+});
+```
+
+### Event: withdrawRequest:action:failed
+
+This event is emitted after a failed call to the LN backend's `payInvoice` method.
+```js
+server.on('withdrawRequest:action:failed', function(event) {
+	const { secret, params, error } = event;
+	// `error` - error from the LN backend
 });
 ```
 
 
 ## Signed LNURLs
 
-It is possible to create signed LNURLs in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - see [Generating a new API key](#generating-a-new-api-key).
+It is possible to create signed LNURLs in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - it is possible to generate an API key via [API method](#generateapikey) or [CLI command](#cli-generateapikey).
 
+Below is an example script to create a signed URL:
 ```js
 const apiKey = {
 	id: 'b6cb8e81e3',
