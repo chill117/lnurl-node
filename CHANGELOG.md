@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * Change default hostname config option of lntxbot LN backend to lntxbot.com
 * v0.19.0:
   * General documentation improvements, including information about previously un-documented events and hooks
   * Added `url:signed` hook which should be used instead of the deprecated `middleware:signedLnurl:afterCheckSignature` hook.
