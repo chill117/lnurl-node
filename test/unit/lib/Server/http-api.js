@@ -82,6 +82,9 @@ describe('Server: HTTP API', function() {
 				return params(secret);
 			} else if (_.isObject(params)) {
 				return _.clone(params);
+			} else {
+				const type = typeof params;
+				throw Error(`Unknown params type: ${type}`);
 			}
 		};
 
@@ -407,6 +410,31 @@ describe('Server: HTTP API', function() {
 						},
 					},
 					{
+						description: 'successAction: null',
+						params: _.extend({}, prepareValidParams('create', 'payRequest'), {
+							successAction: null,
+						}),
+						expected: function(body, response, query) {
+							expect(body).to.be.an('object');
+							expect(body.status).to.be.undefined;
+							expect(body.successAction).to.be.undefined;
+							expect(body.tag).to.equal('payRequest');
+						},
+					},
+					{
+						description: 'successAction: {"tag": "message"} - non-string message',
+						params: _.extend({}, prepareValidParams('create', 'payRequest'), {
+							successAction: {
+								tag: 'message',
+								message: [],
+							},
+						}),
+						expected: {
+							status: 'ERROR',
+							reason: 'Invalid successAction (tag = "message"): Invalid property ("message"): String expected',
+						},
+					},
+					{
 						params: prepareValidParams('create', 'payRequest'),
 						expected: function(body, response, query) {
 							expect(body).to.be.an('object');
@@ -416,7 +444,11 @@ describe('Server: HTTP API', function() {
 							expect(body.callback).to.equal(server.getCallbackUrl() + '/' + secret);
 							const params = prepareValidParams('create', 'payRequest');
 							_.each(params, function(value, key) {
-								expect(body[key]).to.equal(params[key]);
+								if (_.isNull(params[key])) {
+									expect(body[key]).to.be.undefined;
+								} else {
+									expect(body[key]).to.equal(params[key]);
+								}
 							});
 						},
 					},
@@ -600,10 +632,14 @@ describe('Server: HTTP API', function() {
 					description: 'valid secret',
 					expected: function(body) {
 						const { secret } = this;
-						expect(body).to.deep.equal(_.extend({
-							tag: 'payRequest',
-							callback: server.getCallbackUrl() + '/' + secret,
-						}, prepareValidParams('create', 'payRequest')));
+						const params = prepareValidParams('create', 'payRequest');
+						expect(body.tag).to.equal('payRequest');
+						expect(body.callback).to.equal(server.getCallbackUrl() + '/' + secret);
+						_.each(params, (value, key) => {
+							if (!_.isNull(value)) {
+								expect(body[key]).to.equal(value);
+							}
+						});
 					},
 				},
 			];
@@ -885,6 +921,42 @@ describe('Server: HTTP API', function() {
 									expect(body).to.deep.equal(test.expected);
 								}
 							});
+						});
+					});
+				});
+			});
+
+			describe('payRequest - successAction', function() {
+
+				let successActions = [
+					{
+						tag: 'message',
+						message: 'Message to be shown after successful payment',
+					},
+					{
+						tag: 'url',
+						url: 'http://localhost:3000/success-page',
+						description: 'Message to be shown with URL',
+					},
+				];
+
+				_.each(successActions, successAction => {
+					it(JSON.stringify(successAction), function() {
+						const createParams = _.extend({}, prepareValidParams('create', 'payRequest'), { successAction });
+						return server.generateNewUrl('payRequest', createParams).then(result => {
+							const { secret } = result;
+							const actionParams = _.extend({}, prepareValidParams('action', 'payRequest'), {
+								k1: secret,
+							});
+							return helpers.request('get', {
+								url: server.getCallbackUrl(),
+								ca: server.ca,
+								qs: actionParams,
+								json: true,
+							})
+						}).then(result => {
+							const { response, body } = result;
+							expect(body.successAction).to.deep.equal(successAction);
 						});
 					});
 				});

@@ -122,6 +122,39 @@ describe('prepareSignedQuery(apiKey, tag, params[, options])', function() {
 			},
 		},
 		{
+			description: 'JavaScript object in params',
+			args: _.extend({}, validArgs, {
+				tag: 'payRequest',
+				params: {
+					minSendable: 10000,
+					maxSendable: 20000,
+					metadata: '[["text/plain", "test"]]',
+					successAction: {
+						tag: 'message',
+						message: [],
+					},
+				},
+			}),
+			expected: function(result) {
+				const { id, key } = validArgs.apiKey;
+				expect(result).to.be.an('object');
+				const payload = prepareQueryPayloadString({
+					id,
+					nonce: result.nonce,
+					tag: 'payRequest',
+					minSendable: 10000,
+					maxSendable: 20000,
+					metadata: '[["text/plain", "test"]]',
+					successAction: JSON.stringify({
+						tag: 'message',
+						message: [],
+					}),
+				});
+				const signature = createSignature(payload, key, validArgs.options.algorithm);
+				expect(result.signature).to.equal(signature);
+			},
+		},
+		{
 			description: 'invalid apiKey',
 			args: _.extend({}, validArgs, {
 				apiKey: 1,
