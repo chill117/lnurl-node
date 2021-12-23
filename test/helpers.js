@@ -37,8 +37,7 @@ module.exports = {
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || { noWarning: true },
 			},
 		});
-		const server = lnurl.createServer(options);
-		return server;
+		return lnurl.createServer(options);
 	},
 	request: function(method, requestOptions) {
 		return new Promise((resolve, reject) => {
