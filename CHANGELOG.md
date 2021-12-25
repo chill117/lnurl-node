@@ -1,6 +1,8 @@
 # Changelog
 
 * TBD:
+  * Fix msats vs. sats usage for addInvoice method of few LN backend APIs
+  * Change default hostname of lnbits LN backend to legend.lnbits.com
   * Change default hostname config option of lntxbot LN backend to lntxbot.com
 * v0.19.0:
   * General documentation improvements, including information about previously un-documented events and hooks
