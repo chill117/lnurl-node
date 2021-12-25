@@ -85,7 +85,7 @@ describe('lightning', function() {
 					});
 				});
 
-				it.only('addInvoice(amount, extra)', function() {
+				it('addInvoice(amount, extra)', function() {
 					if (tests.addInvoice.skip) return this.skip();
 					let { amount } = tests.addInvoice;
 					if (_.isUndefined(amount)) {
