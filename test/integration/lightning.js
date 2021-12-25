@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const bolt11 = require('bolt11');
 const { createHash, getTagDataFromPaymentRequest } = require('../../lib');
 const { expect } = require('chai');
 const fs = require('fs');
@@ -84,11 +85,11 @@ describe('lightning', function() {
 					});
 				});
 
-				it('addInvoice(amount, extra)', function() {
+				it.only('addInvoice(amount, extra)', function() {
 					if (tests.addInvoice.skip) return this.skip();
 					let { amount } = tests.addInvoice;
 					if (_.isUndefined(amount)) {
-						amount = 5000;
+						amount = 50000;// msats
 					}
 					const description = 'test addInvoice';
 					const extra = {
@@ -99,10 +100,22 @@ describe('lightning', function() {
 						expect(result).to.be.an('object');
 						expect(result).to.have.property('id');
 						expect(result).to.have.property('invoice');
-						const { id, invoice } = result;
-						const paymentHash = getTagDataFromPaymentRequest(invoice, 'payment_hash');
-						expect(paymentHash).to.be.a('string');
-						expect(paymentHash.length > 0).to.equal(true);
+						const { invoice } = result;
+						const decoded = bolt11.decode(invoice);
+						const sats = Math.floor(amount / 1000);
+						expect(decoded.satoshis).to.equal(sats);
+						expect(decoded.millisatoshis).to.equal((sats * 1000).toString());
+						const tags = _.chain(decoded.tags).map(tag => {
+							const { tagName, data } = tag;
+							return [ tagName, data ];
+						}).object().value();
+						if (!_.isUndefined(tags.description)) {
+							expect(tags.description).to.equal(description);
+						}
+						if (!_.isUndefined(tags.description_hash)) {
+							expect(tags.description_hash).to.equal(extra.descriptionHash);
+						}
+						expect(tags.description)
 					});
 				});
 
