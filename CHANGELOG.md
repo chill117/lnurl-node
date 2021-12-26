@@ -1,9 +1,10 @@
 # Changelog
 
-* TBD:
+* v0.19.1:
   * Fix msats vs. sats usage for addInvoice method of few LN backend APIs
   * Change default hostname of lnbits LN backend to legend.lnbits.com
   * Change default hostname config option of lntxbot LN backend to lntxbot.com
+  * Improved error logging with knex data store
 * v0.19.0:
   * General documentation improvements, including information about previously un-documented events and hooks
   * Added `url:signed` hook which should be used instead of the deprecated `middleware:signedLnurl:afterCheckSignature` hook.
