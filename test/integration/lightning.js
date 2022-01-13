@@ -54,7 +54,7 @@ describe('lightning', function() {
 				});
 
 				it('openChannel(remoteId, localAmt, pushAmt, makePrivate)', function() {
-					if (tests.getNodeUri.skip) return this.skip();
+					if (tests.openChannel.skip) return this.skip();
 					this.timeout(60000);
 					let { remoteId, localAmt, pushAmt, makePrivate } = tests.openChannel;
 					if (!remoteId) {

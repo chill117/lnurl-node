@@ -738,6 +738,345 @@ server.on('withdrawRequest:action:failed', function(event) {
 ```
 
 
+## Supported Lightning Network Backends
+
+This project supports various LN backends - both LN service providers as well LN node software.
+
+* [lnd](#lightning-network-daemon-lnd)
+* [coinos](#coinos)
+* [lnbits](#lnbits)
+* [lndhub](#lndhub)
+* [lnpay](#lnpay)
+* [lntxbot](#lntxbot)
+* [opennode](#opennode)
+
+
+### Lightning Network Daemon (lnd)
+
+The following are server configuration options to use the `lnd` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lnd',
+		config: {
+			hostname: '127.0.0.1:8080',
+			/*
+				Can alternatively provide cert as Buffer or String:
+					cert: { data: 'STRING_UTF8_ENCODED' },
+					cert: { data: Buffer.from('STRING_UTF8_ENCODED', 'utf8') },
+			*/
+			cert: '/path/to/lnd/tls.cert',
+			/*
+				Can alternatively provide macaroon as Buffer or String:
+					macaroon: { data: 'STRING_HEX_ENCODED' },
+					macaroon: { data: Buffer.from('STRING_HEX_ENCODED', 'hex') },
+			*/
+			macaroon: '/path/to/lnd/admin.macaroon',
+			// Protocol of HTTP request (can be "http" or "https"):
+			protocol: 'https',
+			// If hostname contains an onion address, the backend will try
+			// to connect to it using the following TOR socks proxy:
+			torSocksProxy: '127.0.0.1:9050',
+		},
+	},
+}
+```
+Note that you can provide the `cert` and `macaroon` options as a string or buffer instead of file path.
+
+Onion addresses are supported. Provide the onion address using the `hostname` option and the LN backend will automatically attempt to use `torSocksProxy` to connect to the hidden service.
+
+It is also possible to use the `baseUrl` option instead of `hostname` and `protocol`. For example:
+```js
+{
+	lightning: {
+		backend: 'lnd',
+		config: {
+			baseUrl: 'https://127.0.0.1:8080/custom/path',
+			// ...
+		},
+	},
+}
+```
+
+
+### Coinos
+
+The following are example server configuration options to use the `coinos` LN backend:
+```js
+{
+	lightning: {
+		backend: 'coinos',
+		config: {
+			baseUrl: 'https://coinos.io',
+			// From your coinos wallet, go to "Settings" -> "Auth keys" to view the "JWT Auth Token".
+			jwt: '',
+		},
+	},
+}
+```
+
+
+### lnbits
+
+The following are example server configuration options to use the `lnbits` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lnbits',
+		config: {
+			baseUrl: 'https://legend.lnbits.com',
+			// From an account page, open "API info" to view the "Admin key".
+			adminKey: '',
+		},
+	},
+}
+```
+
+
+### lndhub
+
+The following are example server configuration options to use the `lndhub` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lndhub',
+		config: {
+			// If using BlueWallet, go to wallet then "Export/Backup" to view the secret.
+			// Example: "lndhub://login:password@baseurl"
+			secret: '',
+		},
+	},
+}
+```
+
+
+### lnpay
+
+The following are example server configuration options to use the `lnpay` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lnpay',
+		config: {
+			apiKey: '',
+			walletKey: '',
+		},
+	},
+}
+```
+
+
+### lntxbot
+
+The following are example server configuration options to use the `lntxbot` LN backend:
+```js
+{
+	lightning: {
+		backend: 'lntxbot',
+		config: {
+			// Open Telegram, open the chat with LNTXBOT, send message to the bot "/api_full".
+			adminKey: '',
+		},
+	},
+}
+```
+
+
+### opennode
+
+The following are example server configuration options to use the `opennode` LN backend:
+```js
+{
+	lightning: {
+		backend: 'opennode',
+		config: {
+			apiKey: '',
+		},
+	},
+}
+```
+
+
+## Custom Lightning Network Backend
+
+It is also possible to define your own custom Lightning Network backend to use with this module. To do so, create a new file and save it in your project:
+```js
+// ./backends/custom.js
+
+const { LightningBackend } = require('lnurl');
+
+class Backend extends LightningBackend {
+
+	constructor(options) {
+		super('custom', options, {
+			defaultOptions: {
+				nodeUri: null,
+			},
+			requiredOptions: ['nodeUri'],
+		});
+	}
+
+	checkOptions(options) {
+		// This is called by the constructor.
+		// Throw an error if any problems are found with the given options.
+	}
+
+	getNodeUri() {
+		return Promise.resolve(this.options.nodeUri);
+	}
+
+	openChannel(remoteId, localAmt, pushAmt, makePrivate) {
+		return Promise.reject('Not implemented');
+	}
+
+	payInvoice(invoice) {
+		return Promise.reject('Not implemented');
+	}
+
+	addInvoice(amount, extra) {
+		return Promise.reject('Not implemented');
+	}
+
+	getInvoiceStatus(paymentHash) {
+		return Promise.reject('Not implemented');
+	}
+}
+
+module.exports = Backend;
+```
+Then to use your new custom backend:
+```js
+{
+	// ...
+	lightning: {
+		backend: {
+			path: '/full/path/to/backends/custom.js',
+		},
+		config: {
+			// Options to pass to your custom backend.
+		},
+	},
+	// ...
+}
+```
+
+
+## Configuring Data Store
+
+By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
+
+
+### SQLite
+
+To use SQLite as your data store you will need to install the [sqlite3 module](https://github.com/mapbox/node-sqlite3) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex sqlite3
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'sqlite3',
+			connection: {
+				filename: './lnurl-server.sqlite3',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"sqlite3","connection":{"filename":"./lnurl-server.sqlite3"}}'
+```
+
+
+### MySQL
+
+To use MySQL as your data store you will need to install the [mysql module](https://github.com/mysqljs/mysql) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex mysql
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'mysql',
+			connection: {
+				host: '127.0.0.1',
+				user: 'lnurl_server',
+				password: '',
+				database: 'lnurl_server',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"mysql","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
+```
+
+
+### PostgreSQL
+
+To use PostgreSQL as your data store you will need to install the [postgres module](https://github.com/brianc/node-postgres) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
+```bash
+npm install knex pg
+```
+Then you can run your server via the API as follows:
+```js
+const lnurl = require('lnurl');
+const server = lnurl.createServer({
+	// ...
+	store: {
+		backend: 'knex',
+		config: {
+			client: 'postgres',
+			connection: {
+				host: '127.0.0.1',
+				user: 'lnurl_server',
+				password: '',
+				database: 'lnurl_server',
+			},
+		},
+	},
+	// ...
+});
+```
+Or via the CLI:
+```bash
+lnurl server \
+	--store.backend="knex" \
+	--store.config='{"client":"postgres","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
+```
+
+
+## Debugging
+
+This module uses [debug](https://github.com/visionmedia/debug) to output debug messages to the console. To output all debug messages, run your node app with the `DEBUG` environment variable:
+```bash
+DEBUG=lnurl* node your-app.js
+```
+Or if using the CLI interface:
+```bash
+DEBUG=lnurl* lnurl server
+```
+
+
 ## Signed LNURLs
 
 It is possible to create signed LNURLs in a separate (or even offline) application. To do this you will first need an API key for the application that will do the signing - it is possible to generate an API key via [API method](#generateapikey) or [CLI command](#cli-generateapikey).
@@ -882,338 +1221,6 @@ The following test vectors are in JSON format where the input (query object) is 
         "defaultDescription=abcABC0123%20ESCAPED%20%23%20UNESCAPED%20-_.!~*'()%20RESERVED%20%3B%2C%2F%3F%3A%40%26%3D%2B%24&id=7f26b286fd9b04bb&maxWithdrawable=50000&minWithdrawable=50000&nonce=d0af14f87faad7fc59ec&tag=withdrawRequest&signature=777b5a3f5780410c44ebda1c865724b71ea83c180ee27d27ac84ac8e2c607f86"
     ]
 ]
-```
-
-
-## Supported Lightning Network Backends
-
-This project supports various LN backends - both LN service providers as well LN node software.
-
-* [lnd](#lightning-network-daemon-lnd)
-* [coinos](#coinos)
-* [lnbits](#lnbits)
-* [lndhub](#lndhub)
-* [lnpay](#lnpay)
-* [lntxbot](#lntxbot)
-* [opennode](#opennode)
-
-
-### Lightning Network Daemon (lnd)
-
-The following are server configuration options to use the `lnd` LN backend:
-```js
-{
-	lightning: {
-		backend: 'lnd',
-		config: {
-			hostname: '127.0.0.1:8080',
-			/*
-				Can alternatively provide cert as Buffer or String:
-					cert: { data: 'STRING_UTF8_ENCODED' },
-					cert: { data: Buffer.from('STRING_UTF8_ENCODED', 'utf8') },
-			*/
-			cert: '/path/to/lnd/tls.cert',
-			/*
-				Can alternatively provide macaroon as Buffer or String:
-					macaroon: { data: 'STRING_HEX_ENCODED' },
-					macaroon: { data: Buffer.from('STRING_HEX_ENCODED', 'hex') },
-			*/
-			macaroon: '/path/to/lnd/admin.macaroon',
-			// Protocol of HTTP request (can be "http" or "https"):
-			protocol: 'https',
-			// If hostname contains an onion address, the backend will try
-			// to connect to it using the following TOR socks proxy:
-			torSocksProxy: '127.0.0.1:9050',
-		},
-	},
-}
-```
-Note that you can provide the `cert` and `macaroon` options as a string or buffer instead of file path.
-
-Onion addresses are supported. Provide the onion address using the `hostname` option and the LN backend will automatically attempt to use `torSocksProxy` to connect to the hidden service.
-
-
-### Coinos
-
-The following are example server configuration options to use the `coinos` LN backend:
-```js
-{
-	lightning: {
-		backend: 'coinos',
-		config: {
-			hostname: 'coinos.io',
-			protocol: 'https',
-			// From your coinos wallet, go to "Settings" -> "Auth keys" to view the "JWT Auth Token".
-			jwt: '',
-		},
-	},
-}
-```
-
-
-### lnbits
-
-The following are example server configuration options to use the `lnbits` LN backend:
-```js
-{
-	lightning: {
-		backend: 'lnbits',
-		config: {
-			hostname: 'lnbits.com',
-			protocol: 'https',
-			// From an account page, open "API info" to view the "Admin key".
-			adminKey: '',
-		},
-	},
-}
-```
-
-
-### lndhub
-
-The following are example server configuration options to use the `lndhub` LN backend:
-```js
-{
-	lightning: {
-		backend: 'lndhub',
-		config: {
-			// If using BlueWallet, go to wallet then "Export/Backup" to view the secret.
-			// Example: "lndhub://login:password@baseurl"
-			secret: '',
-		},
-	},
-}
-```
-
-
-### lnpay
-
-The following are example server configuration options to use the `lnpay` LN backend:
-```js
-{
-	lightning: {
-		backend: 'lnpay',
-		config: {
-			apiKey: '',
-			walletKey: '',
-		},
-	},
-}
-```
-
-
-### lntxbot
-
-The following are example server configuration options to use the `lntxbot` LN backend:
-```js
-{
-	lightning: {
-		backend: 'lntxbot',
-		config: {
-			// Open Telegram, open the chat with LNTXBOT, send message to the bot "/api_full".
-			adminKey: '',
-		},
-	},
-}
-```
-
-
-### opennode
-
-The following are example server configuration options to use the `opennode` LN backend:
-```js
-{
-	lightning: {
-		backend: 'opennode',
-		config: {
-			// Development => dev-api.opennode.co
-			// Production => api.opennode.co
-			hostname: 'api.opennode.co',
-			apiKey: '',
-		},
-	},
-}
-```
-
-
-## Custom Lightning Network Backend
-
-It is also possible to define your own custom Lightning Network backend to use with this module. To do so, create a new file and save it in your project:
-```js
-// ./backends/custom.js
-
-const { LightningBackend } = require('lnurl');
-
-class Backend extends LightningBackend {
-
-	constructor(options) {
-		super('custom', options, {
-			defaultOptions: {
-				nodeUri: null,
-			},
-			requiredOptions: ['nodeUri'],
-		});
-	}
-
-	checkOptions(options) {
-		// This is called by the constructor.
-		// Throw an error if any problems are found with the given options.
-	}
-
-	getNodeUri() {
-		return Promise.resolve(this.options.nodeUri);
-	}
-
-	openChannel(remoteId, localAmt, pushAmt, makePrivate) {
-		return Promise.reject('Not implemented');
-	}
-
-	payInvoice(invoice) {
-		return Promise.reject('Not implemented');
-	}
-
-	addInvoice(amount, extra) {
-		return Promise.reject('Not implemented');
-	}
-
-	getInvoiceStatus(paymentHash) {
-		return Promise.reject('Not implemented');
-	}
-}
-
-module.exports = Backend;
-```
-Then to use your new custom backend:
-```js
-{
-	// ...
-	lightning: {
-		backend: {
-			path: '/full/path/to/backends/custom.js',
-		},
-		config: {
-			// Options to pass to your custom backend.
-		},
-	},
-	// ...
-}
-```
-
-
-
-## Configuring Data Store
-
-By default the lnurl server will store data in memory - which is not ideal for several reasons. It is strongly recommended that you configure a proper data store for your server. This module supports [SQLite](#sqlite), [MySQL](#mysql), and [PostgreSQL](#postgresql).
-
-
-### SQLite
-
-To use SQLite as your data store you will need to install the [sqlite3 module](https://github.com/mapbox/node-sqlite3) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
-```bash
-npm install knex sqlite3
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'knex',
-		config: {
-			client: 'sqlite3',
-			connection: {
-				filename: './lnurl-server.sqlite3',
-			},
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="knex" \
-	--store.config='{"client":"sqlite3","connection":{"filename":"./lnurl-server.sqlite3"}}'
-```
-
-
-### MySQL
-
-To use MySQL as your data store you will need to install the [mysql module](https://github.com/mysqljs/mysql) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
-```bash
-npm install knex mysql
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'knex',
-		config: {
-			client: 'mysql',
-			connection: {
-				host: '127.0.0.1',
-				user: 'lnurl_server',
-				password: '',
-				database: 'lnurl_server',
-			},
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="knex" \
-	--store.config='{"client":"mysql","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
-```
-
-
-### PostgreSQL
-
-To use PostgreSQL as your data store you will need to install the [postgres module](https://github.com/brianc/node-postgres) and [knex](http://knexjs.org/) wherever you are running your lnurl server:
-```bash
-npm install knex pg
-```
-Then you can run your server via the API as follows:
-```js
-const lnurl = require('lnurl');
-const server = lnurl.createServer({
-	// ...
-	store: {
-		backend: 'knex',
-		config: {
-			client: 'postgres',
-			connection: {
-				host: '127.0.0.1',
-				user: 'lnurl_server',
-				password: '',
-				database: 'lnurl_server',
-			},
-		},
-	},
-	// ...
-});
-```
-Or via the CLI:
-```bash
-lnurl server \
-	--store.backend="knex" \
-	--store.config='{"client":"postgres","connection":{"host":"127.0.0.1","user":"lnurl_server","password":"","database":"lnurl_server"}}'
-```
-
-
-## Debugging
-
-This module uses [debug](https://github.com/visionmedia/debug) to output debug messages to the console. To output all debug messages, run your node app with the `DEBUG` environment variable:
-```bash
-DEBUG=lnurl* node your-app.js
-```
-Or if using the CLI interface:
-```bash
-DEBUG=lnurl* lnurl server
 ```
 
 

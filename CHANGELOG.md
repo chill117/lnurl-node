@@ -1,5 +1,7 @@
 # Changelog
 
+* TBD:
+  * New option added to all LN backends ("baseUrl") - specify the full URL where the LN backend HTTP API can be reached.
 * v0.19.1:
   * Fix msats vs. sats usage for addInvoice method of few LN backend APIs
   * Change default hostname of lnbits LN backend to legend.lnbits.com
