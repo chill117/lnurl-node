@@ -1,5 +1,9 @@
 # Changelog
 
+* v0.20.1:
+  * Use secp256k1 with elliptic.js instead of using C bindings compiled via node-gyp
+    * This improves the portability of this module
+  * Upgrade dependencies
 * v0.20.0:
   * New option added to all LN backends ("baseUrl") - specify the full URL where the LN backend HTTP API can be reached.
 * v0.19.1:
