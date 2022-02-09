@@ -18,6 +18,7 @@ if (process.env.LNURL_STORE_BACKEND === 'knex') {
 	const Store = require('../../lib/stores/knex');
 	after(function() {
 		const config = process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG) || {};
+		config.waitForDb = { delay: 20, timeout: 200 };
 		const store = new Store(config);
 		return store.onReady().then(() => {
 			// Rollback all migrations.

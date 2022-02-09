@@ -20,12 +20,13 @@ describe('stores.knex', function() {
 		let store;
 		before(function() {
 			const config = process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG) || {};
+			config.waitForDb = { delay: 20, timeout: 200 };
 			store = new Store(config);
 			return store.onReady();
 		});
 
 		after(function() {
-			return store.close();
+			if (store) return store.close();
 		});
 
 		describe('create(hash, tag, params[, options])', function() {

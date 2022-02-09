@@ -37,6 +37,9 @@ module.exports = {
 				config: (process.env.LNURL_STORE_CONFIG && JSON.parse(process.env.LNURL_STORE_CONFIG)) || { noWarning: true },
 			},
 		});
+		if (options.store.backend === 'knex') {
+			options.store.config.waitForDb = { delay: 20, timeout: 200 };
+		}
 		return lnurl.createServer(options);
 	},
 	request: function(method, requestOptions) {
