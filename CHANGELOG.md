@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.20.2:
+  * Data store (knex): Gracefully wait for a database connection or timeout after 30 seconds (default)
+    * Fails immediately with any error other than ECONNREFUSED
 * v0.20.1:
   * Use secp256k1 with elliptic.js instead of using C bindings compiled via node-gyp
     * This improves the portability of this module
