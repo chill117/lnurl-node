@@ -80,7 +80,7 @@ The following is a list of LUDs which this module already (or plans to) support:
 * [x] [LUD-04](https://github.com/fiatjaf/lnurl-rfc/blob/luds/04.md) - auth
 * [x] [LUD-06](https://github.com/fiatjaf/lnurl-rfc/blob/luds/06.md) - payRequest
 * [ ] [LUD-08](https://github.com/fiatjaf/lnurl-rfc/blob/luds/08.md) - Fast withdrawRequest
-* [ ] [LUD-09](https://github.com/fiatjaf/lnurl-rfc/blob/luds/09.md) - successAction in payRequest
+* [x] [LUD-09](https://github.com/fiatjaf/lnurl-rfc/blob/luds/09.md) - successAction in payRequest
 * [ ] [LUD-10](https://github.com/fiatjaf/lnurl-rfc/blob/luds/10.md) - aes successAction in payRequest
 * [x] [LUD-12](https://github.com/fiatjaf/lnurl-rfc/blob/luds/12.md) - Comments in payRequest
 * [ ] [LUD-16](https://github.com/fiatjaf/lnurl-rfc/blob/luds/16.md) - Lightning Address
