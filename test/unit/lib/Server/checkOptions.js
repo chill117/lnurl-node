@@ -1,108 +1,88 @@
-const _ = require('underscore');
-const { expect } = require('chai');
-const helpers = require('../../../helpers');
+const assert = require('assert');
 const lnurl = require('../../../../');
 
 describe('checkOptions([options[, defaultOptions]])', function() {
 
-	const fn = lnurl.Server.prototype.checkOptions.bind(lnurl.Server.prototype);
+	const checkOptions = lnurl.Server.prototype.checkOptions.bind(lnurl.Server.prototype);
+	const { defaultOptions } = lnurl.Server.prototype;
 
-	const tests = [
-		{
-			description: 'valid options',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: '/lnurl',
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expected: function() {},
-		},
-		{
-			description: 'auth.apiKeys not array',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: '/lnurl',
-					auth: { apiKeys: 'should be an array' },
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expectThrownError: 'Invalid option ("auth.apiKeys"): Array expected',
-		},
-		{
-			description: 'auth.apiKeys not array of objects',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: '/lnurl',
-					auth: { apiKeys: ['should be an array of objects'] },
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expectThrownError: 'Invalid option ("auth.apiKeys"): Array of objects expected',
-		},
-		{
-			description: 'auth.apiKeys not array of objects w/ "id" and "key"',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: '/lnurl',
-					auth: { apiKeys: [{}] },
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expectThrownError: 'Invalid option ("auth.apiKeys"): Each API key should include "id" and "key"',
-		},
-		{
-			description: '{ endpoint: "noslash" }',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: 'noslash',
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expectThrownError: 'Invalid option ("endpoint"): Must begin with a forward slash (/)',
-		},
-		{
-			description: 'commentAllowed max length',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: '/lnurl',
-					commentAllowed: 1200,
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expectThrownError: 'Invalid option ("commentAllowed"): Should not be greater than 1000 due to accepted maximum URL length',
-		},
-		{
-			description: 'unknown key',
-			args: {
-				options: {
-					host: 'localhost',
-					port: 3000,
-					endpoint: '/lnurl',
-					unknownKey: true,
-				},
-				defaultOptions: lnurl.Server.prototype.defaultOptions,
-			},
-			expectThrownError: 'Unknown option: "unknownKey"',
-		},
-	];
+	it('valid options', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: '/lnurl',
+		};
+		checkOptions(options, defaultOptions);
+	});
 
-	_.each(tests, function(test) {
-		test.fn = fn;
-		it(helpers.prepareTestDescription(test), function() {
-			return helpers.runTest(test);
+	it('auth.apiKeys not array', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: '/lnurl',
+			auth: { apiKeys: 'should be an array' },
+		};
+		assert.throws(() => checkOptions(options, defaultOptions), {
+			message: 'Invalid option ("auth.apiKeys"): Array expected',
+		});
+	});
+
+	it('auth.apiKeys not array of objects', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: '/lnurl',
+			auth: { apiKeys: ['should be an array of objects'] },
+		};
+		assert.throws(() => checkOptions(options, defaultOptions), {
+			message: 'Invalid option ("auth.apiKeys"): Array of objects expected',
+		});
+	});
+
+	it('auth.apiKeys not array of objects w/ "id" and "key"', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: '/lnurl',
+			auth: { apiKeys: [{}] },
+		};
+		assert.throws(() => checkOptions(options, defaultOptions), {
+			message: 'Invalid option ("auth.apiKeys"): Each API key should include "id" and "key"',
+		});
+	});
+
+	it('{ endpoint: "noslash" }', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: 'noslash',
+		};
+		assert.throws(() => checkOptions(options, defaultOptions), {
+			message: 'Invalid option ("endpoint"): Must begin with a forward slash (/)',
+		});
+	});
+
+	it('commentAllowed max length', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: '/lnurl',
+			commentAllowed: 1200,
+		};
+		assert.throws(() => checkOptions(options, defaultOptions), {
+			message: 'Invalid option ("commentAllowed"): Should not be greater than 1000 due to accepted maximum URL length',
+		});
+	});
+
+	it('unknown key', function() {
+		const options = {
+			host: 'localhost',
+			port: 3000,
+			endpoint: '/lnurl',
+			unknownKey: true,
+		};
+		assert.throws(() => checkOptions(options, defaultOptions), {
+			message: 'Unknown option: "unknownKey"',
 		});
 	});
 });

@@ -1,23 +1,26 @@
-const _ = require('underscore');
+const assert = require('assert');
 const bolt11 = require('bolt11');
 const { createHash, getTagDataFromPaymentRequest } = require('../../lib');
-const { expect } = require('chai');
 const fs = require('fs');
 const path = require('path');
 
 const backends = (function() {
 	const dirPath = path.join(__dirname, '..', '..', 'lib', 'lightning');
 	const files = fs.readdirSync(dirPath);
-	return _.chain(files).map(file => {
+	let nameToFilePath = {};
+	files.forEach(file => {
 		const name = path.basename(file, '.js');
 		const filePath = path.join(dirPath, file);
-		return name !== 'dummy' ? [name, filePath] : null;
-	}).compact().object().value();
+		if (name !=='dummy') {
+			nameToFilePath[name] = filePath;
+		}
+	});
+	return nameToFilePath;
 })();
 
 describe('lightning', function() {
 
-	_.each(backends, (filePath, backend) => {
+	Object.entries(backends).forEach(([backend, filePath], index) => {
 
 		const BACKEND = backend.toUpperCase();
 
@@ -27,7 +30,7 @@ describe('lightning', function() {
 			let tests = {};
 			before(function() {
 				// Must be one level above other hooks/tests, to skip all hooks and tests in this suite.
-				if (_.isUndefined(process.env[`TEST_${BACKEND}_CONFIG`])) {
+				if (typeof process.env[`TEST_${BACKEND}_CONFIG`] === 'undefined') {
 					return this.skip();
 				}
 				const config = JSON.parse(process.env[`TEST_${BACKEND}_CONFIG`]);
@@ -45,10 +48,10 @@ describe('lightning', function() {
 				it('getNodeUri()', function() {
 					if (tests.getNodeUri.skip) return this.skip();
 					return ln.getNodeUri().then(result => {
-						if (!_.isUndefined(tests.getNodeUri.result)) {
-							expect(result).to.equal(tests.getNodeUri.result);
+						if (typeof tests.getNodeUri.result === 'undefined') {
+							assert.strictEqual(result, tests.getNodeUri.result);
 						} else {
-							expect(result).to.be.a('string');
+							assert.strictEqual(typeof result, 'string');
 						}
 					});
 				});
@@ -57,16 +60,14 @@ describe('lightning', function() {
 					if (tests.openChannel.skip) return this.skip();
 					this.timeout(60000);
 					let { remoteId, localAmt, pushAmt, makePrivate } = tests.openChannel;
-					if (!remoteId) {
-						throw new Error('Missing required "remoteId" test parameter');
-					}
-					if (_.isUndefined(localAmt)) {
+					assert.ok(remoteId, 'Missing required "remoteId" test parameter');
+					if (typeof localAmt === 'undefined') {
 						localAmt = 20000;
 					}
-					if (_.isUndefined(pushAmt)) {
+					if (typeof pushAmt === 'undefined') {
 						pushAmt = 0;
 					}
-					if (_.isUndefined(makePrivate)) {
+					if (typeof makePrivate === 'undefined') {
 						makePrivate = 0;
 					}
 					return ln.openChannel(remoteId, localAmt, pushAmt, makePrivate);
@@ -76,19 +77,17 @@ describe('lightning', function() {
 					if (tests.payInvoice.skip) return this.skip();
 					this.timeout(20000);
 					let { invoice } = tests.payInvoice;
-					if (!invoice) {
-						throw new Error('Missing required "invoice" test parameter');
-					}
+					assert.ok(invoice, 'Missing required "invoice" test parameter');
 					return ln.payInvoice(invoice).then(result => {
-						expect(result).to.be.an('object');
-						expect(result).to.have.property('id');
+						assert.strictEqual(typeof result, 'object');
+						assert.notStrictEqual(typeof result.id, 'undefined');
 					});
 				});
 
 				it('addInvoice(amount, extra)', function() {
 					if (tests.addInvoice.skip) return this.skip();
 					let { amount } = tests.addInvoice;
-					if (_.isUndefined(amount)) {
+					if (typeof amount === 'undefined') {
 						amount = 50000;// msats
 					}
 					const description = 'test addInvoice';
@@ -97,44 +96,42 @@ describe('lightning', function() {
 						descriptionHash: createHash(description),
 					};
 					return ln.addInvoice(amount, extra).then(result => {
-						expect(result).to.be.an('object');
-						expect(result).to.have.property('id');
-						expect(result).to.have.property('invoice');
+						assert.strictEqual(typeof result, 'object');
+						assert.notStrictEqual(typeof result.id, 'undefined');
+						assert.ok(result.invoice);
 						const { invoice } = result;
 						const decoded = bolt11.decode(invoice);
 						const sats = Math.floor(amount / 1000);
-						expect(decoded.satoshis).to.equal(sats);
-						expect(decoded.millisatoshis).to.equal((sats * 1000).toString());
-						const tags = _.chain(decoded.tags).map(tag => {
+						assert.strictEqual(decoded.satoshis, sats);
+						assert.strictEqual(decoded.millisatoshis, (sats * 1000).toString());
+						let tags = {};
+						decoded.tags.forEach(tag => {
 							const { tagName, data } = tag;
-							return [ tagName, data ];
-						}).object().value();
-						if (!_.isUndefined(tags.description)) {
-							expect(tags.description).to.equal(description);
+							tags[tagName] = data;
+						});
+						if (typeof tags.description !== 'undefined') {
+							assert.strictEqual(tags.description, description);
 						}
-						if (!_.isUndefined(tags.description_hash)) {
-							expect(tags.description_hash).to.equal(extra.descriptionHash);
+						if (typeof tags.description_hash !== 'undefined') {
+							assert.strictEqual(tags.description_hash, description_hash);
 						}
-						expect(tags.description)
 					});
 				});
 
 				it('getInvoiceStatus(paymentHash)', function() {
 					if (tests.getInvoiceStatus.skip) return this.skip();
 					let { paymentHash, preimage, settled } = tests.getInvoiceStatus;
-					if (!paymentHash) {
-						throw new Error('Missing required "paymentHash" test parameter');
-					}
+					assert.ok(paymentHash, 'Missing required "paymentHash" test parameter');
 					return ln.getInvoiceStatus(paymentHash).then(result => {
-						expect(result).to.be.an('object');
-						expect(result).to.have.property('preimage');
-						expect(result).to.have.property('settled');
-						expect(result.settled).to.be.a('boolean');
-						if (!_.isUndefined(preimage)) {
-							expect(result.preimage).to.equal(preimage);
+						assert.strictEqual(typeof result, 'object');
+						assert.ok(result.preimage);
+						assert.ok(result.settled);
+						assert.strictEqual(typeof result.settled, 'boolean');
+						if (typeof preimage !== 'undefined') {
+							assert.strictEqual(result.preimage, preimage);
 						}
-						if (!_.isUndefined(settled)) {
-							expect(result.settled).to.equal(settled);
+						if (typeof settled !== 'undefined') {
+							assert.strictEqual(result.settled, settled);
 						}
 					});
 				});

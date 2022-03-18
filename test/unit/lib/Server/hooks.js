@@ -1,25 +1,24 @@
-const _ = require('underscore');
-const { expect } = require('chai');
-const helpers = require('../../../helpers');
-const lnurl = require('../../../../');
-const { HttpError, prepareSignedQuery } = require('../../../../lib');
-const path = require('path');
+const assert = require('assert');
+const { generateApiKey } = require('../../../../');
+const { HttpError } = require('../../../../lib');
+const { prepareSignedQuery } = require('lnurl-offline');
 
 describe('Server: hooks', function() {
 
 	describe('subprotocols', function() {
 
-		const { validParams } = helpers.fixtures;
-
 		let server;
+		let validParams;
 		beforeEach(function() {
-			server = helpers.createServer({
+			server = this.helpers.createServer({
 				listen: false,
 				lightning: {
 					backend: 'dummy',
 					config: {},
 				},
 			});
+			validParams = this.helpers.fixtures.validParams;
+			return server.onReady();
 		});
 
 		afterEach(function() {
@@ -41,9 +40,9 @@ describe('Server: hooks', function() {
 				let calls = 0;
 				server.bindToHook('login', function(key, next) {
 					try {
-						expect(key).to.be.a('string');
-						expect(next).to.be.a('function');
-						expect(++calls).to.equal(1);
+						assert.strictEqual(typeof key, 'string');
+						assert.strictEqual(typeof next, 'function');
+						assert.strictEqual(++calls, 1);
 						next();
 					} catch (error) {
 						return next(error);
@@ -51,52 +50,52 @@ describe('Server: hooks', function() {
 				});
 				server.bindToHook('login', function(key, next) {
 					try {
-						expect(++calls).to.equal(2);
+						assert.strictEqual(++calls, 2);
 						next();
 					} catch (error) {
 						return next(error);
 					}
 				});
 				return server.runSubProtocol('login', 'action', secret, params).then(() => {
-					expect(calls).to.equal(2);
+					assert.strictEqual(calls, 2);
 				});
 			});
 		});
 
-		_.each(['channelRequest', 'payRequest', 'withdrawRequest'], function(tag) {
+		['channelRequest', 'payRequest', 'withdrawRequest'].forEach(tag => {
 
 			describe(`${tag}:validate`, function() {
 
 				it('pass', function() {
 					let calls = 0;
-					server.bindToHook(`${tag}:validate`, function(params, next) {
-						expect(params).to.be.an('object');
-						expect(params).to.deep.equal(validParams.create[tag]);
-						expect(next).to.be.a('function');
-						expect(++calls).to.equal(1);
+					server.bindToHook(`${tag}:validate`, (params, next) => {
+						assert.strictEqual(typeof params, 'object');
+						assert.deepStrictEqual(params, validParams.create[tag]);
+						assert.strictEqual(typeof next, 'function');
+						assert.strictEqual(++calls, 1);
 						next();
 					});
 					return server.validateSubProtocolParameters(tag, validParams.create[tag]).then(() => {
-						expect(calls).to.equal(1);
+						assert.strictEqual(calls, 1);
 					});
 				});
 
 				it('fail', function() {
 					let calls = 0;
 					const thrownError = new Error('A thrown error');
-					server.bindToHook(`${tag}:validate`, function(params, next) {
-						expect(++calls).to.equal(1);
+					server.bindToHook(`${tag}:validate`, (params, next) => {
+						assert.strictEqual(++calls, 1);
 						next(thrownError);
 					});
-					server.bindToHook(`${tag}:validate`, function(params, next) {
+					server.bindToHook(`${tag}:validate`, (params, next) => {
 						++calls;
 						next(new Error('Should not have been executed'));
 					});
 					return server.validateSubProtocolParameters(tag, validParams.create[tag]).then(() => {
 						throw new Error('Should not have been executed');
 					}).catch(error => {
-						expect(error).to.deep.equal(thrownError);
-						expect(calls).to.equal(1);
+						assert.deepStrictEqual(error, thrownError);
+						assert.strictEqual(calls, 1);
 					});
 				});
 			});
@@ -115,15 +114,15 @@ describe('Server: hooks', function() {
 				it('pass', function() {
 					let calls = 0;
 					server.bindToHook(`${tag}:info`, function(secret, params, next) {
-						expect(secret).to.be.a('string');
-						expect(secret).to.equal(newUrl.secret);
-						expect(params).to.be.an('object');
-						expect(next).to.be.a('function');
-						expect(++calls).to.equal(1);
+						assert.strictEqual(typeof secret, 'string');
+						assert.strictEqual(secret, newUrl.secret);
+						assert.strictEqual(typeof params, 'object');
+						assert.strictEqual(typeof next, 'function');
+						assert.strictEqual(++calls, 1);
 						next();
 					});
 					return server.runSubProtocol(tag, 'info', newUrl.secret, createParams).then(() => {
-						expect(calls).to.equal(1);
+						assert.strictEqual(calls, 1);
 					});
 				});
 
@@ -131,7 +130,7 @@ describe('Server: hooks', function() {
 					let calls = 0;
 					const thrownError = new Error('A thrown error');
 					server.bindToHook(`${tag}:info`, function(secret, params, next) {
-						expect(++calls).to.equal(1);
+						assert.strictEqual(++calls, 1);
 						next(thrownError);
 					});
 					server.bindToHook(`${tag}:info`, function(secret, params, next) {
@@ -141,8 +140,8 @@ describe('Server: hooks', function() {
 					return server.runSubProtocol(tag, 'info', newUrl.secret, createParams).then(() => {
 						throw new Error('Should not have been executed');
 					}).catch(error => {
-						expect(error).to.deep.equal(thrownError);
-						expect(calls).to.equal(1);
+						assert.deepStrictEqual(error, thrownError);
+						assert.strictEqual(calls, 1);
 					});
 				});
 			});
@@ -161,28 +160,28 @@ describe('Server: hooks', function() {
 				it('pass', function() {
 					let calls = 0;
 					const actionParams = validParams.action[tag];
-					const combinedParams = _.extend({}, actionParams, createParams);
+					const combinedParams = Object.assign({}, actionParams, createParams);
 					server.bindToHook(`${tag}:action`, function(secret, params, next) {
-						expect(secret).to.be.a('string');
-						expect(secret).to.equal(newUrl.secret);
-						expect(params).to.be.an('object');
-						expect(params).to.deep.equal(combinedParams);
-						expect(next).to.be.a('function');
-						expect(++calls).to.equal(1);
+						assert.strictEqual(typeof secret, 'string');
+						assert.strictEqual(secret, newUrl.secret);
+						assert.strictEqual(typeof params, 'object');
+						assert.deepStrictEqual(params, combinedParams);
+						assert.strictEqual(typeof next, 'function');
+						assert.strictEqual(++calls, 1);
 						next();
 					});
 					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams).then(() => {
-						expect(calls).to.equal(1);
+						assert.strictEqual(calls, 1);
 					});
 				});
 
 				it('fail', function() {
 					let calls = 0;
 					const actionParams = validParams.action[tag];
-					const combinedParams = _.extend({}, actionParams, createParams);
+					const combinedParams = Object.assign({}, actionParams, createParams);
 					const thrownError = new Error('A thrown error');
 					server.bindToHook(`${tag}:action`, function(secret, params, next) {
-						expect(++calls).to.equal(1);
+						assert.strictEqual(++calls, 1);
 						next(thrownError);
 					});
 					server.bindToHook(`${tag}:action`, function(secret, params, next) {
@@ -192,33 +191,31 @@ describe('Server: hooks', function() {
 					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams).then(() => {
 						throw new Error('Should not have been executed');
 					}).catch(error => {
-						expect(error).to.deep.equal(thrownError);
-						expect(calls).to.equal(1);
+						assert.deepStrictEqual(error, thrownError);
+						assert.strictEqual(calls, 1);
 					});
 				});
 			});
 		});
 	});
 
-	_.each([
+	[
 		'url:signed',
 		'middleware:signedLnurl:afterCheckSignature',
-	], hook => {
+	].forEach(hook => {
 
 		describe(hook, function() {
 
 			let apiKey;
-			beforeEach(function(done) {
-				done = _.once(done);
-				apiKey = lnurl.generateApiKey();
-				server = helpers.createServer({
+			beforeEach(function() {
+				apiKey = generateApiKey();
+				server = this.helpers.createServer({
 					auth: {
 						apiKeys: [ apiKey ],
 					},
 					lightning: null,
 				});
-				server.once('error', done);
-				server.once('listening', done);
+				return server.onReady();
 			});
 
 			afterEach(function() {
@@ -231,67 +228,69 @@ describe('Server: hooks', function() {
 				pushAmt: 0,
 			};
 
-			it('invalid API key signature', function(done) {
-				done = _.once(done);
-				const unknownApiKey = lnurl.generateApiKey();
+			it('invalid API key signature', function() {
+				const unknownApiKey = generateApiKey();
 				const query = prepareSignedQuery(unknownApiKey, tag, params);
-				helpers.request('get', {
+				let hookCalled = false
+				server.bindToHook(hook, (req, res, next) => {
+					hookCalled = true;
+				});
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: query,
 					json: true,
 				}).then(result => {
 					const { response, body } = result;
-					expect(body).to.deep.equal({
+					assert.deepStrictEqual(body, {
 						status: 'ERROR',
 						reason: 'Invalid API key signature',
 					});
-				}).then(done).catch(done);
-				server.bindToHook(hook, function(req, res, next) {
-					done(new Error('Should not execute hook callbacks'));
+					assert.strictEqual(hookCalled, false);
 				});
 			});
 
-			it('valid API key signature', function(done) {
-				done = _.once(done);
+			it('valid API key signature', function() {
 				const query = prepareSignedQuery(apiKey, tag, params);
-				helpers.request('get', {
+				let calls = 0;
+				server.bindToHook(hook, (req, res, next) => {
+					calls++;
+					try {
+						assert.strictEqual(typeof req, 'object');
+						assert.strictEqual(typeof res, 'object');
+						assert.strictEqual(typeof next, 'function');
+						req.query.extra = 'example changing the query object';
+						next();
+					} catch (error) {
+						return next(error);
+					}
+				});
+				server.bindToHook(hook, (req, res, next) => {
+					calls++;
+					try {
+						assert.strictEqual(typeof req, 'object');
+						assert.strictEqual(typeof res, 'object');
+						assert.strictEqual(typeof next, 'function');
+						assert.strictEqual(req.query.extra, 'example changing the query object');
+						next(new HttpError('a custom error', 400));
+					} catch (error) {
+						return next(error);
+					}
+				});
+				server.bindToHook(hook, (req, res, next) => {
+					calls++;
+				});
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: query,
 					json: true,
 				}).then(result => {
 					const { response, body } = result;
-					expect(response.statusCode).to.equal(400);
-					expect(body).to.deep.equal({
+					assert.strictEqual(response.statusCode, 400);
+					assert.deepStrictEqual(body, {
 						status: 'ERROR',
 						reason: 'a custom error',
 					});
-				}).then(done).catch(done);
-				server.bindToHook(hook, function(req, res, next) {
-					try {
-						expect(req).to.be.an('object');
-						expect(res).to.be.an('object');
-						expect(next).to.be.a('function');
-						req.query.extra = 'example changing the query object';
-						next();
-					} catch (error) {
-						return done(error);
-					}
-				});
-				server.bindToHook(hook, function(req, res, next) {
-					try {
-						expect(req).to.be.an('object');
-						expect(res).to.be.an('object');
-						expect(next).to.be.a('function');
-						expect(req.query.extra).to.equal('example changing the query object');
-						next(new HttpError('a custom error', 400));
-					} catch (error) {
-						return done(error);
-					}
-				});
-				server.bindToHook(hook, function(req, res, next) {
-					done(new Error('Should not execute further hook callbacks after next invoked with an error'));
+					assert.strictEqual(calls, 2);
 				});
 			});
 		});

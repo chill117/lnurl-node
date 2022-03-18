@@ -1,54 +1,35 @@
-const _ = require('underscore');
-const { expect } = require('chai');
-const helpers = require('../helpers');
-const lnurl = require('../../');
+const assert = require('assert');
+const { createAuthorizationSignature } = require('../../');
 
 describe('createAuthorizationSignature(data, privKey)', function() {
 
-	const fn = lnurl.createAuthorizationSignature;
-
-	it('is a function', function() {
-		expect(fn).to.be.a('function');
+	it('arguments as hex-encoded strings', function() {
+		const data = 'fe3c01aae05dd42a03e5426c1502009662a109fae883c83eb137899544dfb3bd';
+		const privKey = 'ca55310396106f374407df91538759625bee0c524b1c32b79f63d2cca858e474';
+		const result = createAuthorizationSignature(data, privKey);
+		assert.ok(Buffer.isBuffer(result));
+		assert.strictEqual(result.toString('hex'), '304402207ef658b5407858d8dee1895dc3fab9b181d7e025ad2d5c356876e6ba9dc9a9370220216e3df364a3b53233441ef4446c30779799158cfb080c60a0f00db5b41a8a79');
 	});
 
-	const validArgs = {
-		data: 'fe3c01aae05dd42a03e5426c1502009662a109fae883c83eb137899544dfb3bd',
-		privKey: 'ca55310396106f374407df91538759625bee0c524b1c32b79f63d2cca858e474',
-	};
+	it('arguments as buffers', function() {
+		const data = Buffer.from('fe3c01aae05dd42a03e5426c1502009662a109fae883c83eb137899544dfb3bd', 'hex');
+		const privKey = Buffer.from('ca55310396106f374407df91538759625bee0c524b1c32b79f63d2cca858e474', 'hex');
+		const result = createAuthorizationSignature(data, privKey);
+		assert.ok(Buffer.isBuffer(result));
+		assert.strictEqual(result.toString('hex'), '304402207ef658b5407858d8dee1895dc3fab9b181d7e025ad2d5c356876e6ba9dc9a9370220216e3df364a3b53233441ef4446c30779799158cfb080c60a0f00db5b41a8a79');
+	});
 
-	const tests = [
-		{
-			description: 'arguments as hex encoded strings',
-			args: validArgs,
-			expected: function(result) {
-				expect(Buffer.isBuffer(result)).to.equal(true);
-				expect(result.toString('hex')).to.equal('304402207ef658b5407858d8dee1895dc3fab9b181d7e025ad2d5c356876e6ba9dc9a9370220216e3df364a3b53233441ef4446c30779799158cfb080c60a0f00db5b41a8a79');
-			},
-		},
-		{
-			description: 'arguments as buffers',
-			args: _.mapObject(validArgs, function(value, key) {
-				return Buffer.from(value, 'hex');
-			}),
-			expected: function(result) {
-				expect(Buffer.isBuffer(result)).to.equal(true);
-				expect(result.toString('hex')).to.equal('304402207ef658b5407858d8dee1895dc3fab9b181d7e025ad2d5c356876e6ba9dc9a9370220216e3df364a3b53233441ef4446c30779799158cfb080c60a0f00db5b41a8a79');
-			},
-		},
-	];
-
-	_.each(['data', 'privKey'], function(argName) {
-		tests.push({
-			description: `missing required argument "${argName}"`,
-			args: helpers.setKeyUndefined(validArgs, argName),
-			expectThrownError: `Missing required argument: "${argName}"`,
+	it('missing data', function() {
+		const privKey = 'ca55310396106f374407df91538759625bee0c524b1c32b79f63d2cca858e474';
+		assert.throws(() => createAuthorizationSignature(null, privKey), {
+			message: 'Missing required argument: "data"',
 		});
 	});
 
-	_.each(tests, function(test) {
-		test.fn = fn;
-		it(helpers.prepareTestDescription(test), function() {
-			return helpers.runTest(test);
+	it('missing privKey', function() {
+		const data = 'fe3c01aae05dd42a03e5426c1502009662a109fae883c83eb137899544dfb3bd';
+		assert.throws(() => createAuthorizationSignature(data, null), {
+			message: 'Missing required argument: "privKey"',
 		});
 	});
 });

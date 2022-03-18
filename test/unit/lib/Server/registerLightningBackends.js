@@ -1,6 +1,5 @@
-const _ = require('underscore');
+const assert = require('assert');
 const fs = require('fs');
-const { expect } = require('chai');
 const path = require('path');
 const { LightningBackend } = require('../../../../lib');
 
@@ -12,6 +11,7 @@ describe('registerLightningBackends(dirPath)', function() {
 			listen: false,
 			lightning: null,
 		});
+		return server.onReady();
 	});
 
 	afterEach(function() {
@@ -22,7 +22,7 @@ describe('registerLightningBackends(dirPath)', function() {
 		const dirPath = path.join(this.tmpDir, 'custom-ln-backends');
 		fs.mkdirSync(dirPath, { recursive: true });
 		const names = ['custom1', 'custom2', 'custom3'];
-		_.each(names, name => {
+		names.forEach(name => {
 			const filePath = path.join(dirPath, `${name}.js`);
 			const contents = `const LightningBackend = require('../../../lib/LightningBackend');
 	class CustomBackend extends LightningBackend {
@@ -42,11 +42,11 @@ describe('registerLightningBackends(dirPath)', function() {
 			fs.writeFileSync(filePath, contents);
 		});
 		server.registerLightningBackends(dirPath);
-		_.each(names, name => {
+		names.forEach(name => {
 			const ln = server.prepareLightningBackend({ backend: name });
-			expect(ln).to.be.an('object');
-			expect(ln instanceof LightningBackend);
-			expect(ln.name).to.equal(name);
+			assert.strictEqual(typeof ln, 'object');
+			assert.ok(ln instanceof LightningBackend);
+			assert.strictEqual(ln.name, name);
 		});
 	});
 });

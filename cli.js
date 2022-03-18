@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
-const _ = require('underscore');
+const assert = require('assert');
 const commander = require('commander');
 const debug = {
 	error: require('debug')('lnurl:cli:error'),
 };
 const fs = require('fs');
-
-const lnurl = require('./index');
 const path = require('path');
 const pkg = require('./package.json');
+
+const lnurl = require('./index');
+const { createServer, generateApiKey } = lnurl;
+const { defaultOptions } = lnurl.Server.prototype;
+const defaultUrl = lnurl.Server.prototype.getDefaultUrl();
+
 const program = new commander.Command();
 let stdin = '';
 
@@ -45,27 +49,28 @@ program
 	.option(
 		'--encoding [value]',
 		'Encoding to use for ID and key (hex or base64)',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.apiKey.encoding,
+		value => value,
+		defaultOptions.apiKey.encoding,
 	)
 	.option(
 		'--numBytes.id [value]',
 		'Number of random bytes to generate for API key ID',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.apiKey.numBytes.id,
+		value => value,
+		defaultOptions.apiKey.numBytes.id,
 	)
 	.option(
 		'--numBytes.key [value]',
 		'Number of random bytes to generate for API key',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.apiKey.numBytes.key,
+		value => value,
+		defaultOptions.apiKey.numBytes.key,
 	)
 	.action(function(options) {
 		options.numBytes = {};
 		options.numBytes.id = parseInt(options['numBytes.id']);
 		options.numBytes.key = parseInt(options['numBytes.key']);
-		options = _.pick(options, 'encoding', 'numBytes');
-		process.stdout.write(JSON.stringify(lnurl.generateApiKey(options), null, 2));
+		const { encoding, numBytes } = options;
+		options = { encoding, numBytes };
+		process.stdout.write(JSON.stringify(generateApiKey(options), null, 2));
 	});
 
 program
@@ -74,19 +79,19 @@ program
 	.option(
 		'--tag <value>',
 		'The tag (subprotocol name) of the newly generated URL',
-		_.identity,
+		value => value,
 		null,
 	)
 	.option(
 		'--uses <value>',
 		'The number of times the new URL can be used (set to 0 for unlimited uses)',
-		_.identity,
+		value => value,
 		1,
 	)
 	.option(
 		'--params [values]',
 		'Stringified JSON object of params for the newly generated URL - e.g for "withdrawRequest" valid params could be {"minWithdrawable": 1000, "maxWithdrawable": 5000}',
-		_.identity,
+		value => value,
 		null,
 	)
 	.option(
@@ -102,76 +107,70 @@ program
 	.option(
 		'--host [value]',
 		'The host for the web server',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.host,
+		value => value,
+		defaultOptions.host,
 	)
 	.option(
 		'--port [value]',
 		'The port for the web server',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.port
+		value => value,
+		defaultOptions.port
 	)
 	.option(
 		'--protocol [value]',
 		'DEPRECATED - to be removed in a future release',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.protocol
+		value => value,
+		defaultOptions.protocol
 	)
 	.option(
 		'--url [value]',
 		'The URL where the server is externally reachable',
-		_.identity,
+		value => value,
 		lnurl.Server.prototype.getDefaultUrl()
 	)
 	.option(
 		'--endpoint [value]',
 		'The URI path of the web API end-point',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.endpoint
+		value => value,
+		defaultOptions.endpoint
 	)
 	.option(
 		'--store.backend [value]',
 		'Which data store backend to use',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.store.backend
+		value => value,
+		defaultOptions.store.backend
 	)
 	.option(
 		'--store.config [value]',
 		'The options object to use to configure the data store',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.store.config
+		value => value,
+		defaultOptions.store.config
 	)
 	.action(function(options) {
 		try {
 			let { tag, params, uses } = options;
-			options = _.omit(options, ['tag', 'params', 'uses']);
-			if (!tag) {
-				throw new Error('--tag is required');
-			}
+			delete options.params;
+			delete options.tag;
+			delete options.uses;
+			assert.ok(tag, '--tag is required');
 			if (!params) {
 				params = {};
-			} else if (_.isString(params)) {
-				try {
-					params = JSON.parse(params);
-				} catch (error) {
+			} else if (typeof params === 'string') {
+				try { params = JSON.parse(params); } catch (error) {
 					throw new Error('--params must be a valid JSON object');
 				}
 			}
 			uses = uses && parseInt(uses);
-			if (_.isNaN(uses)) {
-				throw new Error('--uses must be an integer');
-			}
+			assert.ok(!Number.isNaN(uses), '--uses must be an integer');
 			if (options.configFile) {
 				options = JSON.parse(fs.readFileSync(options.configFile, 'utf8'));
 			}
-			options = _.omit(options, 'configFile');
+			delete options.configFile;
 			prepareGroupOptions(options, ['store']);
-			if (options.store && options.store.backend === 'memory') {
-				throw new Error('This command does not work with `--store.backend` set to "memory"');
-			}
+			assert.ok(!options.store || options.store.backend !== 'memory', 'This command does not work with `--store.backend` set to "memory"');
 			options.listen = false
 			options.lightning = null;
-			const server = lnurl.createServer(options);
+			const server = createServer(options);
 			return server.generateNewUrl(tag, params, { uses }).then(result => {
 				process.stdout.write(JSON.stringify(result, null, 2));
 				process.exit();
@@ -203,110 +202,107 @@ program
 	.option(
 		'--host [value]',
 		'The host for the web server',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.host,
+		value => value,
+		defaultOptions.host,
 	)
 	.option(
 		'--port [value]',
 		'The port for the web server',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.port
+		value => value,
+		defaultOptions.port
 	)
 	.option(
 		'--protocol [value]',
 		'DEPRECATED - to be removed in a future release',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.protocol
+		value => value,
+		defaultOptions.protocol
 	)
 	.option(
 		'--url [value]',
 		'The URL where the server is externally reachable',
-		_.identity,
-		lnurl.Server.prototype.getDefaultUrl()
+		value => value,
+		defaultUrl,
 	)
 	.option(
 		'--endpoint [value]',
 		'The URI path of the web API end-point',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.endpoint
+		value => value,
+		defaultOptions.endpoint
 	)
 	.option(
 		'--auth.apiKeys [values]',
 		'List of API keys that can be used to sign LNURLs for your server',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.auth.apiKeys,
+		value => value,
+		defaultOptions.auth.apiKeys,
 	)
 	.option(
 		'--lightning.backend [value]',
 		'Which LN backend to use (only lnd supported currently)',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.lightning.backend
+		value => value,
+		defaultOptions.lightning.backend
 	)
 	.option(
 		'--lightning.config [value]',
 		'The configuration object to connect to the LN backend',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.lightning.config
+		value => value,
+		defaultOptions.lightning.config
 	)
 	.option(
 		'--store.backend [value]',
 		'Which data store backend to use',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.store.backend
+		value => value,
+		defaultOptions.store.backend
 	)
 	.option(
 		'--store.config [value]',
 		'The options object to use to configure the data store',
-		_.identity,
-		lnurl.Server.prototype.defaultOptions.store.config
+		value => value,
+		defaultOptions.store.config
 	)
 	.action(function(options) {
 		if (options.configFile) {
 			options = JSON.parse(fs.readFileSync(options.configFile, 'utf8'));
 		}
-		options = _.omit(options, 'configFile');
+		delete options.configFile;
 		prepareGroupOptions(options, ['auth', 'lightning', 'store']);
-		lnurl.createServer(options);
+		createServer(options);
 	});
 
 const prepareGroupOptions = function(options, groups) {
-	_.each(groups, group => {
-		options[group] = _.chain(lnurl.Server.prototype.defaultOptions[group])
-			.keys()
-			.map(key => {
-				let value;
-				if (!_.isUndefined(options[group])) {
-					value = options[group][key];
-				} else {
-					value = options[`${group}.${key}`];
-					if (!_.isUndefined(options[`${group}.${key}`])) {
-						delete options[`${group}.${key}`];
+	groups.forEach(group => {
+		let prepared = {};
+		Object.keys(defaultOptions[group]).forEach(key => {
+			let value;
+			if (typeof options[group] !== 'undefined') {
+				value = options[group][key];
+			} else {
+				value = options[`${group}.${key}`];
+				if (typeof options[`${group}.${key}`] !== 'undefined') {
+					delete options[`${group}.${key}`];
+				}
+			}
+			if (typeof value === 'undefined') {
+				value = defaultOptions[group][key];
+			}
+			switch (group) {
+				case 'lightning':
+				case 'store':
+					if (key === 'backend' && typeof value === 'string' && value[0] === '{') {
+						value = JSON.parse(value);
 					}
-				}
-				if (_.isUndefined(value)) {
-					value = lnurl.Server.prototype.defaultOptions[group][key];
-				}
-				switch (group) {
-					case 'lightning':
-					case 'store':
-						if (key === 'backend' && _.isString(value) && value[0] === '{') {
-							value = JSON.parse(value);
-						}
-						if (key === 'config' && _.isString(value)) {
-							value = JSON.parse(value);
-						}
-						break;
-					case 'auth':
-						if (key === 'apiKeys' && _.isString(value)) {
-							value = JSON.parse(value);
-						}
-						break;
-				}
-				return [key, value];
-			})
-			.compact()
-			.object()
-			.value();
+					if (key === 'config' && typeof value === 'string') {
+						value = JSON.parse(value);
+					}
+					break;
+				case 'auth':
+					if (key === 'apiKeys' && typeof value === 'string') {
+						value = JSON.parse(value);
+					}
+					break;
+			}
+			prepared[key] = value;
+		});
+		options[group] = prepared;
 	});
 };
 
@@ -314,7 +310,7 @@ if (process.stdin.isTTY) {
 	program.parse(process.argv);
 } else {
 	process.stdin.on('readable', function() {
-		var chunk = this.read();
+		const chunk = this.read();
 		if (chunk !== null) {
 			stdin += chunk;
 		}

@@ -1,14 +1,18 @@
-const _ = require('underscore');
+const crypto = require('crypto');
+const { createSignature, createSignedUrl, prepareQueryPayloadString } = require('lnurl-offline');
+const { generateApiKey } = require('../lib');
 
-const {
-	createSignature,
-	createSignedUrl,
-	generateApiKey,
-	generateRandomByteString,
-	prepareQueryPayloadString
-} = require('../lib');
+const prepareSignedQueryString = function(apiKey, tag, params) {
+	const query = Object.assign({}, {
+		id: apiKey.id,
+		tag,
+	}, params || {});
+	const payload = prepareQueryPayloadString(query);
+	const signature = createSignature(payload, Buffer.from(apiKey.key, apiKey.encoding));
+	return payload + '&signature=' + signature;
+}
 
-const inputs = [
+const testVectors = [
 	{
 		apiKey: generateApiKey({
 			numBytes: {
@@ -23,7 +27,7 @@ const inputs = [
 			maxWithdrawable: 7000,
 			defaultDescription: '',
 		},
-		nonce: generateRandomByteString(10),
+		nonce: crypto.randomBytes(10).toString('hex'),
 	},
 	{
 		apiKey: generateApiKey({
@@ -40,7 +44,7 @@ const inputs = [
 			defaultDescription: '',
 			custom1: 'custom parameter 1',
 		},
-		nonce: generateRandomByteString(10),
+		nonce: crypto.randomBytes(10).toString('hex'),
 	},
 	{
 		apiKey: generateApiKey({
@@ -56,7 +60,7 @@ const inputs = [
 			maxWithdrawable: 50000,
 			defaultDescription: 'Example w/ description',
 		},
-		nonce: generateRandomByteString(10),
+		nonce: crypto.randomBytes(10).toString('hex'),
 	},
 	{
 		apiKey: generateApiKey({
@@ -72,23 +76,11 @@ const inputs = [
 			maxWithdrawable: 50000,
 			defaultDescription: 'abcABC0123 ESCAPED # UNESCAPED -_.!~*\'() RESERVED ;,/?:@&=+$',
 		},
-		nonce: generateRandomByteString(10),
+		nonce: crypto.randomBytes(10).toString('hex'),
 	},
-];
-
-const prepareSignedQueryString = function(apiKey, tag, params) {
-	const query = _.extend({
-		id: apiKey.id,
-		tag,
-	}, params || {});
-	const payload = prepareQueryPayloadString(query);
-	const signature = createSignature(payload, Buffer.from(apiKey.key, apiKey.encoding));
-	return payload + '&signature=' + signature;
-}
-
-const testVectors = _.map(inputs, function(input) {
+].map(input => {
 	let { apiKey, tag, params, nonce } = input;
-	params = _.extend({}, params, { nonce });
+	params = Object.assign({}, params, { nonce });
 	const signedQueryString = prepareSignedQueryString(apiKey, tag, params);
 	// const signedUrl = createSignedUrl(apiKey, tag, params, { baseUrl: 'X' });
 	// console.log(signedQueryString);

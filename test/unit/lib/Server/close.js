@@ -1,18 +1,13 @@
-const _ = require('underscore');
-const async = require('async');
-const { expect } = require('chai');
-const lnurl = require('../../../../');
-const helpers = require('../../../helpers');
+const assert = require('assert');
 const http = require('http');
 const url = require('url');
 
 describe('close([options])', function() {
 
 	let server;
-	beforeEach(function(done) {
+	beforeEach(function() {
 		server = this.helpers.createServer();
-		server.once('listening', done);
-		server.once('error', done);
+		return server.onReady();
 	});
 
 	afterEach(function() {
@@ -21,34 +16,34 @@ describe('close([options])', function() {
 
 	describe('force', function() {
 
-		beforeEach(function(done) {
+		beforeEach(function() {
 			const numSockets = 3;
-			async.times(numSockets, (index, next) => {
-				const parsedUrl = url.parse(`http://${server.options.host}:${server.options.port}/status`);
-				const req = http.request({
-					agent: new http.Agent({
-						keepAlive: true,
-						// Infinity is read as 50 sockets:
-						maxSockets: Infinity
-					}),
-					method: 'GET',
-					hostname: parsedUrl.hostname,
-					port: parsedUrl.port,
-					path: parsedUrl.path,
-				}, function(res) {
-					next();
+			return Promise.all(Array.from(Array(numSockets)).map(() => {
+				return new Promise((resolve, reject) => {
+					const { hostname, port, path } = url.parse(`http://${server.options.host}:${server.options.port}/status`);
+					const req = http.request({
+						agent: new http.Agent({
+							keepAlive: true,
+							// Infinity is read as 50 sockets:
+							maxSockets: Infinity
+						}),
+						method: 'GET',
+						hostname,
+						port,
+						path,
+					}, () => resolve());
+					req.once('error', reject);
+					req.end();
 				});
-				req.once('error', next);
-				req.end();
-			}, done);
+			}));
 		});
 
 		describe('true', function() {
 
 			it('force-closes all sockets', function() {
 				return server.close({ force: true }).then(() => {
-					_.each(server.sockets, socket => {
-						expect(socket).to.equal(null);
+					Object.entries(server.sockets).forEach(([id, socket], index) => {
+						assert.strictEqual(socket, null);
 					});
 				});
 			});
@@ -56,10 +51,17 @@ describe('close([options])', function() {
 
 		describe('false', function() {
 
+			afterEach(function() {
+				Object.entries(server.sockets).forEach(([id, socket], index) => {
+					socket.destroy();
+					server.sockets[id] = null;
+				});
+			});
+
 			it('does not force-close all sockets', function() {
 				return server.close({ force: false }).then(() => {
-					_.each(server.sockets, socket => {
-						expect(socket).to.not.equal(null);
+					Object.entries(server.sockets).forEach(([id, socket], index) => {
+						assert.notStrictEqual(socket, null);
 					});
 				});
 			});
@@ -72,16 +74,20 @@ describe('close([options])', function() {
 
 			it('closes the data store', function() {
 				return server.close({ store: true }).then(() => {
-					expect(server.store).to.equal(null);
+					assert.strictEqual(server.store, null);
 				});
 			});
 		});
 
 		describe('false', function() {
 
+			afterEach(function() {
+				return server.store.close();
+			});
+
 			it('does not close the data store', function() {
 				return server.close({ store: false }).then(() => {
-					expect(server.store).to.not.equal(null);
+					assert.notStrictEqual(server.store, null);
 				});
 			});
 		});

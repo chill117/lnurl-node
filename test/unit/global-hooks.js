@@ -1,17 +1,16 @@
-const async = require('async');
-const fs = require('fs');
+const fs = require('fs').promises;
 
 before(function() {
 	this.helpers = require('../helpers');
 	this.tmpDir = this.helpers.tmpDir;
 });
 
-before(function(done) {
-	this.helpers.removeDir(this.tmpDir, done);
+before(function() {
+	return this.helpers.removeDir(this.tmpDir);
 });
 
-before(function(done) {
-	fs.mkdir(this.tmpDir, { recursive: true }, done);
+before(function() {
+	return fs.mkdir(this.tmpDir, { recursive: true });
 });
 
 if (process.env.LNURL_STORE_BACKEND === 'knex') {
@@ -30,6 +29,6 @@ if (process.env.LNURL_STORE_BACKEND === 'knex') {
 	});
 }
 
-after(function(done) {
-	this.helpers.removeDir(this.tmpDir, done);
+after(function() {
+	return this.helpers.removeDir(this.tmpDir);
 });

@@ -1,20 +1,14 @@
-const _ = require('underscore');
-const async = require('async');
-const bolt11 = require('bolt11');
-const { expect } = require('chai');
-const helpers = require('../../../helpers');
-const lnurl = require('../../../../');
-const path = require('path');
-const querystring = require('querystring');
+const assert = require('assert');
+const crypto = require('crypto');
+const { generateApiKey } = require('../../../../');
+const { createSignedUrl, prepareSignedQuery } = require('lnurl-offline');
 const {
 	createAuthorizationSignature,
 	createHash,
-	createSignedUrl,
 	generatePaymentRequest,
-	generateRandomByteString,
 	generateRandomLinkingKey,
 	getTagDataFromPaymentRequest,
-	prepareSignedQuery
+	promiseAllSeries
 } = require('../../../../lib');
 
 const tagToLightningBackendMethod = {
@@ -26,28 +20,23 @@ const tagToLightningBackendMethod = {
 describe('Server: HTTP API', function() {
 
 	let server, apiKeys;
-	before(function(done) {
-		try {
-			apiKeys = [
-				lnurl.generateApiKey(),
-				lnurl.generateApiKey({
-					encoding: 'base64',
-				}),
-			];
-			server = helpers.createServer({
-				auth: {
-					apiKeys: apiKeys,
-				},
-				lightning: {
-					backend: 'dummy',
-					config: {},
-				},
-			});
-			server.once('error', done);
-			server.once('listening', done);
-		} catch (error) {
-			return done(error);
-		}
+	before(function() {
+		apiKeys = [
+			generateApiKey(),
+			generateApiKey({
+				encoding: 'base64',
+			}),
+		];
+		server = this.helpers.createServer({
+			auth: {
+				apiKeys: apiKeys,
+			},
+			lightning: {
+				backend: 'dummy',
+				config: {},
+			},
+		});
+		return server.onReady();
 	});
 
 	after(function() {
@@ -57,15 +46,14 @@ describe('Server: HTTP API', function() {
 	describe('GET /status', function() {
 
 		it('responds with status OK', function() {
-			return helpers.request('get', {
+			return this.helpers.request('get', {
 				url: server.getUrl('/status'),
-				ca: server.ca,
 				qs: {},
 				json: true,
 			}).then(result => {
 				const { response, body } = result;
-				expect(response.statusCode).to.equal(200);
-				expect(body).to.deep.equal({
+				assert.strictEqual(response.statusCode, 200);
+				assert.deepStrictEqual(body, {
 					status: 'OK',
 				});
 			});
@@ -74,14 +62,14 @@ describe('Server: HTTP API', function() {
 
 	describe('GET /lnurl', function() {
 
-		const { validParams } = helpers.fixtures;
+		const { validParams } = require('../../../fixtures');
 
 		const prepareValidParams = function(step, tag, secret) {
 			const params = validParams[step] && validParams[step][tag];
-			if (_.isFunction(params)) {
+			if (typeof params === 'function') {
 				return params(secret);
-			} else if (_.isObject(params)) {
-				return _.clone(params);
+			} else if (typeof params === 'object') {
+				return JSON.parse(JSON.stringify(params));
 			} else {
 				const type = typeof params;
 				throw Error(`Unknown params type: ${type}`);
@@ -89,14 +77,12 @@ describe('Server: HTTP API', function() {
 		};
 
 		it('missing secret', function() {
-			return helpers.request('get', {
+			return this.helpers.request('get', {
 				url: server.getCallbackUrl(),
-				ca: server.ca,
-				qs: {},
 				json: true,
 			}).then(result => {
-				const { response, body } = result;
-				expect(body).to.deep.equal({
+				const { body } = result;
+				assert.deepStrictEqual(body, {
 					status: 'ERROR',
 					reason: 'Missing secret',
 				});
@@ -105,19 +91,18 @@ describe('Server: HTTP API', function() {
 
 		describe('?s=SIGNATURE&id=API_KEY_ID&n=NONCE&..', function() {
 
-			it('invalid authorization signature: unknown API key', function() {
-				const unknownApiKey = lnurl.generateApiKey();
+			it('invalid signature: unknown API key', function() {
+				const unknownApiKey = generateApiKey();
 				const tag = 'channelRequest';
 				const params = prepareValidParams('create', tag);
 				const query = prepareSignedQuery(unknownApiKey, tag, params);
-				return helpers.request('get', {
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: query,
 					json: true,
 				}).then(result => {
-					const { response, body } = result;
-					expect(body).to.deep.equal({
+					const { body } = result;
+					assert.deepStrictEqual(body, {
 						status: 'ERROR',
 						reason: 'Invalid API key signature',
 					});
@@ -131,21 +116,20 @@ describe('Server: HTTP API', function() {
 				const query = prepareSignedQuery(apiKey, tag, params);
 				query.localAmt = 500000;
 				query.pushAmt = 500000;
-				return helpers.request('get', {
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: query,
 					json: true,
 				}).then(result => {
-					const { response, body } = result;
-					expect(body).to.deep.equal({
+					const { body } = result;
+					assert.deepStrictEqual(body, {
 						status: 'ERROR',
 						reason: 'Invalid API key signature',
 					});
 				});
 			});
 
-			_.each(['id', 'nonce', 'tag'], function(field) {
+			['id', 'nonce', 'tag'].forEach(field => {
 				it(`missing "${field}"`, function() {
 					const tag = 'channelRequest';
 					const params = prepareValidParams('create', tag);
@@ -153,14 +137,13 @@ describe('Server: HTTP API', function() {
 					let overrides = {};
 					overrides[field] = '';
 					const query = prepareSignedQuery(apiKey, tag, params, { overrides });
-					return helpers.request('get', {
+					return this.helpers.request('get', {
 						url: server.getCallbackUrl(),
-						ca: server.ca,
 						qs: query,
 						json: true,
 					}).then(result => {
-						const { response, body } = result;
-						expect(body).to.deep.equal({
+						const { body } = result;
+						assert.deepStrictEqual(body, {
 							status: 'ERROR',
 							reason: `Failed API key signature check: Missing "${field}"`,
 						});
@@ -173,21 +156,20 @@ describe('Server: HTTP API', function() {
 				const params = prepareValidParams('create', tag);
 				const apiKey = apiKeys[0];
 				const query = prepareSignedQuery(apiKey, tag, params);
-				const outOfOrderQuery = _.extend({
+				const outOfOrderQuery = Object.assign({
 					signature: query.signature,
 					tag: query.tag,
 					id: query.id,
 					nonce: query.nonce,
 				}, params);
-				return helpers.request('get', {
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: outOfOrderQuery,
 					json: true,
 				}).then(result => {
-					const { response, body } = result;
-					expect(body).to.be.an('object');
-					expect(body.status).to.not.equal('ERROR');
+					const { body } = result;
+					assert.strictEqual(typeof body, 'object');
+					assert.notStrictEqual(body.status, 'ERROR');
 				});
 			});
 
@@ -197,21 +179,37 @@ describe('Server: HTTP API', function() {
 				const apiKey = apiKeys[0];
 				const signedUrl = createSignedUrl(apiKey, tag, params, {
 					baseUrl: server.getCallbackUrl(),
-					encode: false,
 					shorten: true,
 				});
-				return helpers.request('get', {
+				return this.helpers.request('get', {
 					url: signedUrl,
-					ca: server.ca,
 					json: true,
 				}).then(result => {
-					const { response, body } = result;
-					expect(body).to.be.an('object');
-					expect(body.status).to.not.equal('ERROR');
+					const { body } = result;
+					assert.strictEqual(typeof body, 'object');
+					assert.notStrictEqual(body.status, 'ERROR');
 				});
 			});
 
-			describe('valid authorization signature', function() {
+			describe('valid signature', function() {
+
+				it('unknown tag', function() {
+					const tag = 'unknown';
+					const params = {};
+					const apiKey = apiKeys[0];
+					const query = prepareSignedQuery(apiKey, tag, params);
+					return this.helpers.request('get', {
+						url: server.getCallbackUrl(),
+						qs: query,
+						json: true,
+					}).then(result => {
+						const { body } = result;
+						assert.deepStrictEqual(body, {
+							status: 'ERROR',
+							reason: `Unknown subprotocol: "unknown"`,
+						});
+					});
+				})
 
 				let testsByTag = {};
 				testsByTag['unknown'] = [
@@ -257,11 +255,11 @@ describe('Server: HTTP API', function() {
 					{
 						params: prepareValidParams('create', 'channelRequest'),
 						expected: function(body) {
-							expect(body).to.be.an('object');
-							expect(body.k1).to.be.a('string');
-							expect(body.tag).to.equal('channelRequest');
-							expect(body.callback).to.equal(server.getCallbackUrl());
-							expect(body.uri).to.be.a('string');
+							assert.strictEqual(typeof body, 'object');
+							assert.strictEqual(typeof body.k1, 'string');
+							assert.strictEqual(body.tag, 'channelRequest');
+							assert.strictEqual(body.callback, server.getCallbackUrl());
+							assert.strictEqual(typeof body.uri, 'string');
 						},
 					},
 				];
@@ -291,13 +289,13 @@ describe('Server: HTTP API', function() {
 					{
 						params: prepareValidParams('create', 'withdrawRequest'),
 						expected: function(body) {
-							expect(body).to.be.an('object');
-							expect(body.k1).to.be.a('string');
-							expect(body.tag).to.equal('withdrawRequest');
-							expect(body.callback).to.equal(server.getCallbackUrl());
+							assert.strictEqual(typeof body, 'object');
+							assert.strictEqual(typeof body.k1, 'string');
+							assert.strictEqual(body.tag, 'withdrawRequest');
+							assert.strictEqual(body.callback, server.getCallbackUrl());
 							const params = prepareValidParams('create', 'withdrawRequest');
-							_.each(params, function(value, key) {
-								expect(body[key]).to.equal(params[key]);
+							Object.entries(params).forEach(([key, value], index) => {
+								assert.strictEqual(body[key], params[key]);
 							});
 						},
 					},
@@ -411,19 +409,19 @@ describe('Server: HTTP API', function() {
 					},
 					{
 						description: 'successAction: null',
-						params: _.extend({}, prepareValidParams('create', 'payRequest'), {
+						params: () => Object.assign({}, prepareValidParams('create', 'payRequest'), {
 							successAction: null,
 						}),
 						expected: function(body, response, query) {
-							expect(body).to.be.an('object');
-							expect(body.status).to.be.undefined;
-							expect(body.successAction).to.be.undefined;
-							expect(body.tag).to.equal('payRequest');
+							assert.strictEqual(typeof body, 'object');
+							assert.ok(!body.status);
+							assert.ok(!body.successAction);
+							assert.strictEqual(body.tag, 'payRequest');
 						},
 					},
 					{
 						description: 'successAction: {"tag": "message"} - non-string message',
-						params: _.extend({}, prepareValidParams('create', 'payRequest'), {
+						params: () => Object.assign({}, prepareValidParams('create', 'payRequest'), {
 							successAction: {
 								tag: 'message',
 								message: [],
@@ -437,17 +435,17 @@ describe('Server: HTTP API', function() {
 					{
 						params: prepareValidParams('create', 'payRequest'),
 						expected: function(body, response, query) {
-							expect(body).to.be.an('object');
-							expect(body.tag).to.equal('payRequest');
+							assert.strictEqual(typeof body, 'object');
+							assert.strictEqual(body.tag, 'payRequest');
 							const { id, signature } = query;
 							const secret = createHash(`${id}-${signature}`);
-							expect(body.callback).to.equal(server.getCallbackUrl() + '/' + secret);
+							assert.strictEqual(body.callback, server.getCallbackUrl() + '/' + secret);
 							const params = prepareValidParams('create', 'payRequest');
-							_.each(params, function(value, key) {
-								if (_.isNull(params[key])) {
-									expect(body[key]).to.be.undefined;
+							Object.entries(params).forEach(([key, value], index) => {
+								if (params[key] === null) {
+									assert.ok(body[key]);
 								} else {
-									expect(body[key]).to.equal(params[key]);
+									assert.strictEqual(body[key], params[key]);
 								}
 							});
 						},
@@ -459,7 +457,7 @@ describe('Server: HTTP API', function() {
 						params: function() {
 							const linkingKey1 = generateRandomLinkingKey();
 							const linkingKey2 = generateRandomLinkingKey();
-							const k1 = Buffer.from(generateRandomByteString(), 'hex');
+							const k1 = crypto.randomBytes(32);
 							const sig = createAuthorizationSignature(k1, linkingKey1.privKey);
 							return {
 								tag: 'login',
@@ -477,7 +475,7 @@ describe('Server: HTTP API', function() {
 						description: 'valid signature',
 						params: function() {
 							const { pubKey, privKey } = generateRandomLinkingKey();
-							const k1 = Buffer.from(generateRandomByteString(), 'hex');
+							const k1 = crypto.randomBytes(32);
 							const sig = createAuthorizationSignature(k1, privKey);
 							const params = {
 								tag: 'login',
@@ -492,13 +490,13 @@ describe('Server: HTTP API', function() {
 						},
 					},
 				];
-				var requiredParameters = {
+				const requiredParameters = {
 					channelRequest: ['localAmt', 'pushAmt'],
 					withdrawRequest: ['minWithdrawable', 'maxWithdrawable', 'defaultDescription'],
 					payRequest: ['minSendable', 'maxSendable', 'metadata'],
 				};
-				_.each(requiredParameters, function(paramNames, tag) {
-					_.each(paramNames, function(name) {
+				Object.entries(requiredParameters).forEach(([tag, paramNames], index) => {
+					paramNames.forEach(name => {
 						let params = prepareValidParams('create', tag);
 						delete params[name];
 						testsByTag[tag].push({
@@ -510,14 +508,14 @@ describe('Server: HTTP API', function() {
 						});
 					});
 				});
-				var integerParameters = {
+				const integerParameters = {
 					channelRequest: ['localAmt', 'pushAmt'],
 					withdrawRequest: ['minWithdrawable', 'maxWithdrawable'],
 					payRequest: ['minSendable', 'maxSendable', 'commentAllowed'],
 				};
-				_.each(['string', 0.1, true], function(nonIntegerValue) {
-					_.each(integerParameters, function(paramNames, tag) {
-						_.each(paramNames, function(name) {
+				['string', 0.1, true].forEach(nonIntegerValue => {
+					Object.entries(integerParameters).forEach(([tag, paramNames], index) => {
+						paramNames.forEach(name => {
 							let params = prepareValidParams('create', tag);
 							params[name] = nonIntegerValue;
 							testsByTag[tag].push({
@@ -530,30 +528,29 @@ describe('Server: HTTP API', function() {
 						});
 					});
 				});
-				_.each(testsByTag, function(tests, tag) {
+				Object.entries(testsByTag).forEach(([tag, tests], index) => {
 					describe(`tag: "${tag}"`, function() {
-						_.each(tests, function(test) {
+						tests.forEach(test => {
 							let description = test.description || ('params: ' + JSON.stringify(test.params));
 							it(description, function() {
 								let params;
-								if (_.isFunction(test.params)) {
+								if (typeof test.params === 'function') {
 									params = test.params.call(this);
 								} else {
 									params = test.params;
 								}
 								const apiKey = apiKeys[0];
 								const query = prepareSignedQuery(apiKey, tag, params);
-								return helpers.request('get', {
+								return this.helpers.request('get', {
 									url: server.getCallbackUrl(),
-									ca: server.ca,
 									qs: query,
 									json: true,
 								}).then(result => {
 									const { response, body } = result;
-									if (_.isFunction(test.expected)) {
+									if (typeof test.expected === 'function') {
 										test.expected.call(this, body, response, query);
 									} else {
-										expect(body).to.deep.equal(test.expected);
+										assert.deepStrictEqual(body, test.expected);
 									}
 									let secret;
 									switch (tag) {
@@ -568,10 +565,10 @@ describe('Server: HTTP API', function() {
 									const hash = createHash(secret);
 									return server.fetchUrl(hash).then(fetchedUrl => {
 										if (body.status === 'ERROR' && tag !== 'login') {
-											expect(fetchedUrl).to.equal(null);
+											assert.strictEqual(fetchedUrl, null);
 										} else {
-											expect(fetchedUrl).to.be.an('object');
-											expect(fetchedUrl.apiKeyId).to.equal(apiKey.id);
+											assert.strictEqual(typeof fetchedUrl, 'object');
+											assert.strictEqual(fetchedUrl.apiKeyId, apiKey.id);
 										}
 									});
 								});
@@ -585,16 +582,15 @@ describe('Server: HTTP API', function() {
 		describe('?q=SECRET', function() {
 
 			it('invalid secret', function() {
-				return helpers.request('get', {
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: {
 						q: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
 					json: true,
 				}).then(result => {
-					const { response, body } = result;
-					expect(body).to.deep.equal({
+					const { body } = result;
+					assert.deepStrictEqual(body, {
 						status: 'ERROR',
 						reason: 'Invalid secret',
 					});
@@ -606,7 +602,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'valid secret',
 					expected: function(body) {
-						expect(body).to.deep.equal({
+						assert.deepStrictEqual(body, {
 							k1: this.secret,
 							tag: 'channelRequest',
 							callback: server.getCallbackUrl(),
@@ -619,7 +615,7 @@ describe('Server: HTTP API', function() {
 				{
 					description: 'valid secret',
 					expected: function(body) {
-						expect(body).to.deep.equal(_.extend({
+						assert.deepStrictEqual(body, Object.assign({
 							k1: this.secret,
 							tag: 'withdrawRequest',
 							callback: server.getCallbackUrl(),
@@ -633,11 +629,11 @@ describe('Server: HTTP API', function() {
 					expected: function(body) {
 						const { secret } = this;
 						const params = prepareValidParams('create', 'payRequest');
-						expect(body.tag).to.equal('payRequest');
-						expect(body.callback).to.equal(server.getCallbackUrl() + '/' + secret);
-						_.each(params, (value, key) => {
-							if (!_.isNull(value)) {
-								expect(body[key]).to.equal(value);
+						assert.strictEqual(body.tag, 'payRequest');
+						assert.strictEqual(body.callback, server.getCallbackUrl() + '/' + secret);
+						Object.entries(params).forEach(([key, value], index) => {
+							if (value !== null) {
+								assert.strictEqual(body[key], value);
 							}
 						});
 					},
@@ -652,7 +648,7 @@ describe('Server: HTTP API', function() {
 					},
 				},
 			];
-			_.each(testsByTag, function(tests, tag) {
+			Object.entries(testsByTag).forEach(([tag, tests], index) => {
 				describe(`tag: "${tag}"`, function() {
 					beforeEach(function() {
 						this.secret = null;
@@ -661,21 +657,20 @@ describe('Server: HTTP API', function() {
 							this.secret = result.secret;
 						});
 					});
-					_.each(tests, function(test) {
+					tests.forEach(test => {
 						it(test.description, function() {
-							return helpers.request('get', {
+							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
-								ca: server.ca,
 								qs: {
 									q: this.secret,
 								},
 								json: true,
 							}).then(result => {
 								const { response, body } = result;
-								if (_.isFunction(test.expected)) {
+								if (typeof test.expected === 'function') {
 									test.expected.call(this, body, response);
 								} else {
-									expect(body).to.deep.equal(test.expected);
+									assert.deepStrictEqual(body, test.expected);
 								}
 							});
 						});
@@ -687,16 +682,15 @@ describe('Server: HTTP API', function() {
 		describe('?k1=SECRET&..', function() {
 
 			it('invalid secret', function() {
-				return helpers.request('get', {
+				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
-					ca: server.ca,
 					qs: {
 						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
 					json: true,
 				}).then(result => {
 					const { response, body } = result;
-					expect(body).to.deep.equal({
+					assert.deepStrictEqual(body, {
 						status: 'ERROR',
 						reason: 'Invalid secret',
 					});
@@ -717,10 +711,10 @@ describe('Server: HTTP API', function() {
 					description: 'single payment request (total OK)',
 					params: validParams.action.withdrawRequest,
 					expected: function(body) {
-						expect(body).to.deep.equal({
+						assert.deepStrictEqual(body, {
 							status: 'OK',
 						});
-						expect(server.ln.getRequestCount('payInvoice')).to.equal(1);
+						assert.strictEqual(server.ln.getRequestCount('payInvoice'), 1);
 					},
 				},
 				{
@@ -753,11 +747,11 @@ describe('Server: HTTP API', function() {
 						pr: generatePaymentRequest(5000000),
 					},
 					expected: function(body) {
-						expect(body).to.deep.equal({
+						assert.deepStrictEqual(body, {
 							status: 'ERROR',
 							reason: 'Amount in invoice must be less than or equal to "maxWithdrawable"',
 						});
-						expect(server.ln.getRequestCount('payInvoice')).to.equal(0);
+						assert.strictEqual(server.ln.getRequestCount('payInvoice'), 0);
 					},
 				},
 			];
@@ -766,29 +760,29 @@ describe('Server: HTTP API', function() {
 					description: 'amount OK',
 					params: validParams.action.payRequest,
 					expected: function(body, response) {
-						expect(body).to.be.an('object');
-						expect(body.pr).to.be.a('string');
-						expect(body.routes).to.be.an('array');
+						assert.strictEqual(typeof body, 'object');
+						assert.strictEqual(typeof body.pr, 'string');
+						assert.ok(body.routes instanceof Array);
 						const purposeCommitHashTagData = getTagDataFromPaymentRequest(body.pr, 'purpose_commit_hash');
 						const { metadata } = validParams.create.payRequest;
-						expect(purposeCommitHashTagData).to.equal(createHash(Buffer.from(metadata, 'utf8')));
-						expect(server.ln.getRequestCount('addInvoice')).to.equal(1);
-						expect(response.headers['cache-control']).to.equal('private');
+						assert.strictEqual(purposeCommitHashTagData, createHash(Buffer.from(metadata, 'utf8')));
+						assert.strictEqual(server.ln.getRequestCount('addInvoice'), 1);
+						assert.strictEqual(response.headers['cache-control'], 'private');
 					},
 				},
 				{
 					description: 'comment too long',
-					params: _.extend({}, validParams.action.payRequest, {
+					params: Object.assign({}, validParams.action.payRequest, {
 						comment: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
 					}),
 					expected: function(body, response) {
 						const { commentAllowed } = validParams.create.payRequest;
-						expect(body).to.deep.equal({
+						assert.deepStrictEqual(body, {
 							status: 'ERROR',
 							reason: `"comment" length must be less than or equal to ${commentAllowed}`,
 						});
-						expect(server.ln.getRequestCount('addInvoice')).to.equal(0);
-						expect(response.headers['cache-control']).to.be.undefined;
+						assert.strictEqual(server.ln.getRequestCount('addInvoice'), 0);
+						assert.ok(!response.headers['cache-control']);
 					},
 				},
 				{
@@ -797,12 +791,12 @@ describe('Server: HTTP API', function() {
 						amount: 99999,
 					},
 					expected: function(body, response) {
-						expect(body).to.deep.equal({
+						assert.deepStrictEqual(body, {
 							status: 'ERROR',
 							reason: 'Amount must be greater than or equal to "minSendable"',
 						});
-						expect(server.ln.getRequestCount('addInvoice')).to.equal(0);
-						expect(response.headers['cache-control']).to.be.undefined;
+						assert.strictEqual(server.ln.getRequestCount('addInvoice'), 0);
+						assert.ok(!response.headers['cache-control']);
 					},
 				},
 				{
@@ -811,12 +805,12 @@ describe('Server: HTTP API', function() {
 						amount: 200001,
 					},
 					expected: function(body, response) {
-						expect(body).to.deep.equal({
+						assert.deepStrictEqual(body, {
 							status: 'ERROR',
 							reason: 'Amount must be less than or equal to "maxSendable"',
 						});
-						expect(server.ln.getRequestCount('addInvoice')).to.equal(0);
-						expect(response.headers['cache-control']).to.be.undefined;
+						assert.strictEqual(server.ln.getRequestCount('addInvoice'), 0);
+						assert.ok(!response.headers['cache-control']);
 					},
 				},
 			];
@@ -843,7 +837,7 @@ describe('Server: HTTP API', function() {
 					description: 'signed different secret',
 					params: function() {
 						const { pubKey, privKey } = generateRandomLinkingKey();
-						const k1 = Buffer.from(generateRandomByteString(), 'hex');
+						const k1 = crypto.randomBytes(32);
 						const sig = createAuthorizationSignature(k1, privKey);
 						const params = {
 							sig: sig.toString('hex'),
@@ -866,12 +860,12 @@ describe('Server: HTTP API', function() {
 					},
 				},
 			];
-			_.each({
+			Object.entries({
 				channelRequest: ['remoteid'],
 				withdrawRequest: ['pr'],
 				payRequest: ['amount'],
-			}, function(paramNames, tag) {
-				_.each(paramNames, function(name) {
+			}).forEach(([tag, paramNames], index) => {
+				paramNames.forEach(name => {
 					let params = prepareValidParams('action', tag);
 					delete params[name];
 					testsByTag[tag].push({
@@ -883,7 +877,7 @@ describe('Server: HTTP API', function() {
 					});
 				});
 			});
-			_.each(testsByTag, function(tests, tag) {
+			Object.entries(testsByTag).forEach(([tag, tests], index) => {
 				describe(`tag: "${tag}"`, function() {
 					beforeEach(function() {
 						this.secret = null;
@@ -894,31 +888,30 @@ describe('Server: HTTP API', function() {
 					});
 					beforeEach(function() {
 						server.ln.resetRequestCounters();
-						expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(0);
+						assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), 0);
 					});
-					_.each(tests, function(test) {
+					tests.forEach(test => {
 						let description = test.description || ('params: ' + JSON.stringify(test.params));
 						it(description, function() {
 							let params;
-							if (_.isFunction(test.params)) {
+							if (typeof test.params === 'function') {
 								params = test.params.call(this);
 							} else {
 								params = test.params;
 							}
-							params = _.extend({}, params, {
+							params = Object.assign({}, params, {
 								k1: this.secret,
 							});
-							return helpers.request('get', {
+							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
-								ca: server.ca,
 								qs: params,
 								json: true,
 							}).then(result => {
 								const { response, body } = result;
-								if (_.isFunction(test.expected)) {
+								if (typeof test.expected === 'function') {
 									test.expected.call(this, body, response);
 								} else {
-									expect(body).to.deep.equal(test.expected);
+									assert.deepStrictEqual(body, test.expected);
 								}
 							});
 						});
@@ -940,23 +933,22 @@ describe('Server: HTTP API', function() {
 					},
 				];
 
-				_.each(successActions, successAction => {
+				successActions.forEach(successAction => {
 					it(JSON.stringify(successAction), function() {
-						const createParams = _.extend({}, prepareValidParams('create', 'payRequest'), { successAction });
+						const createParams = Object.assign({}, prepareValidParams('create', 'payRequest'), { successAction });
 						return server.generateNewUrl('payRequest', createParams).then(result => {
 							const { secret } = result;
-							const actionParams = _.extend({}, prepareValidParams('action', 'payRequest'), {
+							const actionParams = Object.assign({}, prepareValidParams('action', 'payRequest'), {
 								k1: secret,
 							});
-							return helpers.request('get', {
+							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
-								ca: server.ca,
 								qs: actionParams,
 								json: true,
 							})
 						}).then(result => {
 							const { response, body } = result;
-							expect(body.successAction).to.deep.equal(successAction);
+							assert.deepStrictEqual(body.successAction, successAction);
 						});
 					});
 				});
@@ -967,16 +959,15 @@ describe('Server: HTTP API', function() {
 				describe('failed payment to LN backend', function() {
 
 					let server;
-					before(function(done) {
-						server = helpers.createServer({
+					before(function() {
+						server = this.helpers.createServer({
 							port: 3001,
 							lightning: {
 								backend: 'dummy',
 								config: { alwaysFail: true },
 							},
 						});
-						server.once('error', done);
-						server.once('listening', done);
+						return server.onReady();
 					});
 
 					const uses = 1;
@@ -994,20 +985,19 @@ describe('Server: HTTP API', function() {
 					});
 
 					it('should not record a "use" in case of error response from LN backend', function() {
-						const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
+						const query = Object.assign({}, prepareValidParams('action', tag, secret) || {}, {
 							k1: secret,
 						});
-						return helpers.request('get', {
+						return this.helpers.request('get', {
 							url: server.getCallbackUrl(),
-							ca: server.ca,
 							qs: query,
 							json: true,
 						}).then(result => {
 							const hash = createHash(secret);
 							return server.fetchUrl(hash).then(fetchedUrl => {
-								expect(fetchedUrl).to.be.an('object');
-								expect(fetchedUrl.initialUses).to.equal(uses);
-								expect(fetchedUrl.remainingUses).to.equal(uses);
+								assert.strictEqual(typeof fetchedUrl, 'object');
+								assert.strictEqual(fetchedUrl.initialUses, uses);
+								assert.strictEqual(fetchedUrl.remainingUses, uses);
 							});
 						});
 					});
@@ -1023,71 +1013,68 @@ describe('Server: HTTP API', function() {
 						const options = {
 							baseUrl: server.getCallbackUrl(),
 							shorten: false,
-							encode: false,
 						};
-						signedUrl = lnurl.createSignedUrl(apiKey, tag, params, options);
+						signedUrl = createSignedUrl(apiKey, tag, params, options);
 					});
 
 					before(function() {
 						server.ln.resetRequestCounters();
-						expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(0);
+						assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), 0);
 					});
 
-					it('can be used only once', function(done) {
-						helpers.request('get', {
+					it('can be used only once', function() {
+						return this.helpers.request('get', {
 							url: signedUrl,
-							ca: server.ca,
 							json: true,
-						}).then(result => {
-							expect(result.body).to.be.an('object');
-							expect(result.body.status).to.be.undefined;
-							expect(result.body).to.have.property('k1');
-							return helpers.request('get', {
+						}).then(infoResult => {
+							assert.strictEqual(typeof infoResult.body, 'object');
+							assert.ok(!infoResult.body.status);
+							assert.ok(infoResult.body.k1);
+							return this.helpers.request('get', {
 								url: signedUrl,
-								ca: server.ca,
 								json: true,
-							}).then(result2 => {
-								expect(result2.body).to.be.an('object');
-								expect(result2.body.status).to.be.undefined;
-								expect(result2.body).to.have.property('k1');
-								const { callback, k1 } = result2.body;
-								const query = _.extend({}, prepareValidParams('action', tag, k1) || {}, {
-									k1,
-								});
-								const attempts = 3;
-								const success = 1;
-								async.timesSeries(attempts, function(index, next) {
+							});
+						}).then(infoResult2 => {
+							assert.strictEqual(typeof infoResult2.body, 'object');
+							assert.ok(!infoResult2.body.status);
+							assert.ok(infoResult2.body.k1);
+							const { callback, k1 } = infoResult2.body;
+							const query = Object.assign({}, prepareValidParams('action', tag, k1) || {}, {
+								k1,
+							});
+							const attempts = 3;
+							const success = 1;
+							return promiseAllSeries(Array.from(Array(attempts)).map((value, index) => {
+								return function() {
 									const n = index + 1;
-									helpers.request('get', {
+									return this.helpers.request('get', {
 										url: callback,
-										ca: server.ca,
 										qs: query,
 										json: true,
-									}).then(result3 => {
-										const { body } = result3;
+									}).then(actionResult => {
 										if (n <= success) {
 											// Expecting success.
-											expect(body).to.be.an('object');
-											expect(body.status).to.not.equal('ERROR');
-											expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(n);
+											assert.strictEqual(typeof actionResult.body, 'object');
+											assert.notStrictEqual(actionResult.body.status, 'ERROR');
+											assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), n);
 										} else {
 											// Expecting failure.
-											expect(body).to.deep.equal({
+											assert.deepStrictEqual(actionResult.body, {
 												reason: 'Maximum number of uses already reached',
 												status: 'ERROR',
 											});
-											expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(success);
+											assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), success);
 										}
-									}).then(next).catch(next);
-								}, done);
-							});
-						}).catch(done);
+									});
+								}.bind(this);
+							}));
+						});
 					});
 				});
 
 				describe('simultaneous requests', function() {
 
-					const uses = 1;
+					const uses = 2;
 					const attempts = 5;
 					const tag = 'withdrawRequest';
 					let secret;
@@ -1098,28 +1085,19 @@ describe('Server: HTTP API', function() {
 						});
 					});
 
-					it('has expected number of successes and failures', function(done) {
-						const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
+					it('has expected number of successes and failures', function() {
+						const query = Object.assign({}, prepareValidParams('action', tag, secret) || {}, {
 							k1: secret,
 						});
-						async.times(attempts, function(index, next) {
-							return helpers.request('get', {
+						return Promise.all(Array.from(Array(attempts)).map(() => {
+							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
-								ca: server.ca,
 								qs: query,
 								json: true,
-							}).then(result => {
-								next(null, result.body);
-							}).catch(next);
-						}, function(error, results) {
-							if (error) return done(error);
-							try {
-								const successes = (_.where(results, { status: 'OK' }) || []).length;
-								expect(successes).to.equal(uses);
-							} catch (error) {
-								return done(error);
-							}
-							done();
+							});
+						})).then(results => {
+							const successes = results.filter(result => result.body.status === 'OK').length;
+							assert.strictEqual(successes, uses);
 						});
 					});
 				});
@@ -1153,53 +1131,58 @@ describe('Server: HTTP API', function() {
 					},
 				];
 
-				_.each(tests, function(test) {
+				tests.forEach(test => {
 
-					const { description, tag, uses } = test;
+					const { attempts, description, tag, uses } = test;
 
 					describe(description, function() {
 
 						let secret;
 						before(function() {
 							const params = prepareValidParams('create', tag);
-							return server.generateNewUrl(tag, params, { uses }).then(result => {
+							let options = {};
+							if (typeof uses !== 'undefined') {
+								options.uses = uses;
+							}
+							return server.generateNewUrl(tag, params, options).then(result => {
 								secret = result.secret;
 							});
 						});
 
 						before(function() {
 							server.ln.resetRequestCounters();
-							expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(0);
+							assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), 0);
 						});
 
-						it('has expected number of successes and failures', function(done) {
-							const query = _.extend({}, prepareValidParams('action', tag, secret) || {}, {
+						it('has expected number of successes and failures', function() {
+							const query = Object.assign({}, prepareValidParams('action', tag, secret) || {}, {
 								k1: secret,
 							});
-							async.timesSeries(test.attempts, function(index, next) {
-								const n = index + 1;
-								return helpers.request('get', {
-									url: server.getCallbackUrl(),
-									ca: server.ca,
-									qs: query,
-									json: true,
-								}).then(result => {
-									const { response, body } = result;
-									if (n <= test.expected.success) {
-										// Expecting success.
-										expect(body).to.be.an('object');
-										expect(body.status).to.not.equal('ERROR');
-										expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(n);
-									} else {
-										// Expecting failure.
-										expect(body).to.deep.equal({
-											reason: 'Maximum number of uses already reached',
-											status: 'ERROR',
-										});
-										expect(server.ln.getRequestCount(tagToLightningBackendMethod[tag])).to.equal(test.expected.success);
-									}
-								}).then(next).catch(next);
-							}, done);
+							return promiseAllSeries(Array.from(Array(attempts)).map((value, index) => {
+								return function() {
+									const n = index + 1;
+									return this.helpers.request('get', {
+										url: server.getCallbackUrl(),
+										qs: query,
+										json: true,
+									}).then(result => {
+										const { body } = result;
+										if (n <= test.expected.success) {
+											// Expecting success.
+											assert.strictEqual(typeof body, 'object');
+											assert.notStrictEqual(body.status, 'ERROR');
+											assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), n);
+										} else {
+											// Expecting failure.
+											assert.deepStrictEqual(body, {
+												reason: 'Maximum number of uses already reached',
+												status: 'ERROR',
+											});
+											assert.strictEqual(server.ln.getRequestCount(tagToLightningBackendMethod[tag]), test.expected.success);
+										}
+									});
+								}.bind(this);
+							}));
 						});
 					});
 				});

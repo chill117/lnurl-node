@@ -1,12 +1,7 @@
-const { expect } = require('chai');
-const lnurl = require('../../../../');
+const assert = require('assert');
 const querystring = require('querystring');
 
 describe('getCallbackUrl([params])', function() {
-
-	it('is a function', function() {
-		expect(lnurl.Server.prototype.getCallbackUrl).to.be.a('function');
-	});
 
 	describe('default options', function() {
 
@@ -16,6 +11,7 @@ describe('getCallbackUrl([params])', function() {
 				listen: false,
 				lightning: null,
 			});
+			return server.onReady();
 		});
 
 		after(function() {
@@ -25,7 +21,7 @@ describe('getCallbackUrl([params])', function() {
 		it('no params', function() {
 			const result = server.getCallbackUrl();
 			const { endpoint, url } = server.options;
-			expect(result).to.equal(`${url}${endpoint}`);
+			assert.strictEqual(result, `${url}${endpoint}`);
 		});
 
 		it('with params', function() {
@@ -36,7 +32,7 @@ describe('getCallbackUrl([params])', function() {
 			const result = server.getCallbackUrl(params);
 			const { endpoint, url } = server.options;
 			const query = querystring.stringify(params);
-			expect(result).to.equal(`${url}${endpoint}?${query}`);
+			assert.strictEqual(result, `${url}${endpoint}?${query}`);
 		});
 	});
 
@@ -52,6 +48,7 @@ describe('getCallbackUrl([params])', function() {
 				listen: false,
 				lightning: null,
 			});
+			return server.onReady();
 		});
 
 		after(function() {
@@ -60,7 +57,7 @@ describe('getCallbackUrl([params])', function() {
 
 		it('no params', function() {
 			const result = server.getCallbackUrl();
-			expect(result).to.equal(`${url}${endpoint}`);
+			assert.strictEqual(result, `${url}${endpoint}`);
 		});
 	});
 });

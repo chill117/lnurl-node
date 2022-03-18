@@ -1,6 +1,5 @@
-const _ = require('underscore');
+const assert = require('assert');
 const crypto = require('crypto');
-const { expect } = require('chai');
 const { createHash, generateNodeKey, generatePaymentRequest, getTagDataFromPaymentRequest } = require('../../../../lib');
 const DummyLightningBackend = require('../../../../lib/lightning/dummy');
 
@@ -17,7 +16,7 @@ describe('lightning', function() {
 
 			it('getNodeUri()', function() {
 				return ln.getNodeUri().then(result => {
-					expect(result).to.be.a('string');
+					assert.strictEqual(typeof result, 'string');
 				});
 			});
 
@@ -32,8 +31,8 @@ describe('lightning', function() {
 			it('payInvoice(invoice)', function() {
 				const invoice = generatePaymentRequest(1000);
 				return ln.payInvoice(invoice).then(result => {
-					expect(result).to.be.an('object');
-					expect(result).to.have.property('id');
+					assert.strictEqual(typeof result, 'object');
+					assert.notStrictEqual(typeof result.id, 'undefined');
 				});
 			});
 
@@ -43,17 +42,17 @@ describe('lightning', function() {
 					description: 'lnurl test addInvoice',
 				};
 				return ln.addInvoice(amount, extra).then(result => {
-					expect(result).to.be.an('object');
-					expect(result).to.have.property('id');
+					assert.strictEqual(typeof result, 'object');
+					assert.notStrictEqual(typeof result.id, 'undefined');
 				});
 			});
 
 			it('getInvoiceStatus(paymentHash)', function() {
 				const paymentHash = createHash('preimage test getInvoiceStatus');
 				return ln.getInvoiceStatus(paymentHash).then(result => {
-					expect(result).to.be.an('object');
-					expect(result).to.have.property('preimage');
-					expect(result).to.have.property('settled');
+					assert.strictEqual(typeof result, 'object');
+					assert.ok(result.preimage);
+					assert.ok(result.settled);
 				});
 			});
 		});
@@ -67,13 +66,9 @@ describe('lightning', function() {
 					ln = new DummyLightningBackend({ alwaysFail: true });
 				});
 
-				_.each(['getNodeUri', 'openChannel', 'payInvoice', 'addInvoice'], method => {
+				['getNodeUri', 'openChannel', 'payInvoice', 'addInvoice'].forEach(method => {
 					it(`${method} should fail`, function() {
-						return ln[method]().then(() => {
-							throw new Error(`Expected ${method} to fail`);
-						}).catch(error => {
-							expect(error.message).to.equal(`${method} failure`);
-						});
+						assert.rejects(ln[method]());
 					});
 				});
 			});
@@ -85,9 +80,9 @@ describe('lightning', function() {
 					ln = new DummyLightningBackend({ alwaysFail: false });
 				});
 
-				_.each(['getNodeUri', 'openChannel', 'payInvoice', 'addInvoice'], method => {
+				['getNodeUri', 'openChannel', 'payInvoice', 'addInvoice'].forEach(method => {
 					it(`${method} should not fail`, function() {
-						return ln[method]();
+						assert.doesNotReject(ln[method]());
 					});
 				});
 			});
@@ -103,16 +98,17 @@ describe('lightning', function() {
 
 				it('addInvoice returns invoice with payment hash of preimage', function() {
 					return ln.addInvoice().then(result => {
-						expect(result).to.be.an('object');
+						assert.strictEqual(typeof result, 'object');
+						assert.ok(result.invoice);
 						const paymentHash = getTagDataFromPaymentRequest(result.invoice, 'payment_hash');
-						expect(paymentHash).to.equal(createHash(preimage));
+						assert.strictEqual(paymentHash, createHash(preimage));
 					});
 				});
 
 				it('getInvoiceStatus returns { preimage: "KNOWN_PREIMAGE" }', function() {
 					return ln.getInvoiceStatus().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.preimage).to.equal(preimage);
+						assert.strictEqual(typeof result, 'object');
+						assert.strictEqual(result.preimage, preimage);
 					});
 				});
 			});
@@ -126,17 +122,17 @@ describe('lightning', function() {
 
 				it('payInvoice returns { id: "IDENTIFIER" }', function() {
 					return ln.payInvoice().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.id).to.not.equal(null);
-						expect(result.id).to.be.a('string');
+						assert.strictEqual(typeof result, 'object');
+						assert.ok(result.id);
+						assert.strictEqual(typeof result.id, 'string');
 					});
 				});
 
 				it('addInvoice returns { id: "IDENTIFIER" }', function() {
 					return ln.payInvoice().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.id).to.not.equal(null);
-						expect(result.id).to.be.a('string');
+						assert.strictEqual(typeof result, 'object');
+						assert.ok(result.id);
+						assert.strictEqual(typeof result.id, 'string');
 					});
 				});
 			});
@@ -150,15 +146,15 @@ describe('lightning', function() {
 
 				it('payInvoice returns { id: null }', function() {
 					return ln.payInvoice().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.id).to.equal(null);
+						assert.strictEqual(typeof result, 'object');
+						assert.strictEqual(result.id, null);
 					});
 				});
 
 				it('addInvoice returns { id: null }', function() {
 					return ln.payInvoice().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.id).to.equal(null);
+						assert.strictEqual(typeof result, 'object');
+						assert.strictEqual(result.id, null);
 					});
 				});
 			});
@@ -172,8 +168,8 @@ describe('lightning', function() {
 
 				it('getInvoiceStatus returns { settled: true }', function() {
 					return ln.getInvoiceStatus().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.settled).to.equal(true);
+						assert.strictEqual(typeof result, 'object');
+						assert.strictEqual(result.settled, true);
 					});
 				});
 			});
@@ -187,8 +183,8 @@ describe('lightning', function() {
 
 				it('getInvoiceStatus returns { settled: false }', function() {
 					return ln.getInvoiceStatus().then(result => {
-						expect(result).to.be.an('object');
-						expect(result.settled).to.equal(false);
+						assert.strictEqual(typeof result, 'object');
+						assert.strictEqual(result.settled, false);
 					});
 				});
 			});

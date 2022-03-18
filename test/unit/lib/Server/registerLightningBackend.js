@@ -1,5 +1,5 @@
+const assert = require('assert');
 const fs = require('fs');
-const { expect } = require('chai');
 const path = require('path');
 const { LightningBackend } = require('../../../../lib');
 
@@ -11,6 +11,7 @@ describe('registerLightningBackend(name, filePathOrPrototype)', function() {
 			listen: false,
 			lightning: null,
 		});
+		return server.onReady();
 	});
 
 	afterEach(function() {
@@ -38,9 +39,9 @@ module.exports = CustomBackend;`;
 		fs.writeFileSync(filePath, contents);
 		server.registerLightningBackend(name, filePath);
 		const ln = server.prepareLightningBackend({ backend: name });
-		expect(ln).to.be.an('object');
-		expect(ln instanceof LightningBackend);
-		expect(ln.name).to.equal(name);
+		assert.strictEqual(typeof ln, 'object');
+		assert.ok(ln instanceof LightningBackend);
+		assert.strictEqual(ln.name, name);
 	});
 
 	it('prototype', function() {
@@ -60,9 +61,9 @@ module.exports = CustomBackend;`;
 		};
 		server.registerLightningBackend(name, CustomBackend);
 		const ln = server.prepareLightningBackend({ backend: name });
-		expect(ln).to.be.an('object');
-		expect(ln instanceof CustomBackend);
-		expect(ln.name).to.equal(name);
+		assert.strictEqual(typeof ln, 'object');
+		assert.ok(ln instanceof CustomBackend);
+		assert.strictEqual(ln.name, name);
 	});
 
 	it('missing required method', function() {
@@ -80,14 +81,9 @@ module.exports = CustomBackend;`;
 			addInvoice() {}
 			getInvoiceStatus() {}
 		};
-		let thrownError;
-		try {
-			server.registerLightningBackend(name, CustomBackend);
-		} catch (error) {
-			thrownError = error;
-		}
-		expect(thrownError).to.not.be.undefined;
-		expect(thrownError.message).to.contain(`LightningBackend [${name}] missing required method: "getNodeUri"`);
+		assert.throws(() => server.registerLightningBackend(name, CustomBackend), {
+			message: `LightningBackend [${name}] missing required method: "getNodeUri"`,
+		});
 	});
 
 	it('with required option', function() {
@@ -105,12 +101,6 @@ module.exports = CustomBackend;`;
 			addInvoice() {}
 			getInvoiceStatus() {}
 		};
-		let thrownError;
-		try {
-			server.registerLightningBackend(name, CustomBackend);
-		} catch (error) {
-			thrownError = error;
-		}
-		expect(thrownError).to.be.undefined;
+		server.registerLightningBackend(name, CustomBackend);
 	});
 });

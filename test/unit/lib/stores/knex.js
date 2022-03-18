@@ -1,7 +1,6 @@
-const _ = require('underscore');
-const { createHash, generateRandomByteString } = require('../../../../lib');
-const { expect } = require('chai');
-const helpers = require('../../../helpers');
+const assert = require('assert');
+const crypto = require('crypto');
+const { createHash } = require('../../../../lib');
 
 describe('stores.knex', function() {
 
@@ -31,20 +30,18 @@ describe('stores.knex', function() {
 
 		describe('create(hash, tag, params[, options])', function() {
 
-			it('duplicate hash', function(done) {
-				const hash = createHash(generateRandomByteString());
+			it('duplicate hash', function() {
+				const hash = createHash(crypto.randomBytes(32).toString('hex'));
 				const tag = 'withdrawRequest';
 				const params = {
 					minWithdrawable: 10000,
 					maxWithdrawable: 10000,
 					defaultDescription: '',
 				};
-				store.create(hash, tag, params).then(result => {
+				return store.create(hash, tag, params).then(result => {
 					return store.create(hash, tag, params).then(result2 => {
 						return store.db('urls').select('*').where({ hash }).then(results => {
-							if (results.length > 1) {
-								done(new Error('Should not have been able to save a duplicate entry in the data store'));
-							}
+							assert.strictEqual(results.length, 0, 'Should not have been able to save a duplicate entry in the data store');
 						});
 					}).catch(error => {
 						let uniqueConstraintRegex;
@@ -59,12 +56,12 @@ describe('stores.knex', function() {
 						}
 						if (uniqueConstraintRegex.test(error.message)) {
 							// Error was related to unique constraint, as expected.
-							return done();
+						} else {
+							// Re-throw any other error.
+							throw error;
 						}
-						// Unexpected error.
-						done(error);
 					});
-				}).catch(done);
+				});
 			});
 		});
 
@@ -82,13 +79,15 @@ describe('stores.knex', function() {
 					return store.db.migrate.up();
 				});
 
+				let fixtures;
+
 				before(function() {
 					// Seed URLs into the data store.
 					return store.db('urls').del().then(() => {
-						return store.db('urls').insert([
+						fixtures = [
 							{
 								hash: 'b3c5a924417e2582cc4b0b0a65279ae8dbaf549e565482fe02ffc32bb7cfcc3d',
-								data: JSON.stringify({
+								data: {
 									tag: 'withdrawRequest',
 									params: {
 										minWithdrawable: 50000,
@@ -96,11 +95,11 @@ describe('stores.knex', function() {
 										defaultDescription: 'already used',
 									},
 									used: true,
-								}),
+								},
 							},
 							{
 								hash: '40bfe2e19ed2356db4dd36d448bd96ed9972e3769bdd7cd1d03ac95d50d970f9',
-								data: JSON.stringify({
+								data: {
 									tag: 'withdrawRequest',
 									params: {
 										minWithdrawable: 10000,
@@ -108,11 +107,11 @@ describe('stores.knex', function() {
 										defaultDescription: 'this URL was not used yet',
 									},
 									used: false,
-								}),
+								},
 							},
 							{
 								hash: '8810cb9f6d07ba997050ccd6dc44bd8f83d79cc7eb6b7842ee371f79aa3fb418',
-								data: JSON.stringify({
+								data: {
 									tag: 'channelRequest',
 									params: {
 										localAmt: 100000,
@@ -120,9 +119,14 @@ describe('stores.knex', function() {
 									},
 									apiKeyId: 'dEaqCUc=',
 									used: false,
-								}),
+								},
 							},
-						]);
+						];
+						return store.db('urls').insert(fixtures.map(fixture => {
+							return Object.assign({}, fixture, {
+								data: JSON.stringify(fixture.data),
+							});
+						}));
 					});
 				});
 
@@ -133,59 +137,31 @@ describe('stores.knex', function() {
 
 				it('existing URLs should be migrated to the new schema correctly', function() {
 					return store.db('urls').select().then(results => {
-						results = _.map(results, function(result) {
-							if (_.isString(result.params)) {
+						assert.strictEqual(results.length, fixtures.length);
+						fixtures.forEach(fixture => {
+							const result = results.find(result => {
+								return result.hash === fixture.hash;
+							});
+							assert.ok(result);
+							if (typeof result.params === 'string') {
 								result.params = JSON.parse(result.params);
 							}
-							expect(result).to.have.property('createdAt');
-							expect(result).to.have.property('updatedAt');
+							assert.notStrictEqual(typeof result.createdAt, 'undefined');
+							assert.notStrictEqual(typeof result.updatedAt, 'undefined');
 							switch (store.db.client.config.client) {
 								case 'pg':
 								case 'postgres':
 								case 'sqlite3':
-									expect(result.createdAt).to.equal(null);
-									expect(result.updatedAt).to.equal(null);
+									assert.strictEqual(result.createdAt, null);
+									assert.strictEqual(result.updatedAt, null);
 									break;
 							}
-							return _.omit(result, 'createdAt', 'updatedAt');
+							assert.strictEqual(result.tag, fixture.data.tag);
+							assert.deepStrictEqual(result.params, fixture.data.params);
+							assert.strictEqual(result.apiKeyId, fixture.data.apiKeyId || null);
+							assert.strictEqual(result.initialUses, 1);
+							assert.strictEqual(result.remainingUses, fixture.data.used ? 0 : 1);
 						});
-						expect(results).to.deep.equal([
-							{
-								hash: 'b3c5a924417e2582cc4b0b0a65279ae8dbaf549e565482fe02ffc32bb7cfcc3d',
-								tag: 'withdrawRequest',
-								params: {
-									minWithdrawable: 50000,
-									maxWithdrawable: 70000,
-									defaultDescription: 'already used',
-								},
-								apiKeyId: null,
-								initialUses: 1,
-								remainingUses: 0,
-							},
-							{
-								hash: '40bfe2e19ed2356db4dd36d448bd96ed9972e3769bdd7cd1d03ac95d50d970f9',
-								tag: 'withdrawRequest',
-								params: {
-									minWithdrawable: 10000,
-									maxWithdrawable: 10000,
-									defaultDescription: 'this URL was not used yet',
-								},
-								apiKeyId: null,
-								initialUses: 1,
-								remainingUses: 1,
-							},
-							{
-								hash: '8810cb9f6d07ba997050ccd6dc44bd8f83d79cc7eb6b7842ee371f79aa3fb418',
-								tag: 'channelRequest',
-								params: {
-									localAmt: 100000,
-									pushAmt: 0,
-								},
-								apiKeyId: 'dEaqCUc=',
-								initialUses: 1,
-								remainingUses: 1,
-							},
-						]);
 					});
 				});
 			});

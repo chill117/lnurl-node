@@ -1,4 +1,4 @@
-const _ = require('underscore');
+const { createSignedUrl } = require('lnurl-offline');
 const Server = require('./lib/Server');
 
 let lnurl = {
@@ -6,18 +6,28 @@ let lnurl = {
 	createServer(options) {
 		return new Server(options);
 	},
+	createSignedUrl,
 	Server,
 };
 
-_.extend(lnurl, _.pick(require('./lib'), [
-	'createAuthorizationSignature',
-	'createSignedUrl',
-	'encode',
-	'decode',
-	'generateApiKey',
-	'generateRandomLinkingKey',
-	'LightningBackend',
-	'verifyAuthorizationSignature',
-]))
+const {
+	createAuthorizationSignature,
+	encode,
+	decode,
+	generateApiKey,
+	generateRandomLinkingKey,
+	LightningBackend,
+	verifyAuthorizationSignature
+} = require('./lib');
+
+Object.assign(lnurl, {
+	createAuthorizationSignature,
+	encode,
+	decode,
+	generateApiKey,
+	generateRandomLinkingKey,
+	LightningBackend,
+	verifyAuthorizationSignature
+});
 
 module.exports = lnurl;

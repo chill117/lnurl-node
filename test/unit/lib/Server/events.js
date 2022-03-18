@@ -1,31 +1,29 @@
-const _ = require('underscore');
-const { expect } = require('chai');
+const assert = require('assert');
 const { generateApiKey } = require('../../../../lib');
-const helpers = require('../../../helpers');
 const path = require('path');
 
 describe('Server: events', function() {
 
 	describe('subprotocols', function() {
 
-		const { validParams } = helpers.fixtures;
-
 		let server;
 		let apiKeyAlwaysFail, apiKeyAlwaysSucceed;
+		let validParams;
 		beforeEach(function() {
-			apiKeyAlwaysFail = _.extend({}, generateApiKey(), {
+			validParams = this.helpers.fixtures.validParams;
+			apiKeyAlwaysFail = Object.assign({}, generateApiKey(), {
 				lightning: {
 					backend: 'dummy',
 					config: { alwaysFail: true },
 				},
 			});
-			apiKeyAlwaysSucceed = _.extend({}, generateApiKey(), {
+			apiKeyAlwaysSucceed = Object.assign({}, generateApiKey(), {
 				lightning: {
 					backend: 'dummy',
 					config: {},
 				},
 			});
-			server = helpers.createServer({
+			server = this.helpers.createServer({
 				listen: false,
 				auth: {
 					apiKeys: [
@@ -35,6 +33,7 @@ describe('Server: events', function() {
 				},
 				lightning: null,
 			});
+			return server.onReady();
 		});
 
 		afterEach(function() {
@@ -56,17 +55,17 @@ describe('Server: events', function() {
 				let calls = 0;
 				server.once('login', function(event) {
 					calls++;
-					expect(event).to.be.an('object');
-					expect(event.key).to.be.a('string');
-					expect(event.hash).to.be.a('string');
+					assert.strictEqual(typeof event, 'object');
+					assert.strictEqual(typeof event.key, 'string');
+					assert.strictEqual(typeof event.hash, 'string');
 				});
 				return server.runSubProtocol('login', 'action', secret, params).then(() => {
-					expect(calls).to.equal(1);
+					assert.strictEqual(calls, 1);
 				});
 			});
 		});
 
-		_.each(['channelRequest', 'payRequest', 'withdrawRequest'], function(tag) {
+		['channelRequest', 'payRequest', 'withdrawRequest'].forEach(tag => {
 
 			describe(tag, function() {
 
@@ -82,28 +81,28 @@ describe('Server: events', function() {
 				it(`${tag}:action:processed`, function() {
 					let calls = 0;
 					const actionParams = validParams.action[tag];
-					const combinedParams = _.extend({}, actionParams, createParams);
+					const combinedParams = Object.assign({}, actionParams, createParams);
 					let events = [];
 					server.on(`${tag}:action:processed`, function(event) {
 						events.push(event);
 					});
 					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams, apiKeyAlwaysSucceed.id).then(() => {
-						expect(events).to.have.length(1);
-						_.each(events, event => {
-							expect(event).to.be.an('object');
-							expect(event.secret).to.equal(newUrl.secret);
-							expect(event.params).to.deep.equal(combinedParams);
-							expect(event.result).to.be.an('object');
+						assert.strictEqual(events.length, 1);
+						events.forEach(event => {
+							assert.strictEqual(typeof event, 'object');
+							assert.strictEqual(event.secret, newUrl.secret);
+							assert.deepStrictEqual(event.params, combinedParams);
+							assert.strictEqual(typeof event.result, 'object');
 							switch (tag) {
 								case 'channelRequest':
-									expect(event.result).to.deep.equal({});
+									assert.deepStrictEqual(event.result, {});
 									break;
 								case 'payRequest':
-									expect(event.result.id).to.equal(null);
-									expect(event.result.invoice).to.be.a('string');
+									assert.strictEqual(event.result.id, null);
+									assert.strictEqual(typeof event.result.invoice, 'string');
 									break;
 								case 'withdrawRequest':
-									expect(event.result.id).to.equal(null);
+									assert.strictEqual(event.result.id, null);
 									break;
 							}
 						});
@@ -119,7 +118,7 @@ describe('Server: events', function() {
 				it(`${tag}:action:failed`, function() {
 					let calls = 0;
 					const actionParams = validParams.action[tag];
-					const combinedParams = _.extend({}, actionParams, createParams);
+					const combinedParams = Object.assign({}, actionParams, createParams);
 					const backendMethod = tagToLightningBackendMethod[tag];
 					let events = [];
 					server.on(`${tag}:action:failed`, function(event) {
@@ -128,13 +127,13 @@ describe('Server: events', function() {
 					return server.runSubProtocol(tag, 'action', newUrl.secret, combinedParams, apiKeyAlwaysFail.id).then(() => {
 						throw new Error('Should not have been executed');
 					}).catch(error => {
-						expect(error.message).to.equal(`${backendMethod} failure`);
-						_.each(events, event => {
-							expect(event).to.be.an('object');
-							expect(event.secret).to.be.a('string');
-							expect(event.params).to.be.an('object');
-							expect(event.error instanceof Error).to.equal(true);
-							expect(event.error.message).to.equal(`${backendMethod} failure`);
+						assert.strictEqual(error.message, `${backendMethod} failure`);
+						events.forEach(event => {
+							assert.strictEqual(typeof event, 'object');
+							assert.strictEqual(typeof event.secret, 'string');
+							assert.strictEqual(typeof event.params, 'object');
+							assert.ok(event.error instanceof Error);
+							assert.strictEqual(event.error.message, `${backendMethod} failure`);
 						});
 					});
 				});

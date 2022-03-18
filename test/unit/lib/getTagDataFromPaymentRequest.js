@@ -1,45 +1,19 @@
-const _ = require('underscore');
-const { expect } = require('chai');
+const assert = require('assert');
 const { createHash, getTagDataFromPaymentRequest, generatePaymentRequest } = require('../../../lib');
-const helpers = require('../../helpers');
 
 describe('getTagDataFromPaymentRequest(paymentRequest, tagName)', function() {
 
-	const tests = [
-		(function() {
-			const preimage = '12345';
-			return {
-				args: {
-					paymentRequest: generatePaymentRequest(1000, {}, {
-						preimage,
-					}),
-					tagName: 'payment_hash',
-				},
-				expected: function(result) {
-					expect(result).to.equal(createHash(preimage));
-				},
-			};
-		})(),
-		(function() {
-			const description = '12345';
-			return {
-				args: {
-					paymentRequest: generatePaymentRequest(1000, {
-						description,
-					}),
-					tagName: 'purpose_commit_hash',
-				},
-				expected: function(result) {
-					expect(result).to.equal(createHash(description));
-				},
-			};
-		})(),
-	];
+	it('payment_hash', function() {
+		const preimage = '12345';
+		const pr = generatePaymentRequest(1000, {}, { preimage });
+		const result = getTagDataFromPaymentRequest(pr, 'payment_hash');
+		assert.strictEqual(result, createHash(preimage));
+	});
 
-	_.each(tests, function(test) {
-		test.fn = getTagDataFromPaymentRequest;
-		it(helpers.prepareTestDescription(test), function() {
-			return helpers.runTest(test);
-		});
+	it('purpose_commit_hash', function() {
+		const description = '12345';
+		const pr = generatePaymentRequest(1000, { description });
+		const result = getTagDataFromPaymentRequest(pr, 'purpose_commit_hash');
+		assert.strictEqual(result, createHash(description));
 	});
 });

@@ -1,95 +1,53 @@
-const _ = require('underscore');
+const assert = require('assert');
 const bolt11 = require('bolt11');
-const { expect } = require('chai');
 const { createHash, generatePaymentRequest } = require('../../../lib');
 const helpers = require('../../helpers');
 const secp256k1 = require('secp256k1');
 
 describe('generatePaymentRequest(amount[, extra[, options]])', function() {
 
-	const tests = [
-		{
-			args: {
-				amount: 1,
-				extra: {},
-				options: {},
-			},
-			expected: function(result) {
-				expect(result).to.be.a('string');
-				expect(result.substr(0, 'lnbc'.length)).to.equal('lnbc');
-				const decoded = bolt11.decode(result);
-				expect(decoded.millisatoshis).to.equal('1');
-			},
-		},
-		{
-			args: {
-				amount: 7000,
-				extra: {},
-				options: {
-					network: 'testnet',
-				},
-			},
-			expected: function(result) {
-				expect(result.substr(0, 'lntb'.length)).to.equal('lntb');
-				const decoded = bolt11.decode(result);
-				expect(decoded.millisatoshis).to.equal('7000');
-			},
-		},
-		{
-			args: {
-				amount: 7000,
-				extra: {},
-				options: {
-					network: 'testnet',
-				},
-			},
-			expected: function(result) {
-				expect(result.substr(0, 'lntb'.length)).to.equal('lntb');
-				const decoded = bolt11.decode(result);
-				expect(decoded.millisatoshis).to.equal('7000');
-			},
-		},
-		(function() {
-			const preimage = 'ed2088cfa529cf0539b486882caa08269203ac86';
-			return {
-				args: {
-					amount: 20000,
-					extra: {},
-					options: {
-						preimage,
-					},
-				},
-				expected: function(result) {
-					const decoded = bolt11.decode(result);
-					const paymentHash = _.chain(decoded.tags)
-						.findWhere({ tagName: 'payment_hash' })
-						.pick('data').values().first().value();
-					expect(paymentHash).to.equal(createHash(preimage));
-				},
-			};
-		})(),
-		(function() {
-			const nodePrivateKey = '4619651a34a875979ce5498968be9e0c048b36db4ab003eeddead0453d3fe214';
-			return {
-				args: {
-					amount: 42000,
-					extra: {},
-					options: { nodePrivateKey },
-				},
-				expected: function(result) {
-					const decoded = bolt11.decode(result);
-					const nodePublicKey = Buffer.from(secp256k1.publicKeyCreate(Buffer.from(nodePrivateKey, 'hex'))).toString('hex');
-					expect(decoded.payeeNodeKey).to.equal(nodePublicKey);
-				},
-			};
-		})(),
-	];
+	it('creates a valid bolt11 invoice', function() {
+		const amount = 1;
+		const result = generatePaymentRequest(amount);
+		assert.strictEqual(typeof result, 'string');
+		assert.strictEqual(result.substr(0, 'lnbc'.length), 'lnbc');
+		const decoded = bolt11.decode(result);
+		assert.strictEqual(decoded.millisatoshis, '1');
+	});
 
-	_.each(tests, function(test) {
-		test.fn = generatePaymentRequest;
-		it(helpers.prepareTestDescription(test), function() {
-			return helpers.runTest(test);
-		});
+	it('testnet network', function() {
+		const amount = 7000;
+		const result = generatePaymentRequest(amount, {}, { network: 'testnet' });
+		assert.strictEqual(typeof result, 'string');
+		assert.strictEqual(result.substr(0, 'lntb'.length), 'lntb');
+		const decoded = bolt11.decode(result);
+		assert.strictEqual(decoded.millisatoshis, '7000');
+	});
+
+	it('custom preimage', function() {
+		const amount = 20000;
+		const preimage = 'ed2088cfa529cf0539b486882caa08269203ac86';
+		const result = generatePaymentRequest(amount, {}, { preimage });
+		assert.strictEqual(typeof result, 'string');
+		assert.strictEqual(result.substr(0, 'lnbc'.length), 'lnbc');
+		const decoded = bolt11.decode(result);
+		assert.strictEqual(decoded.millisatoshis, '20000');
+		const paymentHash = decoded.tags.find(tag => {
+			return tag.tagName === 'payment_hash';
+		}).data;
+		assert.strictEqual(paymentHash, createHash(preimage));
+	});
+
+	it('custom node private key', function() {
+		const amount = 42000;
+		const nodePrivateKey = '4619651a34a875979ce5498968be9e0c048b36db4ab003eeddead0453d3fe214';
+		const result = generatePaymentRequest(amount, {}, { nodePrivateKey });
+		assert.strictEqual(typeof result, 'string');
+		assert.strictEqual(result.substr(0, 'lnbc'.length), 'lnbc');
+		const decoded = bolt11.decode(result);
+		assert.strictEqual(decoded.millisatoshis, '42000');
+		const nodePublicKey = Buffer.from(secp256k1.publicKeyCreate(Buffer.from(nodePrivateKey, 'hex'))).toString('hex');
+		assert.strictEqual(decoded.payeeNodeKey, nodePublicKey);
 	});
 });
 

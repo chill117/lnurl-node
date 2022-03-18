@@ -1,25 +1,11 @@
-const _ = require('underscore');
-const { expect } = require('chai');
-const helpers = require('../../helpers');
+const assert = require('assert');
 
 describe('CLI: lnurl --help', function() {
 
-	let tests = [
-		{
-			cmd: ['--help'],
-			expected: {
-				stdout: function(result) {
-					const parts = result.split('\n');
-					expect(parts).to.include('Usage: cli [options] [command]');
-					expect(parts).to.include('Node.js implementation of lnurl');
-				},
-			},
-		},
-	];
-
-	_.each(tests, function(test) {
-		it(helpers.prepareTestDescription(test), function() {
-			return helpers.runTest(test);
+	it('prints help menu', function() {
+		return this.helpers.cli('--help').then(result => {
+			assert.ok(result.indexOf('Usage: cli [options] [command]') !== -1);
+			assert.ok(result.indexOf('Node.js implementation of lnurl') !== -1);
 		});
 	});
 });
