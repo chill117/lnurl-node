@@ -35,20 +35,20 @@
   },
   "homepage": "https://github.com/chill117/lnurl-node",
   "dependencies": {
-    "async": "3.2.2",
+    "async": "3.2.3",
     "bech32": "2.0.0",
-    "bignumber.js": "9.0.1",
+    "bignumber.js": "9.0.2",
     "bolt11": "https://github.com/chill117/bolt11/archive/v1.3.4-elliptic.tar.gz",
-    "commander": "8.3.0",
-    "debug": "4.3.2",
-    "express": "4.17.1",
+    "commander": "9.1.0",
+    "debug": "4.3.4",
+    "express": "4.17.3",
     "lnurl-offline": "1.0.2",
     "secp256k1": "https://github.com/chill117/secp256k1-node/archive/v4.0.3-elliptic.tar.gz",
     "socks-proxy-agent": "6.1.0"
   },
   "devDependencies": {
-    "dotenv": "10.0.0",
-    "mocha": "9.2.0"
+    "dotenv": "16.0.0",
+    "mocha": "9.2.2"
   },
   "readmeFilename": "README.md"
 }
