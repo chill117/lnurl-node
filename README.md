@@ -1,6 +1,6 @@
 # lnurl-node
 
-![Build Status](https://github.com/chill117/lnurl-node/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/chill117/lnurl-node/actions/workflows/tests.yml/badge.svg)
 
 Node.js implementation of [lnurl](https://github.com/fiatjaf/lnurl-rfc). The purpose of this project is to provide an easy and flexible lnurl server that you can run as a stand-alone process (via CLI) or integrated with your own custom node.js application (via API).
 
