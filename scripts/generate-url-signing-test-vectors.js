@@ -1,6 +1,5 @@
 const crypto = require('crypto');
-const { createSignature, createSignedUrl, prepareQueryPayloadString } = require('lnurl-offline');
-const { generateApiKey } = require('../lib');
+const { createSignature, createSignedUrl, generateApiKey, prepareQueryPayloadString } = require('lnurl-offline');
 
 const prepareSignedQueryString = function(apiKey, tag, params) {
 	const query = Object.assign({}, {

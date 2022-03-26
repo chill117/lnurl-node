@@ -42,7 +42,7 @@
     "debug": "4.3.4",
     "express": "4.17.3",
     "lightning-backends": "1.0.2",
-    "lnurl-offline": "1.0.2",
+    "lnurl-offline": "1.1.0",
     "secp256k1": "4.0.3",
     "socks-proxy-agent": "6.1.0"
   },

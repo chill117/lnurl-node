@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { generateApiKey } = require('../../../../lib');
+const { generateApiKey } = require('../../../../');
 const path = require('path');
 
 describe('Server: events', function() {
