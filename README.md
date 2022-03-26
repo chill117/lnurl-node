@@ -949,9 +949,7 @@ Then to use your new custom backend:
 {
 	// ...
 	lightning: {
-		backend: {
-			path: '/full/path/to/backends/custom.js',
-		},
+		backend: './backends/custom.js',
 		config: {
 			// Options to pass to your custom backend.
 		},

@@ -2,14 +2,8 @@ const assert = require('assert');
 const crypto = require('crypto');
 const { generateApiKey } = require('../../../../');
 const { createSignedUrl, prepareSignedQuery } = require('lnurl-offline');
-const {
-	createAuthorizationSignature,
-	createHash,
-	generatePaymentRequest,
-	generateRandomLinkingKey,
-	getTagDataFromPaymentRequest,
-	promiseAllSeries
-} = require('../../../../lib');
+const { createAuthorizationSignature, createHash, generateRandomLinkingKey, promiseAllSeries } = require('../../../../lib');
+const { generatePaymentRequest, getTagDataFromPaymentRequest } = require('lightning-backends');
 
 const tagToLightningBackendMethod = {
 	'channelRequest': 'openChannel',

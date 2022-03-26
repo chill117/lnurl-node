@@ -1,4 +1,5 @@
 const { createSignedUrl } = require('lnurl-offline');
+const { LightningBackend } = require('lightning-backends');
 const Server = require('./lib/Server');
 
 let lnurl = {
@@ -16,7 +17,6 @@ const {
 	decode,
 	generateApiKey,
 	generateRandomLinkingKey,
-	LightningBackend,
 	verifyAuthorizationSignature
 } = require('./lib');
 
