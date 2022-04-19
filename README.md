@@ -632,7 +632,7 @@ server.on('withdrawRequest:action:failed', function(event) {
 
 ## Supported Lightning Network Backends
 
-See [lightning-backends]() for a list of supported Lightning Network backends and their corresponding configuration options.
+See [lightning-backends](https://github.com/bleskomat/lightning-backends-node) for a list of supported Lightning Network backends and their corresponding configuration options.
 
 
 ## Configuring Data Store
