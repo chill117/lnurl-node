@@ -1,5 +1,13 @@
 # Changelog
 
+* v0.22.0:
+  * Deprecated and will be removed from future v1.0.0 release:
+    * SQLite and MySQL as data store backend
+    * Built-in support for signed LNURLs
+  * Refactoring:
+    * Abstract parts of this module to lnurl-offline and lightning-backends modules
+    * Use promises instead of async.js where possible
+    * Removed underscore dependency
 * v0.21.0:
   * LUD-09 successAction url, message support
 * v0.20.2:
