@@ -416,6 +416,8 @@ _none_
 
 It is possible to further customize your lnurl server by using hooks to run custom application code at key points in the server application flow.
 
+* [status](#hook-status)
+* [url:process](#hook-urlprocess)
 * [login](#hook-login)
 * [channelRequest:validate](#hook-channelrequestvalidate)
 * [channelRequest:info](#hook-channelrequestinfo)
@@ -441,6 +443,47 @@ server.bindToHook('HOOK', function(arg1, arg2, arg3, next) {
 	next(new HttpError('Custom error sent in the response object', 400/* status code */));
 	// Or call next without any arguments to continue with the request:
 	next();
+});
+```
+
+
+### Hook: status
+
+This hook is called when a request is received at the web server's `/status` end-point.
+
+Example OK status response:
+```js
+server.bindToHook('status', function(req, res, next) {
+	// Call next() with no arguments to continue with the normal status flow.
+	next();
+});
+```
+
+Example failed status response:
+```js
+server.bindToHook('status', function(req, res, next) {
+	// Or, call next with an error to fail the request:
+	next(new HttpError('Service temporarily unavailable', 503));
+});
+```
+
+
+### Hook: url:process
+
+This hook is called when a request is received at the web server's LNURL end-point.
+
+Example modifying the request object:
+```js
+server.bindToHook('url:process', function(req, res, next) {
+	req.query.defaultDescription = 'custom default description';
+	next();// Call next() with no arguments to continue the request.
+});
+```
+Example rejecting the request:
+```js
+server.bindToHook('url:process', function(req, res, next) {
+	// Call next() with an error to fail the request:
+	next(new HttpError('Failed check', 400));
 });
 ```
 

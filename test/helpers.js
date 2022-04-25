@@ -38,41 +38,39 @@ module.exports = {
 		return createServer(options);
 	},
 	request: function(method, requestOptions) {
-		return Promise.resolve().then(() => {
-			const parsedUrl = url.parse(requestOptions.url);
-			let options = {
-				method: method.toUpperCase(),
-				hostname: parsedUrl.hostname,
-				port: parsedUrl.port,
-				path: parsedUrl.path,
-				headers: requestOptions.headers || {},
-			};
-			if (requestOptions.qs) {
-				options.path += '?' + querystring.stringify(requestOptions.qs);
-			}
-			let postData;
-			if (requestOptions.form) {
-				options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-				postData = querystring.stringify(requestOptions.form);
-			} else if (requestOptions.body && requestOptions.json) {
-				options.headers['Content-Type'] = 'application/json';
-				postData = querystring.stringify(requestOptions.body);
-			}
-			if (postData) {
-				options.headers['Content-Length'] = Buffer.byteLength(postData);
-			}
-			const request = parsedUrl.protocol === 'https:' ? https.request : http.request;
-			return new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
+			try {
+				const parsedUrl = url.parse(requestOptions.url);
+				let options = {
+					method: method.toUpperCase(),
+					hostname: parsedUrl.hostname,
+					port: parsedUrl.port,
+					path: parsedUrl.path,
+					headers: requestOptions.headers || {},
+				};
+				if (requestOptions.qs) {
+					options.path += '?' + querystring.stringify(requestOptions.qs);
+				}
+				let postData;
+				if (requestOptions.form) {
+					options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+					postData = querystring.stringify(requestOptions.form);
+				} else if (requestOptions.body && requestOptions.json) {
+					options.headers['Content-Type'] = 'application/json';
+					postData = querystring.stringify(requestOptions.body);
+				}
+				if (postData) {
+					options.headers['Content-Length'] = Buffer.byteLength(postData);
+				}
+				const request = parsedUrl.protocol === 'https:' ? https.request : http.request;
 				const req = request(options, function(response) {
 					let body = '';
 					response.on('data', function(buffer) {
 						body += buffer.toString();
 					});
 					response.on('end', function() {
-						if (requestOptions.json) {
-							try {
-								body = JSON.parse(body);
-							} catch (error) {
+						if (response.headers['content-type'].substr(0, 'application/json'.length) === 'application/json') {
+							try { body = JSON.parse(body); } catch (error) {
 								return reject(error);
 							}
 						}
@@ -84,7 +82,9 @@ module.exports = {
 				}
 				req.once('error', reject);
 				req.end();
-			});
+			} catch (error) {
+				return reject(error);
+			}
 		});
 	},
 	cli: function(cmd, options) {

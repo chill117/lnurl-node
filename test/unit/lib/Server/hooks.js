@@ -1,9 +1,126 @@
 const assert = require('assert');
+const crypto = require('crypto');
 const { generateApiKey } = require('../../../../');
 const { HttpError } = require('../../../../lib');
 const { prepareSignedQuery } = require('lnurl-offline');
 
 describe('Server: hooks', function() {
+
+	describe('status', function() {
+
+		let server;
+		beforeEach(function() {
+			server = this.helpers.createServer({
+				lightning: null,
+			});
+			return server.onReady();
+		});
+
+		afterEach(function() {
+			if (server) return server.close();
+		});
+
+		it('ok', function() {
+			server.bindToHook('status', function(req, res, next) {
+				next();
+			});
+			return this.helpers.request('get', {
+				url: server.getUrl('/status'),
+			}).then(result => {
+				const { body, response } = result;
+				assert.strictEqual(response.statusCode, 200);
+				assert.deepStrictEqual(body, { status: 'OK' });
+			});
+		});
+
+		it('error', function() {
+			server.bindToHook('status', function(req, res, next) {
+				next(new HttpError('Thrown inside status hook', 400));
+			});
+			return this.helpers.request('get', {
+				url: server.getUrl('/status'),
+			}).then(result => {
+				const { body, response } = result;
+				assert.strictEqual(response.statusCode, 400);
+				assert.deepStrictEqual(body, {
+					status: 'ERROR',
+					reason: 'Thrown inside status hook',
+				});
+			});
+		});
+	});
+
+	describe('url:process', function() {
+
+		let server;
+		beforeEach(function() {
+			server = this.helpers.createServer({
+				lightning: null,
+			});
+			return server.onReady();
+		});
+
+		afterEach(function() {
+			if (server) return server.close();
+		});
+
+		it('modify request object', function() {
+			server.bindToHook('url:process', function(req, res, next) {
+				try {
+					assert.strictEqual(req.query.amount, '1.25');
+					assert.strictEqual(req.query.fiatCurrency, 'EUR');
+					setTimeout(function() {
+						req.query.minWithdrawable = 10000;
+						req.query.maxWithdrawable = 10000;
+						req.query.defaultDescription = 'modified';
+						next();
+					}, 10);
+				} catch (error) {
+					return next(error);
+				}
+			});
+			server.bindToHook('url:process', function(req, res, next) {
+				try {
+					assert.strictEqual(req.query.minWithdrawable, 10000);
+					assert.strictEqual(req.query.maxWithdrawable, 10000);
+					assert.strictEqual(req.query.defaultDescription, 'modified');
+					next();
+				} catch (error) {
+					return next(error);
+				}
+			});
+			return this.helpers.request('get', {
+				url: server.getCallbackUrl(),
+				qs: {
+					q: crypto.randomBytes(32).toString('hex'),
+					amount: '1.25',
+					fiatCurrency: 'EUR',
+				},
+			}).then(result => {
+				const { body } = result;
+				assert.deepStrictEqual(body, {
+					status: 'ERROR',
+					reason: 'Invalid secret',
+				});
+			});
+		});
+
+		it('error', function() {
+			server.bindToHook('url:process', function(req, res, next) {
+				next(new HttpError('Thrown inside url:process hook', 400));
+			});
+			return this.helpers.request('get', {
+				url: server.getCallbackUrl(),
+			}).then(result => {
+				const { body, response } = result;
+				assert.strictEqual(response.statusCode, 400);
+				assert.deepStrictEqual(body, {
+					status: 'ERROR',
+					reason: 'Thrown inside url:process hook',
+				});
+			});
+		});
+	});
 
 	describe('subprotocols', function() {
 
@@ -238,7 +355,6 @@ describe('Server: hooks', function() {
 				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
 					qs: query,
-					json: true,
 				}).then(result => {
 					const { response, body } = result;
 					assert.deepStrictEqual(body, {
@@ -282,7 +398,6 @@ describe('Server: hooks', function() {
 				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
 					qs: query,
-					json: true,
 				}).then(result => {
 					const { response, body } = result;
 					assert.strictEqual(response.statusCode, 400);

@@ -36,7 +36,6 @@ describe('Server: options', function() {
 			}).then(generatedUrl => {
 				return this.helpers.request('get', {
 					url: generatedUrl.url,
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.strictEqual(typeof body, 'object');
@@ -87,7 +86,6 @@ describe('Server: options', function() {
 					return this.helpers.request('get', {
 						url: server.getCallbackUrl(),
 						qs: query,
-						json: true,
 					}).then(result => {
 						const { body } = result;
 						assert.notStrictEqual(body.status, 'ERROR');

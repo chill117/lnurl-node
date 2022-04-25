@@ -69,7 +69,7 @@ describe('CLI: server [options]', function() {
 					}).then(result => {
 						const { body, response } = result;
 						assert.strictEqual(response.statusCode, 200);
-						assert.strictEqual(body, '{"status":"OK"}');
+						assert.deepStrictEqual(body, { status: 'OK' });
 						isUp = true;
 					}).catch(error => {
 						if (n < maxAttempts) {
@@ -127,7 +127,6 @@ describe('CLI: server [options]', function() {
 				return this.helpers.request('get', {
 					url: callbackUrl,
 					qs: query,
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.strictEqual(typeof body, 'object');

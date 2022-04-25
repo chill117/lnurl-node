@@ -43,7 +43,6 @@ describe('Server: HTTP API', function() {
 			return this.helpers.request('get', {
 				url: server.getUrl('/status'),
 				qs: {},
-				json: true,
 			}).then(result => {
 				const { response, body } = result;
 				assert.strictEqual(response.statusCode, 200);
@@ -73,7 +72,6 @@ describe('Server: HTTP API', function() {
 		it('missing secret', function() {
 			return this.helpers.request('get', {
 				url: server.getCallbackUrl(),
-				json: true,
 			}).then(result => {
 				const { body } = result;
 				assert.deepStrictEqual(body, {
@@ -93,7 +91,6 @@ describe('Server: HTTP API', function() {
 				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
 					qs: query,
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.deepStrictEqual(body, {
@@ -113,7 +110,6 @@ describe('Server: HTTP API', function() {
 				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
 					qs: query,
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.deepStrictEqual(body, {
@@ -134,7 +130,6 @@ describe('Server: HTTP API', function() {
 					return this.helpers.request('get', {
 						url: server.getCallbackUrl(),
 						qs: query,
-						json: true,
 					}).then(result => {
 						const { body } = result;
 						assert.deepStrictEqual(body, {
@@ -159,7 +154,6 @@ describe('Server: HTTP API', function() {
 				return this.helpers.request('get', {
 					url: server.getCallbackUrl(),
 					qs: outOfOrderQuery,
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.strictEqual(typeof body, 'object');
@@ -177,7 +171,6 @@ describe('Server: HTTP API', function() {
 				});
 				return this.helpers.request('get', {
 					url: signedUrl,
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.strictEqual(typeof body, 'object');
@@ -195,7 +188,6 @@ describe('Server: HTTP API', function() {
 					return this.helpers.request('get', {
 						url: server.getCallbackUrl(),
 						qs: query,
-						json: true,
 					}).then(result => {
 						const { body } = result;
 						assert.deepStrictEqual(body, {
@@ -538,7 +530,6 @@ describe('Server: HTTP API', function() {
 								return this.helpers.request('get', {
 									url: server.getCallbackUrl(),
 									qs: query,
-									json: true,
 								}).then(result => {
 									const { response, body } = result;
 									if (typeof test.expected === 'function') {
@@ -581,7 +572,6 @@ describe('Server: HTTP API', function() {
 					qs: {
 						q: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
-					json: true,
 				}).then(result => {
 					const { body } = result;
 					assert.deepStrictEqual(body, {
@@ -658,7 +648,6 @@ describe('Server: HTTP API', function() {
 								qs: {
 									q: this.secret,
 								},
-								json: true,
 							}).then(result => {
 								const { response, body } = result;
 								if (typeof test.expected === 'function') {
@@ -681,7 +670,6 @@ describe('Server: HTTP API', function() {
 					qs: {
 						k1: '469bf65fd2b3575a1604d62fc7a6a94f',
 					},
-					json: true,
 				}).then(result => {
 					const { response, body } = result;
 					assert.deepStrictEqual(body, {
@@ -899,7 +887,6 @@ describe('Server: HTTP API', function() {
 							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
 								qs: params,
-								json: true,
 							}).then(result => {
 								const { response, body } = result;
 								if (typeof test.expected === 'function') {
@@ -938,7 +925,6 @@ describe('Server: HTTP API', function() {
 							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
 								qs: actionParams,
-								json: true,
 							})
 						}).then(result => {
 							const { response, body } = result;
@@ -985,7 +971,6 @@ describe('Server: HTTP API', function() {
 						return this.helpers.request('get', {
 							url: server.getCallbackUrl(),
 							qs: query,
-							json: true,
 						}).then(result => {
 							const hash = createHash(secret);
 							return server.fetchUrl(hash).then(fetchedUrl => {
@@ -1019,14 +1004,12 @@ describe('Server: HTTP API', function() {
 					it('can be used only once', function() {
 						return this.helpers.request('get', {
 							url: signedUrl,
-							json: true,
 						}).then(infoResult => {
 							assert.strictEqual(typeof infoResult.body, 'object');
 							assert.ok(!infoResult.body.status);
 							assert.ok(infoResult.body.k1);
 							return this.helpers.request('get', {
 								url: signedUrl,
-								json: true,
 							});
 						}).then(infoResult2 => {
 							assert.strictEqual(typeof infoResult2.body, 'object');
@@ -1044,7 +1027,6 @@ describe('Server: HTTP API', function() {
 									return this.helpers.request('get', {
 										url: callback,
 										qs: query,
-										json: true,
 									}).then(actionResult => {
 										if (n <= success) {
 											// Expecting success.
@@ -1087,7 +1069,6 @@ describe('Server: HTTP API', function() {
 							return this.helpers.request('get', {
 								url: server.getCallbackUrl(),
 								qs: query,
-								json: true,
 							});
 						})).then(results => {
 							const successes = results.filter(result => result.body.status === 'OK').length;
@@ -1158,7 +1139,6 @@ describe('Server: HTTP API', function() {
 									return this.helpers.request('get', {
 										url: server.getCallbackUrl(),
 										qs: query,
-										json: true,
 									}).then(result => {
 										const { body } = result;
 										if (n <= test.expected.success) {
