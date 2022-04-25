@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.23.0:
+  * Added "status" and "url:process" hooks
 * v0.22.0:
   * Deprecated and will be removed from future v1.0.0 release:
     * SQLite and MySQL as data store backend
