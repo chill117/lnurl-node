@@ -64,6 +64,29 @@ describe('Server: hooks', function() {
 			if (server) return server.close();
 		});
 
+		it('called before signature check', function() {
+			server.bindToHook('url:process', function(req, res, next) {
+				delete req.query.id;
+				delete req.query.signature;
+				next();
+			});
+			return this.helpers.request('get', {
+				url: server.getCallbackUrl(),
+				qs: {
+					id: crypto.randomBytes(8).toString('hex'),
+					signature: crypto.randomBytes(32).toString('hex'),
+					nonce: crypto.randomBytes(10).toString('hex'),
+					tag: 'withdrawRequest',
+				},
+			}).then(result => {
+				const { body } = result;
+				assert.deepStrictEqual(body, {
+					status: 'ERROR',
+					reason: 'Missing secret',
+				});
+			});
+		});
+
 		it('modify request object', function() {
 			server.bindToHook('url:process', function(req, res, next) {
 				try {
