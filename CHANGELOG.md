@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.24.0:
+  * "url:process" hook called before signature check
+  * C-Lightning backend now supported via JSON-RPC unix sock or HTTP-RPC API provided by Sparko plugin
 * v0.23.0:
   * Added "status" and "url:process" hooks
 * v0.22.0:

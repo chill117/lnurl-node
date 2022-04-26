@@ -1,6 +1,6 @@
 {
   "name": "lnurl",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "Node.js implementation of lnurl",
   "main": "index.js",
   "scripts": {
