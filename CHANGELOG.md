@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.24.1:
+  * Upgraded lightning-backends
 * v0.24.0:
   * "url:process" hook called before signature check
   * C-Lightning backend now supported via JSON-RPC unix sock or HTTP-RPC API provided by Sparko plugin
