@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.24.2:
+  * Upgraded dependencies
 * v0.24.1:
   * Upgraded lightning-backends
 * v0.24.0:
