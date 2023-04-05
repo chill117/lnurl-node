@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # add self-signed lnd cert to system
-mkdir -p /usr/local/share/ca-certificates
+
 cp $LND_CERT_PATH /usr/local/share/ca-certificates/lnd.crt
 update-ca-certificates
 
