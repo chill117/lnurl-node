@@ -57,8 +57,8 @@ describe('CLI: server [options]', function() {
 	const serverIsUp = function(host) {
 		return Promise.resolve().then(() => {
 			assert.ok(host, 'Missing required argument: "host"');
-			const maxAttempts = 50;
-			const waitTimeBetweenAttempts = 10;
+			const maxAttempts = 100;
+			const waitTimeBetweenAttempts = 20;
 			let isUp = false;
 			return promiseAllSeries(Array.from(Array(maxAttempts)).map((value, index) => {
 				const n = index + 1;
