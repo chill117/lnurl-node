@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.25.0:
+  * Server.generateNewUrl method now accepts a pre-defined "k1" value. If not provided, then the "k1" value is randomly generated - the previous behavior.
+  * Upgraded dependencies
 * v0.24.2:
   * Upgraded dependencies
 * v0.24.1:
