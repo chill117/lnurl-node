@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.25.1:
+  * Use latest lightning-backends with downgraded dependencies - this fixes incompatibility with older nodejs
 * v0.25.0:
   * Server.generateNewUrl method now accepts a pre-defined "k1" value. If not provided, then the "k1" value is randomly generated - the previous behavior.
   * Upgraded dependencies
