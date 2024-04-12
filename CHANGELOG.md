@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.25.2:
+  * Use latest lightning-backends with fixed LNBits backend
 * v0.25.1:
   * Use latest lightning-backends with downgraded dependencies - this fixes incompatibility with older nodejs
 * v0.25.0:
