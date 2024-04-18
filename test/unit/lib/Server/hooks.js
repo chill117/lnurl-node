@@ -6,10 +6,10 @@ const { prepareSignedQuery } = require('lnurl-offline');
 
 describe('Server: hooks', function() {
 
-	describe('status', function() {
+	describe('error', function() {
 
 		let server;
-		beforeEach(function() {
+		before(function() {
 			server = this.helpers.createServer({
 				lightning: null,
 			});
@@ -17,6 +17,98 @@ describe('Server: hooks', function() {
 		});
 
 		afterEach(function() {
+			server.clearCallbacksBoundToHook('error');
+		});
+
+		after(function() {
+			if (server) return server.close();
+		});
+
+		it('no error', function() {
+			let called = false;
+			server.bindToHook('error', function(error, req, res, next) {
+				called = true;
+				next();
+			});
+			return this.helpers.request('get', {
+				url: server.getUrl('/status'),
+			}).then(result => {
+				const { body, response } = result;
+				assert.ok(!called);
+				assert.strictEqual(response.statusCode, 200);
+				assert.deepStrictEqual(body, { status: 'OK' });
+			});
+		});
+
+		it('pass-thru existing error', function() {
+			let called = false;
+			server.bindToHook('error', function(error, req, res, next) {
+				called = true;
+				next();
+			});
+			return this.helpers.request('get', {
+				url: server.getUrl('/does-not-exist'),
+			}).then(result => {
+				const { body, response } = result;
+				assert.ok(called);
+				assert.strictEqual(response.statusCode, 404);
+				assert.deepStrictEqual(body, {
+					status: 'ERROR',
+					reason: 'Not found',
+				});
+			});
+		});
+
+		it('throw new error', function() {
+			server.bindToHook('error', function(error, req, res, next) {
+				next(new HttpError('Thrown inside error hook', 400));
+			});
+			return this.helpers.request('get', {
+				url: server.getUrl('/does-not-exist'),
+			}).then(result => {
+				const { body, response } = result;
+				assert.strictEqual(response.statusCode, 400);
+				assert.deepStrictEqual(body, {
+					status: 'ERROR',
+					reason: 'Thrown inside error hook',
+				});
+			});
+		});
+
+		it('custom response', function() {
+			const customResponse = {
+				statusCode: 201,
+				data: { message: 'custom response from error hook' },
+			};
+			server.bindToHook('error', function(error, req, res, next) {
+				const { statusCode, data } = customResponse;
+				res.status(statusCode).json(data);
+			});
+			return this.helpers.request('get', {
+				url: server.getUrl('/does-not-exist'),
+			}).then(result => {
+				const { body, response } = result;
+				assert.strictEqual(response.statusCode, customResponse.statusCode);
+				assert.deepStrictEqual(body, customResponse.data);
+			});
+		});
+	});
+
+	describe('status', function() {
+
+		let server;
+		before(function() {
+			server = this.helpers.createServer({
+				lightning: null,
+			});
+			return server.onReady();
+		});
+
+		afterEach(function() {
+			server.clearCallbacksBoundToHook('status');
+		});
+
+		after(function() {
 			if (server) return server.close();
 		});
 
@@ -53,7 +145,7 @@ describe('Server: hooks', function() {
 	describe('url:process', function() {
 
 		let server;
-		beforeEach(function() {
+		before(function() {
 			server = this.helpers.createServer({
 				lightning: null,
 			});
@@ -61,6 +153,10 @@ describe('Server: hooks', function() {
 		});
 
 		afterEach(function() {
+			server.clearCallbacksBoundToHook('url:process');
+		});
+
+		after(function() {
 			if (server) return server.close();
 		});
 

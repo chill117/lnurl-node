@@ -25,6 +25,9 @@ This project attempts to maintain backwards compatibility for any features, meth
   * [generateNewUrl](#generatenewurl)
 * [Tags and Parameters](#tags-and-parameters)
 * [Hooks](#hooks)
+	* [error](#hook-error)
+	* [status](#hook-status)
+	* [url:process](#hook-urlprocess)
 	* [login](#hook-login)
 	* [channelRequest:validate](#hook-channelrequestvalidate)
 	* [channelRequest:info](#hook-channelrequestinfo)
@@ -416,6 +419,7 @@ _none_
 
 It is possible to further customize your lnurl server by using hooks to run custom application code at key points in the server application flow.
 
+* [error](#hook-error)
 * [status](#hook-status)
 * [url:process](#hook-urlprocess)
 * [login](#hook-login)
@@ -443,6 +447,34 @@ server.bindToHook('HOOK', function(arg1, arg2, arg3, next) {
 	next(new HttpError('Custom error sent in the response object', 400/* status code */));
 	// Or call next without any arguments to continue with the request:
 	next();
+});
+```
+
+
+### Hook: error
+
+This hook is called when any request fails with an error.
+
+Override the existing error with a new error:
+```js
+server.bindToHook('error', function(error, req, res, next) {
+	// Call next with a new error which will be passed to the default error handler:
+	next(new HttpError('A new error message', 400));
+});
+```
+Continue with the existing error:
+```js
+server.bindToHook('error', function(error, req, res, next) {
+	// Call next with no arguments to let the error pass-thru to the default error handler:
+	next();
+});
+```
+Make a custom response:
+```js
+server.bindToHook('error', function(error, req, res, next) {
+	// Use the response object to make a custom response:
+	res.status(200).json({ message: 'custom error handling' });
+	// Do not call next in this case.
 });
 ```
 
