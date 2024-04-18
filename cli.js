@@ -30,6 +30,7 @@ program
 		}
 		const encoded = lnurl.encode(unencoded);
 		process.stdout.write(encoded);
+		process.exit();
 	});
 
 program
@@ -41,6 +42,7 @@ program
 		}
 		const decoded = lnurl.decode(encoded);
 		process.stdout.write(decoded);
+		process.exit();
 	});
 
 program
@@ -71,6 +73,7 @@ program
 		const { encoding, numBytes } = options;
 		options = { encoding, numBytes };
 		process.stdout.write(JSON.stringify(generateApiKey(options), null, 2));
+		process.exit();
 	});
 
 program
@@ -265,7 +268,13 @@ program
 		}
 		delete options.configFile;
 		prepareGroupOptions(options, ['auth', 'lightning', 'store']);
-		createServer(options);
+		const server = createServer(options);
+		server.on('closed', () => {
+			process.exit();
+		});
+		['exit', 'SIGINT', 'SIGUSR1', 'SIGUSR2', 'SIGTERM'].forEach(event => {
+			process.on(event, () => server.close());
+		});
 	});
 
 const prepareGroupOptions = function(options, groups) {

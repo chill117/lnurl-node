@@ -53,7 +53,7 @@ describe('close([options])', function() {
 
 			afterEach(function() {
 				Object.entries(server.sockets).forEach(([id, socket], index) => {
-					socket.destroy();
+					socket && socket.destroy();
 					server.sockets[id] = null;
 				});
 			});

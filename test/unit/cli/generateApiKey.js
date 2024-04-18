@@ -4,6 +4,8 @@ const { isHex } = require('lnurl-offline');
 
 describe('CLI: generateApiKey [options]', function() {
 
+	this.timeout(5000);
+
 	it('prints new API key', function() {
 		return this.helpers.cli('generateApiKey').then(result => {
 			assert.notStrictEqual(result, '');

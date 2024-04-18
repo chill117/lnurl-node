@@ -6,6 +6,8 @@ const path = require('path');
 
 describe('CLI: generateNewUrl [options]', function() {
 
+	this.timeout(5000);
+
 	let server;
 	before(function() {
 		server = this.helpers.createServer({

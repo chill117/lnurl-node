@@ -8,6 +8,8 @@ const { spawn } = require('child_process');
 
 describe('CLI: server [options]', function() {
 
+	this.timeout(5000);
+
 	let cliFilePath;
 	before(function() {
 		cliFilePath = this.helpers.cliFilePath;
