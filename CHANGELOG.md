@@ -1,5 +1,8 @@
 # Changelog
 
+* v0.26.0:
+  * New error hook
+  * Upgrade dependencies
 * v0.25.2:
   * Use latest lightning-backends with fixed LNBits backend
 * v0.25.1:
