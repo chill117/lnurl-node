@@ -34,10 +34,10 @@
     "bech32": "2.0.0",
     "bignumber.js": "9.1.2",
     "bolt11": "1.4.1",
-    "commander": "12.0.0",
-    "debug": "4.3.4",
+    "commander": "12.1.0",
+    "debug": "4.3.5",
     "express": "4.19.2",
-    "lightning-backends": "1.6.3",
+    "lightning-backends": "1.6.4",
     "lnurl-offline": "1.2.0",
     "secp256k1": "5.0.0"
   },
