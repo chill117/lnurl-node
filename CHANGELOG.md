@@ -1,5 +1,7 @@
 # Changelog
 
+* v0.26.2:
+  * Latest lightning-backends fixed GetAlby (again)
 * v0.26.1:
   * Latest lightning-backends fixed GetAlby bug w/ latest LndHub credentials
   * Upgrade dependencies
