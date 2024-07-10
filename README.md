@@ -290,6 +290,8 @@ Below is the full list of options that can be passed to the `createServer` metho
 	port: 3000,
 	// Whether or not to start listening when the server is created:
 	listen: true,
+	// Whether or not to allow CORS requests:
+	cors: false,
 	// The URL where the server is externally reachable (e.g "https://your-lnurl-server.com"):
 	url: null,
 	// The URI path of the web API end-point:
