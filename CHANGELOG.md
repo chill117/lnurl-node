@@ -1,7 +1,8 @@
 # Changelog
 
-* TBD:
+* v0.27.0:
   * New "cors" option that when enabled the server will allow CORS requests - disabled by default.
+  * Upgrade dependencies
 * v0.26.2:
   * Latest lightning-backends fixed GetAlby (again)
 * v0.26.1:
